@@ -1,0 +1,489 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+
+.doc { padding: 32px 0 48px; max-width: 720px; }
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 10px;
+}
+.doc-title {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+  margin-bottom: 6px;
+}
+.doc-sub {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+.divider {
+  border: none;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  margin: 28px 0;
+}
+
+/* Section headings */
+.sh {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 14px;
+}
+
+/* Copy block — the actual prompt text */
+.prompt-block {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 20px 22px;
+  position: relative;
+  margin-bottom: 28px;
+}
+.prompt-block p, .prompt-block li {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-text-primary);
+}
+.prompt-block ul { padding-left: 18px; margin: 8px 0; }
+.prompt-block li { margin-bottom: 4px; }
+.prompt-block strong { font-weight: 500; }
+.prompt-block .section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 10px;
+}
+.copy-btn {
+  position: absolute;
+  top: 14px; right: 14px;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.copy-btn:hover { background: var(--color-background-secondary); }
+.copy-btn.copied { color: var(--color-text-success); border-color: var(--color-border-success); }
+
+/* Role cards */
+.roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+.role-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 16px;
+  background: var(--color-background-primary);
+}
+.role-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.role-icon.org { background: var(--color-background-info); }
+.role-icon.sup { background: var(--color-background-warning); }
+.role-icon.vol { background: var(--color-background-success); }
+.role-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+.role-desc { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+
+/* Screen chips */
+.screen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 28px; }
+.screen-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+}
+.screen-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.screen-dot.org { background: var(--color-text-info); }
+.screen-dot.sup { background: var(--color-text-warning); }
+.screen-dot.vol { background: var(--color-text-success); }
+.screen-dot.pub { background: var(--color-text-secondary); }
+.screen-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.screen-note { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+
+/* Token system row */
+.token-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
+.token-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  background: var(--color-background-primary);
+}
+.token-swatch { height: 28px; border-radius: 6px; margin-bottom: 8px; }
+.token-name { font-size: 11px; font-weight: 500; color: var(--color-text-primary); }
+.token-val { font-size: 11px; color: var(--color-text-tertiary); font-family: var(--font-mono); margin-top: 2px; }
+
+/* Legend */
+.legend { display: flex; gap: 20px; margin-bottom: 16px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Inline badge */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  vertical-align: middle;
+}
+.badge-blue { background: var(--color-background-info); color: var(--color-text-info); }
+.badge-amber { background: var(--color-background-warning); color: var(--color-text-warning); }
+.badge-green { background: var(--color-background-success); color: var(--color-text-success); }
+.badge-gray { background: var(--color-background-tertiary); color: var(--color-text-secondary); }
+</style>
+
+<div class="doc">
+
+  <div class="eyebrow">Figma Make · Full Project Prompt</div>
+  <div class="doc-title">Volunteer–Nonprofit Connection Platform</div>
+  <div class="doc-sub">A graduation project web platform with three roles — organizations, supervisors, and volunteers — focused on core functionality, clean structure, and usability.</div>
+
+  <!-- MASTER PROMPT -->
+  <div class="sh">Master prompt — paste this into Figma Make</div>
+  <div class="prompt-block" id="master-block">
+    <button class="copy-btn" onclick="copyBlock('master-block', this)">Copy</button>
+    <div class="section-label">Project overview</div>
+    <p>Design a complete web platform called <strong>VolunteerBridge</strong> that connects non-profit organizations with volunteers. The platform has three roles: <strong>Organization</strong> (full admin access to all data), <strong>Supervisor</strong> (manages volunteers only), and <strong>Volunteer</strong> (views their organization and manages their own activities).</p>
+    <br>
+    <div class="section-label">Design direction</div>
+    <p>The visual language should be <strong>warm, trustworthy, and purposeful</strong> — this is a civic platform, not a SaaS tool. Use a clean white surface with generous whitespace, a single primary green accent color (<strong>#16A34A</strong>), soft neutrals for secondary surfaces, and Inter as the typeface throughout. Prioritize readability and usability over decorative elements. All layouts must be fully responsive (desktop, tablet, mobile).</p>
+    <br>
+    <div class="section-label">Design system tokens</div>
+    <ul>
+      <li><strong>Primary:</strong> #16A34A (green) — buttons, active nav, key actions</li>
+      <li><strong>Primary hover:</strong> #15803D</li>
+      <li><strong>Primary light:</strong> #DCFCE7 — selected states, info highlights</li>
+      <li><strong>Danger:</strong> #DC2626 — delete, reject, errors</li>
+      <li><strong>Warning:</strong> #D97706 — pending, awaiting</li>
+      <li><strong>Surface:</strong> #F8FAFC — page background tint</li>
+      <li><strong>Card:</strong> #FFFFFF with 1px #E2E8F0 border and 12px radius</li>
+      <li><strong>Nav:</strong> #0F172A — dark navy top bar, 64px height</li>
+      <li><strong>Body text:</strong> #1E293B — primary, #64748B — secondary, #94A3B8 — muted</li>
+      <li><strong>Font:</strong> Inter — 28px/600 H1, 20px/500 H2, 15px/400 body, 13px/500 labels</li>
+      <li><strong>Inputs:</strong> 42px height, 1.5px #E2E8F0 border, 8px radius, blue focus ring on active</li>
+      <li><strong>Buttons:</strong> 40px height, 8px radius, 500 weight — primary green, outline, ghost, danger</li>
+      <li><strong>Badges:</strong> soft pill style — light background + dark same-family text, 20px radius</li>
+    </ul>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ROLES -->
+  <div class="sh">The three roles</div>
+  <div class="roles">
+    <div class="role-card">
+      <div class="role-icon org">🏢</div>
+      <div class="role-name">Organization</div>
+      <div class="role-desc">Full access. Manages all data, volunteers, supervisors, events, and reports. Creates the workspace.</div>
+    </div>
+    <div class="role-card">
+      <div class="role-icon sup">👤</div>
+      <div class="role-name">Supervisor</div>
+      <div class="role-desc">Manages volunteers assigned to their team. Can approve activities and view volunteer progress.</div>
+    </div>
+    <div class="role-card">
+      <div class="role-icon vol">🙋</div>
+      <div class="role-name">Volunteer</div>
+      <div class="role-desc">Sees their organization, logs activities, tracks hours, and manages their own profile and history.</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SCREENS -->
+  <div class="sh">Screens to design</div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:var(--color-text-info)"></span>Organization</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--color-text-warning)"></span>Supervisor</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--color-text-success)"></span>Volunteer</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--color-text-secondary)"></span>Public</span>
+  </div>
+  <div class="screen-grid">
+    <div class="screen-item">
+      <span class="screen-dot pub"></span>
+      <div><div class="screen-title">Landing page</div><div class="screen-note">Hero, features, dual CTA for org and volunteer signup</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot pub"></span>
+      <div><div class="screen-title">Login / Register</div><div class="screen-note">Shared auth screens with role-aware redirect</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot org"></span>
+      <div><div class="screen-title">Org dashboard</div><div class="screen-note">Stats overview, recent activity, quick actions</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot org"></span>
+      <div><div class="screen-title">Volunteer management</div><div class="screen-note">Full list, search/filter, approve or remove</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot org"></span>
+      <div><div class="screen-title">Supervisor management</div><div class="screen-note">Invite supervisors, assign to teams</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot org"></span>
+      <div><div class="screen-title">Event management</div><div class="screen-note">Create, edit, list all events with status</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot org"></span>
+      <div><div class="screen-title">Reports & hours</div><div class="screen-note">Total hours per volunteer, export-ready table</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot sup"></span>
+      <div><div class="screen-title">Supervisor dashboard</div><div class="screen-note">Team overview, pending approvals, hours</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot sup"></span>
+      <div><div class="screen-title">Volunteer detail (sup)</div><div class="screen-note">View profile, approve logged activities</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot vol"></span>
+      <div><div class="screen-title">Volunteer dashboard</div><div class="screen-note">My hours, upcoming events, status summary</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot vol"></span>
+      <div><div class="screen-title">Log activity</div><div class="screen-note">Submit hours with date, event, description</div></div>
+    </div>
+    <div class="screen-item">
+      <span class="screen-dot vol"></span>
+      <div><div class="screen-title">My profile</div><div class="screen-note">Edit personal info, skills, view org details</div></div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SCREEN-BY-SCREEN PROMPTS -->
+  <div class="sh">Screen-by-screen prompts</div>
+
+  <!-- Landing -->
+  <div class="prompt-block" id="landing-block">
+    <button class="copy-btn" onclick="copyBlock('landing-block', this)">Copy</button>
+    <p><strong>Screen: Landing page</strong> — Public, unauthenticated</p>
+    <br>
+    <p>Design a marketing landing page for VolunteerBridge. Navbar: dark navy (#0F172A), logo left, "Login" ghost button + "Get Started" green primary button right.</p>
+    <br>
+    <p><strong>Hero section:</strong> Dark navy-to-deep-green diagonal gradient background, min-height 580px. Left column: small teal eyebrow chip "Connecting people with purpose", H1 "Unite volunteers with the organizations that need them" (42px bold white, max-width 520px), subtext "VolunteerBridge helps nonprofits recruit, manage, and recognize their volunteers — all in one simple platform." (15px #94A3B8). Two CTA buttons: "Join as a Volunteer" (green solid) + "Register Your Organization" (white outline). Right column: stylized browser-frame mockup showing the org dashboard stat cards in the platform's color system.</p>
+    <br>
+    <p><strong>Stats strip:</strong> White background, single row — "2,400+ Volunteers · 180+ Organizations · 34,000 Hours Logged · 3 Simple Roles". Values in green, labels in #64748B.</p>
+    <br>
+    <p><strong>Features section:</strong> #F8FAFC background. H2 "Everything your organization needs", 3-column card grid: (1) Volunteer Recruitment — search, filter, approve. (2) Event Coordination — create events, track attendance. (3) Hours & Reporting — log activities, export totals. Each card: white bg, 12px radius, 1px border, 24px padding, 40px icon square (green gradient), 16px bold title, 14px #64748B body.</p>
+    <br>
+    <p><strong>How it works:</strong> 3 numbered horizontal steps on white bg — "1. Register your organization → 2. Invite volunteers → 3. Manage and recognize". Steps connected by dashed line.</p>
+    <br>
+    <p><strong>Split CTA banner:</strong> Dark navy background. Left: "Are you a volunteer?" with green "Sign Up Free" button. Right: "Are you an organization?" with white-outline "Get Started" button. 1px vertical divider between them.</p>
+    <br>
+    <p><strong>Footer:</strong> #0F172A, 4-column layout — Brand + tagline, Product links, Organization links, Legal. Bottom bar copyright.</p>
+  </div>
+
+  <!-- Auth -->
+  <div class="prompt-block" id="auth-block">
+    <button class="copy-btn" onclick="copyBlock('auth-block', this)">Copy</button>
+    <p><strong>Screen: Login + Register</strong> — Public</p>
+    <br>
+    <p><strong>Login page:</strong> #F8FAFC page background. Unauthenticated navbar. Centered card 440px wide, white bg, 16px radius, generous shadow, 40px padding. Top of card: VolunteerBridge logo centered, 20px bold. Fields: Email input, Password input with eye-toggle icon. "Remember me" checkbox + "Forgot password?" link right-aligned. Full-width green primary button "Sign In". Divider then "Don't have an account? Sign up →" centered link. Error state: soft red banner above card — light red bg, left accent border, error message text + dismiss X.</p>
+    <br>
+    <p><strong>Register page:</strong> Same card layout, 520px wide. Header: "Create your account" H2 + role selector tabs at top of card — three pill tabs: "Volunteer" | "Supervisor" | "Organization" (selected tab fills green). Fields change based on selected role. Volunteer: Full Name, Email, Password, Phone, City, Skills textarea. Organization: Org Name, Email, Password, Phone, Website, Description textarea. Bottom: full-width green "Create Account" button + "Already registered? Log in →" link.</p>
+  </div>
+
+  <!-- Org Dashboard -->
+  <div class="prompt-block" id="org-dash-block">
+    <button class="copy-btn" onclick="copyBlock('org-dash-block', this)">Copy</button>
+    <p><strong>Screen: Organization dashboard</strong> <span class="badge badge-blue">Organization only</span></p>
+    <br>
+    <p>Authenticated navbar: dark navy, "VolunteerBridge" logo, nav links — "Dashboard" (active) · "Volunteers" · "Supervisors" · "Events" · "Reports". Right: org name + avatar + dropdown.</p>
+    <br>
+    <p><strong>Page header:</strong> "Welcome back, [Org Name]" H1 + today's date in #64748B. Right: "Invite Volunteer" ghost button + "Create Event" green primary button.</p>
+    <br>
+    <p><strong>Stat cards row (4 cards, 16px gap):</strong> Each 120px tall, 12px radius, no border, gradient backgrounds.<br>
+    — "Total Volunteers" → green gradient, person icon, large number.<br>
+    — "Pending Approvals" → amber gradient, clock icon, count.<br>
+    — "Active Events" → blue gradient, calendar icon, count.<br>
+    — "Hours This Month" → teal gradient, chart icon, hours.</p>
+    <br>
+    <p><strong>Two-column layout below (60/40 gap 24px):</strong><br>
+    Left — "Pending Approvals" section: stacked volunteer cards, each with name bold + email + join date + "Approve" green small button + "Reject" red small button. 4px amber left-accent border per card.<br>
+    Right — "Recent Events" list in a white card: event name + date chip + status badge (upcoming / active / completed) + "View" link.</p>
+  </div>
+
+  <!-- Volunteer Management -->
+  <div class="prompt-block" id="vol-mgmt-block">
+    <button class="copy-btn" onclick="copyBlock('vol-mgmt-block', this)">Copy</button>
+    <p><strong>Screen: Volunteer management</strong> <span class="badge badge-blue">Organization only</span></p>
+    <br>
+    <p>Page title "Volunteers" + count badge. Filter bar below: text search input (full-width left), Status dropdown, Supervisor dropdown, Search button right. All in a white card panel with 1px border and 20px padding.</p>
+    <br>
+    <p><strong>Volunteer table (white card, borderless rows):</strong> Columns — Avatar + Name, Email, Phone, Supervisor, Status (soft badge: Active / Pending / Suspended), Hours, Actions. Table header: #F8FAFC background, uppercase 11px labels. Row hover: #F8FAFC. Actions column: "View" teal ghost small + "Remove" red ghost small. Pagination strip at bottom of card.</p>
+    <br>
+    <p><strong>Empty state:</strong> Centered illustration area + "No volunteers yet. Invite your first volunteer." + green "Invite Volunteer" button.</p>
+  </div>
+
+  <!-- Supervisor Management -->
+  <div class="prompt-block" id="sup-mgmt-block">
+    <button class="copy-btn" onclick="copyBlock('sup-mgmt-block', this)">Copy</button>
+    <p><strong>Screen: Supervisor management</strong> <span class="badge badge-blue">Organization only</span></p>
+    <br>
+    <p>Page title "Supervisors" + "Invite Supervisor" green primary button top right. Two-column layout (40/60 gap 24px).</p>
+    <br>
+    <p><strong>Left — "Invite Supervisor" form card:</strong> White card, 12px radius, 24px padding. Fields: Full Name, Email, Department/Team text input. Green full-width "Send Invitation" button.</p>
+    <br>
+    <p><strong>Right — Supervisors table:</strong> White card, columns — Name + avatar, Email, Team, Assigned Volunteers count (blue badge number), Status, Actions ("Manage" ghost + "Remove" red ghost). Show 3 example rows.</p>
+  </div>
+
+  <!-- Event Management -->
+  <div class="prompt-block" id="events-block">
+    <button class="copy-btn" onclick="copyBlock('events-block', this)">Copy</button>
+    <p><strong>Screen: Event management</strong> <span class="badge badge-blue">Organization only</span></p>
+    <br>
+    <p>Page title "Events" + "Create Event" green button right. Filter tabs below title: All · Upcoming · Active · Completed — pill tab style, active tab fills green.</p>
+    <br>
+    <p><strong>Event cards grid (2 columns, 16px gap):</strong> Each card white bg, 12px radius, 1px border, 20px padding, hover lift. Card anatomy: top color band (4px, green for upcoming, amber for active, gray for completed). Event name bold 16px. Date row: calendar icon + date. Location row: pin icon + location. Volunteer count: person icon + "X / Y volunteers". Status badge soft pill. Bottom row: "Edit" ghost + "View Applicants" teal outline + "Delete" red ghost.</p>
+    <br>
+    <p><strong>Create/Edit Event modal or side panel (not a new page):</strong> Slides in from right, 480px wide, white bg. Fields: Event Name, Description (textarea), Location, Date picker, Time picker, Duration (hours), Max Volunteers (number), Required Skills (comma-separated). Bottom: "Cancel" ghost + "Save Event" green primary. Use a 2-column grid for Date/Time and Duration/Max Volunteers.</p>
+  </div>
+
+  <!-- Reports -->
+  <div class="prompt-block" id="reports-block">
+    <button class="copy-btn" onclick="copyBlock('reports-block', this)">Copy</button>
+    <p><strong>Screen: Reports & hours</strong> <span class="badge badge-blue">Organization only</span></p>
+    <br>
+    <p>Page title "Reports". Date range filter bar: "From" date input + "To" date input + "Filter" button + "Export CSV" ghost button right.</p>
+    <br>
+    <p><strong>Summary cards row (3 cards):</strong> "Total Hours Logged" (large green number), "Active Volunteers" (blue number), "Events Completed" (teal number). Metric card style: #F8FAFC bg, 8px radius, 1rem padding.</p>
+    <br>
+    <p><strong>Hours table (white card, full width):</strong> Columns — Volunteer Name, Email, Events Attended, Total Hours, Last Activity Date, Status. Header: #F8FAFC, 11px uppercase. Sortable columns (sort arrows on hover). Rows alternating very subtle bg. Totals row pinned at bottom with bold values.</p>
+  </div>
+
+  <!-- Supervisor Dashboard -->
+  <div class="prompt-block" id="sup-dash-block">
+    <button class="copy-btn" onclick="copyBlock('sup-dash-block', this)">Copy</button>
+    <p><strong>Screen: Supervisor dashboard</strong> <span class="badge badge-amber">Supervisor only</span></p>
+    <br>
+    <p>Same navbar but nav links: "Dashboard" · "My Volunteers" · "Events". Right: supervisor name + avatar.</p>
+    <br>
+    <p><strong>Stat cards (3 cards):</strong> "My Volunteers" (green), "Pending Activity Approvals" (amber), "Total Hours This Month" (blue).</p>
+    <br>
+    <p><strong>Two-column layout (55/45):</strong><br>
+    Left — "Pending Approvals" section: cards showing volunteer name, activity logged, hours, date, description excerpt. Buttons: "Approve" green small + "Reject" red small per card.<br>
+    Right — "My Volunteers" compact list in a white card: avatar + name + hours this month + status badge. Clicking a row navigates to the volunteer detail screen.</p>
+  </div>
+
+  <!-- Volunteer Detail (Supervisor) -->
+  <div class="prompt-block" id="vol-detail-sup-block">
+    <button class="copy-btn" onclick="copyBlock('vol-detail-sup-block', this)">Copy</button>
+    <p><strong>Screen: Volunteer detail (supervisor view)</strong> <span class="badge badge-amber">Supervisor only</span></p>
+    <br>
+    <p>Breadcrumb: "My Volunteers / [Name]". Two-column layout (30/70 gap 24px).</p>
+    <br>
+    <p><strong>Left — Profile card:</strong> Avatar circle (initials, green bg), name bold 18px, email, phone, city, join date, skills chips (soft gray pills). "Total Hours: X" green bold stat. Thin divider. "Send Message" ghost button full-width.</p>
+    <br>
+    <p><strong>Right — Activity log table:</strong> Section heading "Logged Activities" + status filter tabs (All / Pending / Approved / Rejected). Table columns: Date, Event, Description (truncated), Hours, Status badge, Actions (Approve green + Reject red per row). Show 4 example rows with mixed statuses.</p>
+  </div>
+
+  <!-- Volunteer Dashboard -->
+  <div class="prompt-block" id="vol-dash-block">
+    <button class="copy-btn" onclick="copyBlock('vol-dash-block', this)">Copy</button>
+    <p><strong>Screen: Volunteer dashboard</strong> <span class="badge badge-green">Volunteer only</span></p>
+    <br>
+    <p>Navbar nav links: "Dashboard" · "Log Activity" · "My Profile". Right: volunteer name + avatar.</p>
+    <br>
+    <p><strong>Stat cards (3 cards):</strong> "Total Hours Logged" (green, large), "Activities Submitted" (blue), "Pending Review" (amber).</p>
+    <br>
+    <p><strong>Two-column layout (35/65 gap 24px):</strong><br>
+    Left — "My Organization" card: org logo placeholder (rounded square, green gradient), org name bold, description excerpt, supervisor name with small avatar. "View Details" teal outline button full-width. Below: "Upcoming Events" mini list — 2–3 event rows with date chip and event name.<br>
+    Right — "Recent Activity" section: activity log entries as cards, each with event name bold, date, hours badge (green pill), description excerpt, status badge. "Log New Activity" green primary button above the list, right-aligned.</p>
+  </div>
+
+  <!-- Log Activity -->
+  <div class="prompt-block" id="log-activity-block">
+    <button class="copy-btn" onclick="copyBlock('log-activity-block', this)">Copy</button>
+    <p><strong>Screen: Log activity</strong> <span class="badge badge-green">Volunteer only</span></p>
+    <br>
+    <p>Page title "Log an Activity" + breadcrumb "Dashboard / Log Activity". Centered form card, max-width 640px, white bg, 16px radius, 36px padding.</p>
+    <br>
+    <p>Fields:<br>
+    — "Activity Date" → date picker input, full width<br>
+    — "Related Event" → styled select dropdown (lists org's events), full width<br>
+    — "Hours Contributed" → number input, step 0.5, with "hrs" suffix label right inside input<br>
+    — "Description" → textarea 5 rows, placeholder "Briefly describe what you did and any impact you observed."<br>
+    — Helper text below: "Your supervisor will review and approve this entry." 12px muted.</p>
+    <br>
+    <p>Bottom row: "Cancel" ghost button left + "Submit Activity" green primary button right.</p>
+    <br>
+    <p><strong>Success state:</strong> After submit, replace form with a centered confirmation — green check circle icon (48px), "Activity submitted!" 20px bold, "Your supervisor will review it shortly." 14px muted, "Log another" ghost + "Back to Dashboard" green button.</p>
+  </div>
+
+  <!-- Volunteer Profile -->
+  <div class="prompt-block" id="vol-profile-block">
+    <button class="copy-btn" onclick="copyBlock('vol-profile-block', this)">Copy</button>
+    <p><strong>Screen: Volunteer profile</strong> <span class="badge badge-green">Volunteer only</span></p>
+    <br>
+    <p>Page title "My Profile". Two-column layout (35/65 gap 24px).</p>
+    <br>
+    <p><strong>Left — Profile summary card:</strong> Avatar circle 64px (initials, green gradient bg), name bold 18px centered, email centered 13px muted. Divider. Stats: "Total Hours" green bold number, "Activities" number, "Member Since" date. Divider. "My Organization" section — org name bold, org logo placeholder 32px. Supervisor: small avatar + supervisor name + "Send Message" link.</p>
+    <br>
+    <p><strong>Right — Edit form card:</strong> Card heading "Edit Profile" 17px semi-bold. Fields: Full Name, Phone Number, City, Skills (comma-separated textarea, helper text "Add skills to help orgs find you"), About Me (short textarea). Bottom: "Save Changes" green primary full-width button. Below card: "Change Password" collapsed section — expands to show Current Password, New Password, Confirm Password fields + "Update Password" button.</p>
+  </div>
+
+  <hr class="divider">
+
+  <!-- UX PRINCIPLES -->
+  <div class="sh">UX principles to follow</div>
+  <div class="prompt-block" id="ux-block">
+    <button class="copy-btn" onclick="copyBlock('ux-block', this)">Copy</button>
+    <ul>
+      <li><strong>Empty states:</strong> Every list or table that could be empty must have a designed empty state — a simple centered message and a primary CTA to add the first item. Never show a blank page.</li>
+      <li><strong>Loading states:</strong> Show skeleton loaders (gray rounded rect placeholders matching content shape) on tables and card grids while data loads.</li>
+      <li><strong>Toast notifications:</strong> Floating toasts bottom-right for success ("Volunteer approved"), error ("Something went wrong — try again"), and info. Auto-dismiss after 4 seconds. Green left-accent for success, red for error.</li>
+      <li><strong>Confirmation dialogs:</strong> Destructive actions (Remove volunteer, Delete event) must trigger a modal confirmation — centered overlay, white card, action description, "Cancel" ghost + "Confirm" red primary.</li>
+      <li><strong>Role-aware navigation:</strong> The sidebar or top nav must only show links relevant to the logged-in role. Org sees all sections; supervisor sees only their team sections; volunteer sees only their personal sections.</li>
+      <li><strong>Responsive behavior:</strong> On mobile, top nav collapses to a hamburger drawer. Two-column layouts stack to single column. Tables become card lists on small screens.</li>
+      <li><strong>Consistent page anatomy:</strong> Every page follows the same structure — breadcrumb (if needed) → page title → optional subtitle → content. No orphaned sections floating without a header.</li>
+      <li><strong>Form accessibility:</strong> Every input has a visible label (never placeholder-only), required fields are marked with a small red asterisk, error messages appear below the relevant field in red with an X icon.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+function copyBlock(id, btn) {
+  const el = document.getElementById(id);
+  const texts = [];
+  el.querySelectorAll('p, li').forEach(node => {
+    const t = node.innerText.trim();
+    if (t) texts.push(t);
+  });
+  const text = texts.join('\n\n');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+</script>

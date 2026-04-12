@@ -1,0 +1,168 @@
+import { Link, useNavigate, useLocation } from "react-router";
+import { useAuth } from "../context/AuthContext";
+
+interface NavbarProps {
+  role?: "org" | "supervisor" | "volunteer" | "guest";
+  userName?: string;
+}
+
+const NAV = "#0F172A";
+const GREEN = "#16A34A";
+const GREEN_HOVER = "#15803D";
+
+export function Navbar({ role = "guest", userName }: NavbarProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const { logout } = useAuth();
+  const handleLogout = () => { logout(); navigate("/"); };
+
+  const navLinks: { label: string; to: string }[] =
+    role === "org"
+      ? [
+          { label: "Dashboard", to: "/org" },
+          { label: "Volunteers", to: "/org/volunteers" },
+          { label: "Supervisors", to: "/org/supervisors" },
+          { label: "Events", to: "/org/events" },
+          { label: "Reports", to: "/org/reports" },
+        ]
+      : role === "supervisor"
+      ? [
+          { label: "Dashboard", to: "/supervisor" },
+          { label: "My Volunteers", to: "/supervisor" },
+        ]
+      : role === "volunteer"
+      ? [
+          { label: "Dashboard", to: "/dashboard" },
+          { label: "Log Activity", to: "/dashboard/log-activity" },
+          { label: "My Profile", to: "/dashboard/profile" },
+        ]
+      : [];
+
+  const isActive = (to: string) => location.pathname === to;
+
+  return (
+    <nav
+      className="w-full flex items-center justify-between px-8"
+      style={{ backgroundColor: NAV, height: 64, minHeight: 64 }}
+    >
+      <div className="flex items-center gap-8">
+        <Link
+          to="/"
+          className="flex items-center gap-2 no-underline"
+        >
+          {/* Leaf icon */}
+          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="16" fill={GREEN} opacity={0.2} />
+            <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={GREEN} />
+            <path d="M16 14V24" stroke="#DCFCE7" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M16 18C16 18 13 16 12 14" stroke="#DCFCE7" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <span style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
+            Altruism
+          </span>
+        </Link>
+
+        <div className="hidden md:flex items-center gap-6">
+          {navLinks.map((link) => (
+            <Link
+              key={link.to + link.label}
+              to={link.to}
+              className="no-underline"
+              style={{
+                fontSize: 14,
+                fontWeight: isActive(link.to) ? 600 : 400,
+                color: isActive(link.to) ? "#FFFFFF" : "#94A3B8",
+                borderBottom: isActive(link.to) ? `2px solid ${GREEN}` : "2px solid transparent",
+                paddingBottom: 2,
+                transition: "color 150ms",
+              }}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {role === "guest" ? (
+          <>
+            <button
+              onClick={() => navigate("/login")}
+              style={{
+                backgroundColor: "transparent",
+                color: "#94A3B8",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 8,
+                height: 36,
+                padding: "0 16px",
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              Login
+            </button>
+            <button
+              onClick={() => navigate("/register")}
+              style={{
+                backgroundColor: GREEN,
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                height: 36,
+                padding: "0 18px",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = GREEN_HOVER)}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = GREEN)}
+            >
+              Get Started
+            </button>
+          </>
+        ) : (
+          <>
+            {userName && (
+              <div className="flex items-center gap-3">
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    backgroundColor: GREEN,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#fff",
+                  }}
+                >
+                  {userName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+                <span style={{ fontSize: 14, color: "#FFFFFF" }}>{userName}</span>
+              </div>
+            )}
+            <button
+              onClick={handleLogout}
+              style={{
+                backgroundColor: "transparent",
+                color: "#94A3B8",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 8,
+                height: 32,
+                padding: "0 12px",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+          </>
+        )}
+      </div>
+    </nav>
+  );
+}
