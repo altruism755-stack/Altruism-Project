@@ -67,7 +67,6 @@ def health():
 @app.on_event("startup")
 def startup():
     init_schema()
-    print("Altruism API (FastAPI) running on http://localhost:3001")
 
 
 if __name__ == "__main__":
