@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from database import init_schema
 from routes.auth_routes import router as auth_router
@@ -15,6 +16,8 @@ from routes.activities import router as activities_router
 from routes.certificates import router as certificates_router
 from routes.reports import router as reports_router
 from routes.organizations import router as organizations_router
+from routes.event_applications import router as event_applications_router
+from routes.announcements import router as announcements_router
 
 app = FastAPI(title="Altruism API", redirect_slashes=False)
 
@@ -55,6 +58,13 @@ app.include_router(activities_router)
 app.include_router(certificates_router)
 app.include_router(reports_router)
 app.include_router(organizations_router)
+app.include_router(event_applications_router)
+app.include_router(announcements_router)
+
+# Serve uploaded profile pictures
+uploads_dir = os.path.join(os.path.dirname(__file__), "uploads", "profiles")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads/profiles", StaticFiles(directory=uploads_dir), name="profile_uploads")
 
 
 # Health check

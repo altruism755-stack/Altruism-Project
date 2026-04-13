@@ -30,11 +30,17 @@ def report_summary(current_user: dict = Depends(require_roles("org_admin"))):
         pending_activities = db.execute(
             "SELECT COUNT(*) as c FROM activities WHERE org_id = ? AND status = 'Pending'", (oid,)
         ).fetchone()["c"]
+        pending_members = db.execute(
+            "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = ? AND status = 'Pending'", (oid,)
+        ).fetchone()["c"]
         completed_events = db.execute(
             "SELECT COUNT(*) as c FROM events WHERE org_id = ? AND status = 'Completed'", (oid,)
         ).fetchone()["c"]
         total_events = db.execute(
             "SELECT COUNT(*) as c FROM events WHERE org_id = ?", (oid,)
+        ).fetchone()["c"]
+        active_events = db.execute(
+            "SELECT COUNT(*) as c FROM events WHERE org_id = ? AND status IN ('Active','Upcoming')", (oid,)
         ).fetchone()["c"]
 
         return {
@@ -42,8 +48,10 @@ def report_summary(current_user: dict = Depends(require_roles("org_admin"))):
             "activeVolunteers": active_volunteers,
             "totalHours": total_hours,
             "pendingActivities": pending_activities,
+            "pendingMembers": pending_members,
             "completedEvents": completed_events,
             "totalEvents": total_events,
+            "activeEvents": active_events,
         }
 
 

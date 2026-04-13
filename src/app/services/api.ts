@@ -93,8 +93,13 @@ export const api = {
   getOrganization: (id: number) => request(`/organizations/${id}`),
   joinOrganization: (id: number) =>
     request(`/organizations/${id}/join`, { method: "POST" }),
+  getOrgMembers: (orgId: number) => request(`/organizations/${orgId}/members`),
   approveOrgMember: (orgId: number, volId: number, data: any) =>
     request(`/organizations/${orgId}/members/${volId}/approve`, { method: "PUT", body: JSON.stringify(data) }),
+  rejectOrgMember: (orgId: number, volId: number) =>
+    request(`/organizations/${orgId}/members/${volId}/reject`, { method: "PUT" }),
+  removeOrgMember: (orgId: number, volId: number) =>
+    request(`/organizations/${orgId}/members/${volId}`, { method: "DELETE" }),
 
   // Reports
   getReportSummary: () => request("/reports/summary"),
@@ -103,4 +108,32 @@ export const api = {
     return request(`/reports/volunteer-hours${qs}`);
   },
   exportCSV: () => request("/reports/export-csv"),
+
+  // Profile picture
+  uploadProfilePicture: (volunteerId: number, image: string) =>
+    request(`/volunteers/${volunteerId}/profile-picture`, {
+      method: "PUT",
+      body: JSON.stringify({ image }),
+    }),
+
+  // Volunteer org dashboard
+  getVolunteerOrgDashboard: (volunteerId: number, orgId: number) =>
+    request(`/volunteers/${volunteerId}/org/${orgId}`),
+
+  // Event Applications
+  getEventApplications: () => request("/event-applications"),
+  applyToEvent: (eventId: number) =>
+    request("/event-applications", { method: "POST", body: JSON.stringify({ event_id: eventId }) }),
+  approveApplication: (appId: number) =>
+    request(`/event-applications/${appId}/approve`, { method: "PUT" }),
+  rejectApplication: (appId: number) =>
+    request(`/event-applications/${appId}/reject`, { method: "PUT" }),
+
+  // Announcements
+  getAnnouncements: (orgIds?: number[]) => {
+    const qs = orgIds && orgIds.length ? `?org_ids=${orgIds.join(",")}` : "";
+    return request(`/announcements${qs}`);
+  },
+  createAnnouncement: (data: { title: string; content: string }) =>
+    request("/announcements", { method: "POST", body: JSON.stringify(data) }),
 };

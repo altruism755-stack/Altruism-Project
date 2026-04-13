@@ -22,9 +22,11 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 // Fallback demo credentials when backend is unavailable
 const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string }> = {
-  "admin@example.com": { password: "admin", role: "org_admin", name: "Resala" },
-  "supervisor@example.com": { password: "supervisor", role: "supervisor", name: "Dr. Amira Khalil" },
-  "volunteer@example.com": { password: "volunteer", role: "volunteer", name: "Test Volunteer" },
+  "admin@resala.org":      { password: "admin",      role: "org_admin",  name: "Resala" },
+  "admin@redcrescent.org": { password: "admin",      role: "org_admin",  name: "Egyptian Red Crescent" },
+  "admin@enactus.org":     { password: "admin",      role: "org_admin",  name: "Enactus Egypt" },
+  "amira@resala.org":      { password: "supervisor", role: "supervisor", name: "Dr. Amira Khalil" },
+  "volunteer@example.com": { password: "volunteer",  role: "volunteer",  name: "Yara Hassan" },
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

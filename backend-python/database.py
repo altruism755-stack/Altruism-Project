@@ -140,6 +140,37 @@ def init_schema():
             issued_date TEXT DEFAULT (date('now')),
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS event_applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            volunteer_id INTEGER REFERENCES volunteers(id),
+            event_id INTEGER REFERENCES events(id),
+            org_id INTEGER REFERENCES organizations(id),
+            status TEXT DEFAULT 'Pending' CHECK(status IN ('Pending','Approved','Rejected')),
+            applied_date TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            org_id INTEGER REFERENCES organizations(id),
+            title TEXT NOT NULL,
+            content TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
     """)
+
+    # Add new columns to volunteers if they don't exist
+    try:
+        conn.execute("ALTER TABLE volunteers ADD COLUMN date_of_birth TEXT")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE volunteers ADD COLUMN governorate TEXT")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE volunteers ADD COLUMN profile_picture TEXT")
+    except Exception:
+        pass
     conn.commit()
     conn.close()

@@ -12,6 +12,19 @@ def list_organizations():
         orgs = dict_rows(db.execute(
             "SELECT id, name, description, category, color, secondary_color, initials, founded FROM organizations"
         ).fetchall())
+
+        for org in orgs:
+            oid = org["id"]
+            org["total_volunteers"] = db.execute(
+                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = ? AND status = 'Active'", (oid,)
+            ).fetchone()["c"]
+            org["pending_requests"] = db.execute(
+                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = ? AND status = 'Pending'", (oid,)
+            ).fetchone()["c"]
+            org["active_activities"] = db.execute(
+                "SELECT COUNT(*) as c FROM events WHERE org_id = ? AND status IN ('Active', 'Upcoming')", (oid,)
+            ).fetchone()["c"]
+
         return {"organizations": orgs}
 
 
@@ -93,3 +106,31 @@ def approve_org_member(
             (body.get("supervisor_id"), body.get("department"), org_id, vol_id),
         )
         return {"message": "Volunteer approved"}
+
+
+@router.put("/{org_id}/members/{vol_id}/reject")
+def reject_org_member(
+    org_id: int,
+    vol_id: int,
+    current_user: dict = Depends(require_roles("org_admin")),
+):
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            (org_id, vol_id),
+        )
+        return {"message": "Request rejected"}
+
+
+@router.delete("/{org_id}/members/{vol_id}")
+def remove_org_member(
+    org_id: int,
+    vol_id: int,
+    current_user: dict = Depends(require_roles("org_admin")),
+):
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            (org_id, vol_id),
+        )
+        return {"message": "Volunteer removed from organization"}

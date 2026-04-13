@@ -8,7 +8,7 @@ const GREEN_HOVER = "#15803D";
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading } = useAuth();
-  const [email, setEmail] = useState("volunteer@example.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -20,10 +20,12 @@ export function LoginPage() {
     setError(false);
     const success = await login(email, password);
     if (success) {
-      // Determine redirect based on credentials
-      if (email === "admin@example.com") navigate("/org");
-      else if (email === "supervisor@example.com") navigate("/supervisor");
-      else navigate("/dashboard");
+      // Determine redirect based on role stored after login
+      const stored = sessionStorage.getItem("altruism_user");
+      const u = stored ? JSON.parse(stored) : null;
+      if (u?.role === "org_admin") navigate("/org");
+      else if (u?.role === "supervisor") navigate("/supervisor");
+      else navigate("/dashboard/profile");
     } else {
       setError(true);
     }
@@ -110,14 +112,12 @@ export function LoginPage() {
               <a onClick={() => navigate("/register")} style={{ fontSize: 14, color: GREEN, fontWeight: 500, cursor: "pointer", textDecoration: "none" }}>Sign up →</a>
             </div>
 
-            <div className="text-center" style={{ marginTop: 4 }}>
-              <span style={{ fontSize: 12, color: "#94A3B8" }}>
-                Demo: admin@example.com / admin · supervisor@example.com / supervisor · volunteer@example.com / volunteer
-              </span>
-              <br />
-              <span style={{ fontSize: 11, color: "#CBD5E1", marginTop: 4, display: "inline-block" }}>
-                Supervisors receive their credentials from their organization
-              </span>
+            <div style={{ marginTop: 4, backgroundColor: "#F8FAFC", borderRadius: 8, padding: "12px 14px", fontSize: 12, color: "#64748B", lineHeight: 1.8 }}>
+              <strong style={{ color: "#1E293B" }}>Demo accounts:</strong><br />
+              volunteer@example.com / <strong>volunteer</strong> — Yara Hassan<br />
+              admin@resala.org / <strong>admin</strong> — Resala Admin<br />
+              admin@redcrescent.org / <strong>admin</strong> — Red Crescent Admin<br />
+              amira@resala.org / <strong>supervisor</strong> — Resala Supervisor
             </div>
           </form>
         </div>

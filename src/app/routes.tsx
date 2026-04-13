@@ -9,9 +9,10 @@ import { EventManagement } from "./pages/EventManagement";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SupervisorDashboard } from "./pages/SupervisorDashboard";
 import { VolunteerDetail } from "./pages/VolunteerDetail";
-import { VolunteerDashboard } from "./pages/VolunteerDashboard";
-import { LogActivityPage } from "./pages/LogActivityPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { VolunteerOrgDashboard } from "./pages/VolunteerOrgDashboard";
+import { NewsFeed } from "./pages/NewsFeed";
+import { BrowseOrganizations } from "./pages/BrowseOrganizations";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function ErrorPage() {
@@ -28,19 +29,27 @@ export const router = createBrowserRouter([
   { path: "/", element: <LandingPage />, errorElement: <ErrorPage /> },
   { path: "/login", element: <LoginPage />, errorElement: <ErrorPage /> },
   { path: "/register", element: <RegisterPage />, errorElement: <ErrorPage /> },
-  // Organization routes (org_admin only)
+
+  // Organization admin routes
   { path: "/org", element: <ProtectedRoute allowedRoles={["org_admin"]}><OrgDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
   { path: "/org/volunteers", element: <ProtectedRoute allowedRoles={["org_admin"]}><VolunteerManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
   { path: "/org/supervisors", element: <ProtectedRoute allowedRoles={["org_admin"]}><SupervisorManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/org/events", element: <ProtectedRoute allowedRoles={["org_admin"]}><EventManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
+  { path: "/org/activities", element: <ProtectedRoute allowedRoles={["org_admin"]}><EventManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
+  // Legacy redirect
+  { path: "/org/events", element: <Navigate to="/org/activities" replace /> },
   { path: "/org/reports", element: <ProtectedRoute allowedRoles={["org_admin"]}><ReportsPage /></ProtectedRoute>, errorElement: <ErrorPage /> },
+
   // Supervisor routes
   { path: "/supervisor", element: <ProtectedRoute allowedRoles={["supervisor"]}><SupervisorDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
   { path: "/supervisor/volunteer/:id", element: <ProtectedRoute allowedRoles={["supervisor"]}><VolunteerDetail /></ProtectedRoute>, errorElement: <ErrorPage /> },
+
   // Volunteer routes
-  { path: "/dashboard", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/dashboard/log-activity", element: <ProtectedRoute allowedRoles={["volunteer"]}><LogActivityPage /></ProtectedRoute>, errorElement: <ErrorPage /> },
+  { path: "/dashboard", element: <Navigate to="/dashboard/profile" replace /> },
   { path: "/dashboard/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><ProfilePage /></ProtectedRoute>, errorElement: <ErrorPage /> },
+  { path: "/dashboard/orgs", element: <ProtectedRoute allowedRoles={["volunteer"]}><BrowseOrganizations /></ProtectedRoute>, errorElement: <ErrorPage /> },
+  { path: "/dashboard/org/:orgId", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
+  { path: "/dashboard/feed", element: <ProtectedRoute allowedRoles={["volunteer"]}><NewsFeed /></ProtectedRoute>, errorElement: <ErrorPage /> },
+
   // Catch-all
   { path: "*", element: <Navigate to="/" replace /> },
 ]);

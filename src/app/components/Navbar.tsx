@@ -20,22 +20,22 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
   const navLinks: { label: string; to: string }[] =
     role === "org"
       ? [
-          { label: "Dashboard", to: "/org" },
-          { label: "Volunteers", to: "/org/volunteers" },
+          { label: "Dashboard",   to: "/org" },
+          { label: "Volunteers",  to: "/org/volunteers" },
           { label: "Supervisors", to: "/org/supervisors" },
-          { label: "Events", to: "/org/events" },
-          { label: "Reports", to: "/org/reports" },
+          { label: "Activities",  to: "/org/activities" },
+          { label: "Reports",     to: "/org/reports" },
         ]
       : role === "supervisor"
       ? [
-          { label: "Dashboard", to: "/supervisor" },
+          { label: "Dashboard",     to: "/supervisor" },
           { label: "My Volunteers", to: "/supervisor" },
         ]
       : role === "volunteer"
       ? [
-          { label: "Dashboard", to: "/dashboard" },
-          { label: "Log Activity", to: "/dashboard/log-activity" },
-          { label: "My Profile", to: "/dashboard/profile" },
+          { label: "My Profile",    to: "/dashboard/profile" },
+          { label: "Organizations", to: "/dashboard/orgs" },
+          { label: "News Feed",     to: "/dashboard/feed" },
         ]
       : [];
 
