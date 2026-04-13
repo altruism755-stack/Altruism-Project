@@ -18,7 +18,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 // Fallback demo credentials when backend is unavailable
 const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string }> = {
