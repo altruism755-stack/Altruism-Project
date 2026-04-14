@@ -20,11 +20,8 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
   const navLinks: { label: string; to: string }[] =
     role === "org"
       ? [
-          { label: "Dashboard",   to: "/org" },
-          { label: "Volunteers",  to: "/org/volunteers" },
-          { label: "Supervisors", to: "/org/supervisors" },
-          { label: "Activities",  to: "/org/activities" },
-          { label: "Reports",     to: "/org/reports" },
+          { label: "Dashboard", to: "/org" },
+          { label: "Reports",   to: "/org/reports" },
         ]
       : role === "supervisor"
       ? [

@@ -34,72 +34,173 @@ function getDaysInMonth(year: number, month: number) {
 
 function CalendarWidget({ events }: { events: { date: string; name: string }[] }) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = new Date(year, month, 1).getDay();
   const monthName = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  const eventDates = new Set(events.map((e) => {
+  // Map date key → events[]
+  const eventsByDate = new Map<string, { date: string; name: string }[]>();
+  events.forEach((e) => {
     const d = new Date(e.date);
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-  }));
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!eventsByDate.has(key)) eventsByDate.set(key, []);
+    eventsByDate.get(key)!.push(e);
+  });
 
-  const days = [];
+  const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
   const today = new Date();
   const isToday = (d: number) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-  const hasEvent = (d: number) => eventDates.has(`${year}-${month}-${d}`);
+  const getDayEvents = (d: number) => eventsByDate.get(`${year}-${month}-${d}`) || [];
+
+  const sortedEvents = [...events].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
     <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
+      {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: 0 }}>Upcoming Activities</h3>
         <div className="flex items-center gap-2">
-          <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, width: 28, height: 28, cursor: "pointer", fontSize: 12 }}>&lt;</button>
+          <button
+            onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+            style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, width: 28, height: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#64748B" }}
+          >&#8249;</button>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", minWidth: 120, textAlign: "center" }}>{monthName}</span>
-          <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, width: 28, height: 28, cursor: "pointer", fontSize: 12 }}>&gt;</button>
+          <button
+            onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+            style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 6, width: 28, height: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#64748B" }}
+          >&#8250;</button>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+
+      {/* Day-of-week headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
         {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
           <div key={d} style={{ textAlign: "center", fontSize: 11, color: "#94A3B8", fontWeight: 600, padding: "4px 0" }}>{d}</div>
         ))}
-        {days.map((d, i) => (
-          <div key={i} style={{
-            textAlign: "center", fontSize: 12, padding: "6px 0", borderRadius: 6, position: "relative",
-            backgroundColor: d && isToday(d) ? GREEN : "transparent",
-            color: d ? (isToday(d) ? "#fff" : "#1E293B") : "transparent",
-            fontWeight: d && isToday(d) ? 700 : 400,
-          }}>
-            {d || ""}
-            {d && hasEvent(d) && (
-              <div style={{ position: "absolute", bottom: 1, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", backgroundColor: isToday(d) ? "#fff" : GREEN }} />
-            )}
-          </div>
-        ))}
       </div>
-      {events.length > 0 && (
-        <div style={{ marginTop: 16, borderTop: "1px solid #E2E8F0", paddingTop: 12 }}>
-          {events.slice(0, 4).map((e, i) => (
-            <div key={i} className="flex items-center gap-2" style={{ padding: "6px 0", borderBottom: i < Math.min(events.length, 4) - 1 ? "1px solid #F1F5F9" : "none" }}>
-              <span style={{ backgroundColor: "#DCFCE7", color: "#15803D", fontSize: 10, fontWeight: 600, borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap" }}>{e.date}</span>
-              <span style={{ fontSize: 13, color: "#1E293B" }}>{e.name}</span>
+
+      {/* Day cells */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+        {days.map((d, i) => {
+          const dayEvents = d ? getDayEvents(d) : [];
+          const count = dayEvents.length;
+          const todayCell = d !== null && isToday(d);
+          const isHovered = hoveredDay === d && d !== null;
+
+          return (
+            <div
+              key={i}
+              style={{ position: "relative" }}
+              onMouseEnter={() => { if (d !== null && count > 0) setHoveredDay(d); }}
+              onMouseLeave={() => setHoveredDay(null)}
+            >
+              <div style={{
+                textAlign: "center",
+                fontSize: 12,
+                borderRadius: 7,
+                position: "relative",
+                backgroundColor: todayCell ? GREEN : (count > 0 && isHovered ? "#F0FDF4" : "transparent"),
+                color: d !== null ? (todayCell ? "#fff" : "#1E293B") : "transparent",
+                fontWeight: todayCell ? 700 : (count > 0 ? 600 : 400),
+                cursor: count > 0 ? "pointer" : "default",
+                transition: "background-color 150ms",
+                minHeight: 36,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                paddingTop: 6,
+                gap: 2,
+              }}>
+                <span>{d ?? ""}</span>
+                {d !== null && count === 1 && (
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: todayCell ? "#fff" : GREEN, flexShrink: 0 }} />
+                )}
+                {d !== null && count > 1 && (
+                  <div style={{
+                    fontSize: 9, fontWeight: 700, lineHeight: "14px", minWidth: 14,
+                    backgroundColor: todayCell ? "rgba(255,255,255,0.25)" : "#DCFCE7",
+                    color: todayCell ? "#fff" : "#15803D",
+                    borderRadius: 8, padding: "0 3px", textAlign: "center",
+                  }}>{count}</div>
+                )}
+              </div>
+
+              {/* Hover tooltip */}
+              {d !== null && count > 0 && isHovered && (
+                <div style={{
+                  position: "absolute",
+                  bottom: "calc(100% + 8px)",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  backgroundColor: "#1E293B",
+                  color: "#fff",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  fontSize: 11,
+                  zIndex: 200,
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 6px 16px rgba(0,0,0,0.18)",
+                  pointerEvents: "none",
+                }}>
+                  {dayEvents.map((e, idx) => (
+                    <div key={idx} style={{ padding: "2px 0", display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", backgroundColor: GREEN, flexShrink: 0 }} />
+                      {e.name}
+                    </div>
+                  ))}
+                  {/* Arrow */}
+                  <div style={{
+                    position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+                    width: 0, height: 0,
+                    borderLeft: "5px solid transparent", borderRight: "5px solid transparent",
+                    borderTop: "5px solid #1E293B",
+                  }} />
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+
+      {/* Event list */}
+      <div style={{ marginTop: 16, borderTop: "1px solid #E2E8F0", paddingTop: 12 }}>
+        {sortedEvents.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", padding: "8px 0" }}>No upcoming activities.</div>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Scheduled</div>
+            {sortedEvents.slice(0, 5).map((e, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", borderBottom: i < Math.min(sortedEvents.length, 5) - 1 ? "1px solid #F1F5F9" : "none" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: GREEN, flexShrink: 0, marginTop: 5 }} />
+                <div>
+                  <div style={{ fontSize: 13, color: "#1E293B", fontWeight: 500, lineHeight: 1.3 }}>{e.name}</div>
+                  <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{e.date}</div>
+                </div>
+              </div>
+            ))}
+            {sortedEvents.length > 5 && (
+              <div style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", paddingTop: 8 }}>
+                +{sortedEvents.length - 5} more
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const volName = profile?.name || "Volunteer";
-  const volId = user?.id || 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [volunteer, setVolunteer] = useState<any>(null);
@@ -124,14 +225,25 @@ export function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const [volRes, evtRes] = await Promise.all([
-        api.getVolunteer(volId),
-        api.getEvents({ status: "Upcoming" }),
-      ]);
+      const volRes = await api.getVolunteerMe();
       setVolunteer(volRes);
-      setMyOrgs(volRes.organizations || []);
+
+      const orgs: any[] = volRes.organizations || [];
+      setMyOrgs(orgs);
       setMyCertificates(volRes.certificates || []);
-      setUpcomingEvents((evtRes.events || []).slice(0, 10));
+
+      // Fetch events only from the volunteer's ACTIVE org memberships
+      const activeOrgIds = orgs
+        .filter((o: any) => o.membership_status === "Active")
+        .map((o: any) => o.id);
+
+      if (activeOrgIds.length > 0) {
+        try {
+          const evtRes = await api.getEvents({ status: "Upcoming" });
+          const filtered = (evtRes.events || []).filter((e: any) => activeOrgIds.includes(e.org_id));
+          setUpcomingEvents(filtered);
+        } catch { setUpcomingEvents([]); }
+      }
 
       const allActivities = volRes.activities || [];
       setPendingActivities(allActivities.filter((a: any) => a.status === "Pending"));
@@ -156,13 +268,16 @@ export function ProfilePage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchProfile(); }, [volId]);
+  useEffect(() => { fetchProfile(); }, []);
+
+  // Use volunteer.id (volunteer record ID), NOT user.id (user table ID)
+  const volRecordId = volunteer?.id || 0;
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const skillsArray = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
-      await api.updateVolunteer(volId, {
+      await api.updateVolunteer(volRecordId, {
         name: form.fullName,
         phone: form.phone,
         city: form.city,
@@ -190,7 +305,7 @@ export function ProfilePage() {
       return;
     }
     try {
-      await api.updateVolunteer(volId, {
+      await api.updateVolunteer(volRecordId, {
         current_password: passwordForm.current,
         new_password: passwordForm.newPass,
       });
@@ -209,7 +324,7 @@ export function ProfilePage() {
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = reader.result as string;
-        await api.uploadProfilePicture(volId, base64);
+        await api.uploadProfilePicture(volRecordId, base64);
         fetchProfile();
         setUploadingPic(false);
       };
@@ -296,25 +411,40 @@ export function ProfilePage() {
 
               {/* My Organizations */}
               <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1E293B", marginBottom: 12 }}>My Organizations ({myOrgs.length})</div>
-                {myOrgs.map((org: any, idx: number) => (
-                  <div
-                    key={org.id}
-                    className="flex items-center gap-3"
-                    style={{ padding: "8px 0", borderBottom: idx < myOrgs.length - 1 ? "1px solid #F1F5F9" : "none", cursor: "pointer", borderRadius: 6 }}
-                    onClick={() => navigate(`/dashboard/org/${org.id}`)}
-                  >
-                    <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <OrgLogo orgId={org.id} size={32} />
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1E293B", marginBottom: 12 }}>
+                  My Organizations ({myOrgs.filter((o: any) => o.membership_status === "Active").length} active)
+                </div>
+                {myOrgs.map((org: any, idx: number) => {
+                  const isActive = org.membership_status === "Active";
+                  return (
+                    <div
+                      key={org.id}
+                      className="flex items-center gap-3"
+                      style={{ padding: "8px 0", borderBottom: idx < myOrgs.length - 1 ? "1px solid #F1F5F9" : "none", cursor: isActive ? "pointer" : "default", borderRadius: 6, opacity: isActive ? 1 : 0.7 }}
+                      onClick={() => isActive && navigate(`/dashboard/org/${org.id}`)}
+                    >
+                      <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <OrgLogo orgId={org.id} size={32} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "#1E293B" }}>{org.name}</div>
+                        <div style={{ fontSize: 11, color: "#94A3B8" }}>{org.category || "Organization"}</div>
+                      </div>
+                      {isActive ? (
+                        <span style={{ fontSize: 10, fontWeight: 600, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "2px 6px" }}>Active</span>
+                      ) : (
+                        <span style={{ fontSize: 10, fontWeight: 600, backgroundColor: "#FEF3C7", color: "#B45309", borderRadius: 4, padding: "2px 6px" }}>Pending</span>
+                      )}
+                      {isActive && <span style={{ fontSize: 16, color: "#94A3B8" }}>&rsaquo;</span>}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "#1E293B" }}>{org.name}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{org.category || "Organization"}</div>
-                    </div>
-                    <span style={{ fontSize: 16, color: "#94A3B8" }}>&rsaquo;</span>
+                  );
+                })}
+                {myOrgs.length === 0 && (
+                  <div style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", padding: "12px 0" }}>
+                    You haven't joined any organizations yet.{" "}
+                    <a onClick={() => navigate("/dashboard/orgs")} style={{ color: GREEN, cursor: "pointer" }}>Browse organizations →</a>
                   </div>
-                ))}
-                {myOrgs.length === 0 && <div style={{ fontSize: 13, color: "#94A3B8" }}>You haven't joined any organizations yet.</div>}
+                )}
               </div>
             </div>
 
@@ -329,7 +459,7 @@ export function ProfilePage() {
                       <span style={{ fontSize: 13, fontWeight: 500, color: "#1E293B" }}>{cert.event_name}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "2px 8px" }}>{cert.type}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{cert.org_name} \u00B7 {cert.issued_date}</div>
+                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{cert.org_name} &middot; {cert.issued_date}</div>
                   </div>
                 );
               })}
@@ -359,7 +489,7 @@ export function ProfilePage() {
                           <div key={a.id} className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
                             <div>
                               <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.event_name}</div>
-                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{a.date} \u00B7 {a.hours} hrs</div>
+                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{a.date} &middot; {a.hours} hrs</div>
                             </div>
                             <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text, borderRadius: 20, padding: "3px 10px" }}>Pending</span>
                           </div>
@@ -377,7 +507,7 @@ export function ProfilePage() {
                           <div key={app.id} className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
                             <div>
                               <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.event_name}</div>
-                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.org_name} \u00B7 {app.event_date}</div>
+                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.org_name} &middot; {app.event_date}</div>
                             </div>
                             <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text, borderRadius: 20, padding: "3px 10px" }}>Pending</span>
                           </div>
@@ -396,11 +526,25 @@ export function ProfilePage() {
                   <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: 0 }}>Edit Profile</h3>
                   <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#94A3B8", cursor: "pointer" }}>&times;</button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label style={labelStyle}>Full Name</label>
-                    <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} style={inputStyle} />
+                {/* Read-only fields — set at registration, cannot be changed */}
+                <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "12px 16px", marginBottom: 4 }}>
+                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>These details can only be changed by contacting the administration.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Full Name</label>
+                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.name}</div>
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Date of Birth</label>
+                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.date_of_birth || "—"}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <label style={{ ...labelStyle, color: "#94A3B8" }}>National ID</label>
+                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed", letterSpacing: "0.05em" }}>{volunteer?.national_id || "—"}</div>
+                    </div>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label style={labelStyle}>Email</label>
                     <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={inputStyle} />
@@ -408,10 +552,6 @@ export function ProfilePage() {
                   <div>
                     <label style={labelStyle}>Phone Number</label>
                     <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Date of Birth</label>
-                    <input type="date" value={form.dateOfBirth} onChange={(e) => setForm((f) => ({ ...f, dateOfBirth: e.target.value }))} style={inputStyle} />
                   </div>
                   <div>
                     <label style={labelStyle}>Governorate</label>
@@ -448,7 +588,13 @@ export function ProfilePage() {
               <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
                 <button onClick={() => setShowPasswordSection(!showPasswordSection)} className="flex items-center justify-between w-full" style={{ padding: "16px 24px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
                   <span style={{ fontSize: 15, fontWeight: 500, color: "#1E293B" }}>Change Password</span>
-                  <span style={{ color: "#94A3B8", transform: showPasswordSection ? "rotate(180deg)" : "none", transition: "transform 200ms" }}>\u25BC</span>
+                  <svg
+                    width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ transform: showPasswordSection ? "rotate(180deg)" : "none", transition: "transform 200ms", flexShrink: 0 }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
                 {showPasswordSection && (
                   <div className="px-6 pb-6 flex flex-col gap-4" style={{ borderTop: "1px solid #E2E8F0", paddingTop: 20 }}>
@@ -473,6 +619,7 @@ export function ProfilePage() {
                     { label: "Email", value: volunteer?.email },
                     { label: "Phone", value: volunteer?.phone || "\u2014" },
                     { label: "Date of Birth", value: volunteer?.date_of_birth || "\u2014" },
+                    { label: "National ID", value: volunteer?.national_id || "\u2014" },
                     { label: "Governorate", value: volunteer?.governorate || "\u2014" },
                     { label: "City", value: volunteer?.city || "\u2014" },
                   ].map((item) => (

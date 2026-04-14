@@ -172,5 +172,39 @@ def init_schema():
         conn.execute("ALTER TABLE volunteers ADD COLUMN profile_picture TEXT")
     except Exception:
         pass
+    try:
+        conn.execute("ALTER TABLE volunteers ADD COLUMN national_id TEXT")
+    except Exception:
+        pass
+
+    # Organization approval workflow + enhanced registration fields
+    org_extra_columns = [
+        ("status", "TEXT DEFAULT 'approved'"),   # pending / approved / rejected
+        ("rejection_reason", "TEXT"),
+        ("org_type", "TEXT"),                    # NGO, company, student_activity, etc.
+        ("official_email", "TEXT"),
+        ("founded_year", "TEXT"),
+        ("location", "TEXT"),                    # city / governorate
+        ("social_links", "TEXT"),
+        ("logo_url", "TEXT"),
+        ("documents_url", "TEXT"),
+        ("submitter_name", "TEXT"),
+        ("submitter_role", "TEXT"),
+        ("reviewed_at", "TEXT"),
+    ]
+    for col, ddl in org_extra_columns:
+        try:
+            conn.execute(f"ALTER TABLE organizations ADD COLUMN {col} {ddl}")
+        except Exception:
+            pass
+
+    # Platform admins table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_admins (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id),
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+
     conn.commit()
     conn.close()

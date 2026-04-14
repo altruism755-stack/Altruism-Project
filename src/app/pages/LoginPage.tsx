@@ -23,7 +23,11 @@ export function LoginPage() {
       // Determine redirect based on role stored after login
       const stored = sessionStorage.getItem("altruism_user");
       const u = stored ? JSON.parse(stored) : null;
-      if (u?.role === "org_admin") navigate("/org");
+      const orgStatus = sessionStorage.getItem("altruism_org_status");
+      if (u?.is_platform_admin) navigate("/platform-admin");
+      else if (u?.role === "org_admin") {
+        navigate(orgStatus && orgStatus !== "approved" ? "/org/pending" : "/org");
+      }
       else if (u?.role === "supervisor") navigate("/supervisor");
       else navigate("/dashboard/profile");
     } else {
@@ -117,7 +121,8 @@ export function LoginPage() {
               volunteer@example.com / <strong>volunteer</strong> — Yara Hassan<br />
               admin@resala.org / <strong>admin</strong> — Resala Admin<br />
               admin@redcrescent.org / <strong>admin</strong> — Red Crescent Admin<br />
-              amira@resala.org / <strong>supervisor</strong> — Resala Supervisor
+              amira@resala.org / <strong>supervisor</strong> — Resala Supervisor<br />
+              platform@altruism.org / <strong>platform</strong> — Platform Admin
             </div>
           </form>
         </div>

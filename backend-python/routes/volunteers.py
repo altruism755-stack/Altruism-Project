@@ -62,38 +62,55 @@ def list_volunteers(
         }
 
 
+@router.get("/me")
+def get_my_volunteer_profile(current_user: dict = Depends(require_roles("volunteer"))):
+    """Return the current volunteer's own full profile, scoped by their user_id."""
+    with get_db() as db:
+        vol = dict_row(db.execute(
+            "SELECT * FROM volunteers WHERE user_id = ?", (current_user["id"],)
+        ).fetchone())
+        if not vol:
+            raise HTTPException(404, "Volunteer profile not found")
+        return _build_volunteer_response(db, vol)
+
+
+def _build_volunteer_response(db, vol: dict) -> dict:
+    activities = dict_rows(db.execute(
+        "SELECT a.*, e.name as event_name, o.name as org_name FROM activities a "
+        "LEFT JOIN events e ON a.event_id = e.id "
+        "LEFT JOIN organizations o ON a.org_id = o.id "
+        "WHERE a.volunteer_id = ? ORDER BY a.date DESC",
+        (vol["id"],),
+    ).fetchall())
+
+    orgs = dict_rows(db.execute(
+        "SELECT o.*, ov.status as membership_status, ov.department, ov.joined_date "
+        "FROM organizations o "
+        "JOIN org_volunteers ov ON o.id = ov.org_id WHERE ov.volunteer_id = ? "
+        "ORDER BY ov.status DESC, ov.joined_date DESC",
+        (vol["id"],),
+    ).fetchall())
+
+    certificates = dict_rows(db.execute(
+        "SELECT c.*, o.name as org_name, e.name as event_name "
+        "FROM certificates c "
+        "JOIN organizations o ON c.org_id = o.id "
+        "LEFT JOIN events e ON c.event_id = e.id "
+        "WHERE c.volunteer_id = ?",
+        (vol["id"],),
+    ).fetchall())
+
+    total_hours = sum(a["hours"] for a in activities if a["status"] == "Approved")
+    return {**vol, "activities": activities, "organizations": orgs, "certificates": certificates, "totalHours": total_hours}
+
+
 @router.get("/{volunteer_id}")
 def get_volunteer(volunteer_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         vol = dict_row(db.execute("SELECT * FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
-
-        activities = dict_rows(db.execute(
-            "SELECT a.*, e.name as event_name FROM activities a "
-            "LEFT JOIN events e ON a.event_id = e.id "
-            "WHERE a.volunteer_id = ? ORDER BY a.date DESC",
-            (vol["id"],),
-        ).fetchall())
-
-        orgs = dict_rows(db.execute(
-            "SELECT o.* FROM organizations o "
-            "JOIN org_volunteers ov ON o.id = ov.org_id WHERE ov.volunteer_id = ?",
-            (vol["id"],),
-        ).fetchall())
-
-        certificates = dict_rows(db.execute(
-            "SELECT c.*, o.name as org_name, e.name as event_name "
-            "FROM certificates c "
-            "JOIN organizations o ON c.org_id = o.id "
-            "LEFT JOIN events e ON c.event_id = e.id "
-            "WHERE c.volunteer_id = ?",
-            (vol["id"],),
-        ).fetchall())
-
-        total_hours = sum(a["hours"] for a in activities if a["status"] == "Approved")
-
-        return {**vol, "activities": activities, "organizations": orgs, "certificates": certificates, "totalHours": total_hours}
+        return _build_volunteer_response(db, vol)
 
 
 @router.put("/{volunteer_id}")

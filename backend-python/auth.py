@@ -58,3 +58,36 @@ def require_roles(*roles: str):
         return current_user
 
     return dependency
+
+
+def require_platform_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """Platform admins are stored in the platform_admins table — a user may also
+    have a regular role (org_admin, volunteer) and be elevated to platform level."""
+    from database import get_db
+    with get_db() as db:
+        row = db.execute(
+            "SELECT user_id FROM platform_admins WHERE user_id = ?", (current_user["id"],)
+        ).fetchone()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Platform admin access required",
+            )
+    return current_user
+
+
+def require_approved_org_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """Org admin whose organization has been approved by the platform."""
+    if current_user["role"] != "org_admin":
+        raise HTTPException(status_code=403, detail="Org admin access required")
+    from database import get_db
+    with get_db() as db:
+        row = db.execute(
+            "SELECT status FROM organizations WHERE admin_user_id = ?",
+            (current_user["id"],),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Organization not found")
+        if row["status"] not in ("approved", None):
+            raise HTTPException(status_code=403, detail=f"Organization is {row['status']}")
+    return current_user

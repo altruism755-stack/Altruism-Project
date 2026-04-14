@@ -15,7 +15,8 @@ def seed():
         for table in [
             "event_applications", "announcements",
             "certificates", "activities", "org_volunteers",
-            "events", "supervisors", "volunteers", "organizations", "users",
+            "events", "supervisors", "volunteers", "organizations",
+            "platform_admins", "users",
         ]:
             try:
                 db.execute(f"DELETE FROM {table}")
@@ -26,6 +27,8 @@ def seed():
 
         # ──────────── USERS ────────────
         users = [
+            # platform admin (user id 100 to avoid colliding with regular accounts)
+            (100, "platform@altruism.org",    h("platform"),   "org_admin"),
             # org admins
             (1,  "admin@resala.org",          h("admin"),      "org_admin"),
             (2,  "admin@redcrescent.org",     h("admin"),      "org_admin"),
@@ -53,28 +56,41 @@ def seed():
             users,
         )
 
+        # Mark the platform admin
+        db.execute("INSERT INTO platform_admins (user_id) VALUES (?)", (100,))
+
         # ──────────── ORGANIZATIONS ────────────
-        db.execute(
-            "INSERT INTO organizations (id, name, description, category, color, secondary_color, initials, founded, admin_user_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (1, "Resala", "Egypt's largest volunteer organization dedicated to community support, "
-             "youth empowerment, food drives, and social welfare programs across all governorates.",
-             "Social Welfare", "#D97706", "#F59E0B", "RS", "1999-01-01", 1),
+        org_cols = (
+            "id, name, description, category, color, secondary_color, initials, founded, admin_user_id, "
+            "status, org_type, founded_year, location, official_email, submitter_name, submitter_role"
         )
-        db.execute(
-            "INSERT INTO organizations (id, name, description, category, color, secondary_color, initials, founded, admin_user_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (2, "Egyptian Red Crescent", "Providing humanitarian aid, disaster relief, blood donation drives, "
-             "and emergency health services across Egypt since 1912.",
-             "Humanitarian Aid", "#DC2626", "#EF4444", "RC", "1912-03-15", 2),
-        )
-        db.execute(
-            "INSERT INTO organizations (id, name, description, category, color, secondary_color, initials, founded, admin_user_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (3, "Enactus Egypt", "A student-run entrepreneurship organization empowering communities "
-             "through innovative social projects and sustainable business solutions.",
-             "Student Entrepreneurship", "#0891B2", "#06B6D4", "EN", "2004-09-01", 3),
-        )
+        org_placeholders = ", ".join(["?"] * 16)
+        insert_org = f"INSERT INTO organizations ({org_cols}) VALUES ({org_placeholders})"
+
+        db.execute(insert_org, (
+            1, "Resala",
+            "Egypt's largest volunteer organization dedicated to community support, "
+            "youth empowerment, food drives, and social welfare programs across all governorates.",
+            "Social Welfare", "#D97706", "#F59E0B", "RS", "1999-01-01", 1,
+            "approved", "NGO", "1999", "Cairo", "info@resala.org",
+            "Sherif Abdel Aziz", "Executive Director",
+        ))
+        db.execute(insert_org, (
+            2, "Egyptian Red Crescent",
+            "Providing humanitarian aid, disaster relief, blood donation drives, "
+            "and emergency health services across Egypt since 1912.",
+            "Humanitarian Aid", "#DC2626", "#EF4444", "RC", "1912-03-15", 2,
+            "approved", "NGO", "1912", "Cairo", "info@egyptianrc.org",
+            "Fatima El-Sayed", "Communications Director",
+        ))
+        db.execute(insert_org, (
+            3, "Enactus Egypt",
+            "A student-run entrepreneurship organization empowering communities "
+            "through innovative social projects and sustainable business solutions.",
+            "Student Entrepreneurship", "#0891B2", "#06B6D4", "EN", "2004-09-01", 3,
+            "approved", "Student Activity", "2004", "Giza", "contact@enactus-egypt.org",
+            "Mohamed Farouk", "Country Director",
+        ))
 
         # ──────────── SUPERVISORS ────────────
         supervisors = [

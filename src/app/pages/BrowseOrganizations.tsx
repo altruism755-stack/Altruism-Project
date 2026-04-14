@@ -7,9 +7,8 @@ import { OrgLogo } from "../components/OrgLogos";
 const GREEN = "#16A34A";
 
 export function BrowseOrganizations() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const volName = profile?.name || "Volunteer";
-  const volId = user?.id || 0;
 
   const [orgs, setOrgs] = useState<any[]>([]);
   const [myOrgIds, setMyOrgIds] = useState<Set<number>>(new Set());
@@ -23,43 +22,33 @@ export function BrowseOrganizations() {
       try {
         const [orgsRes, volRes] = await Promise.all([
           api.getOrganizations(),
-          api.getVolunteer(volId),
+          api.getVolunteerMe(),
         ]);
         setOrgs(orgsRes.organizations || []);
 
         const volOrgs: any[] = volRes.organizations || [];
-        // organizations endpoint only returns Active orgs; we need pending too
-        // Use getOrgMembers indirectly via volunteer data — check joined orgs
-        // The volunteer endpoint only returns Active org memberships. We'll check via event applications
-        // For pending, we need a different approach: try joining and catch 409
-        // Actually the volunteer endpoint doesn't show pending orgs, so we detect by trying join
-        // Better: fetch all orgs member lists but that requires admin.
-        // Simpler: track locally after user applies.
-        const activeIds = new Set<number>(volOrgs.map((o: any) => o.id));
+        const activeIds = new Set<number>(
+          volOrgs.filter((o: any) => o.membership_status === "Active").map((o: any) => o.id)
+        );
+        const pendingIds = new Set<number>(
+          volOrgs.filter((o: any) => o.membership_status === "Pending").map((o: any) => o.id)
+        );
         setMyOrgIds(activeIds);
-
-        // Try to detect pending memberships via event_applications or stored in session
-        const storedPending = sessionStorage.getItem(`altruism_pending_orgs_${volId}`);
-        if (storedPending) {
-          try { setPendingOrgIds(new Set(JSON.parse(storedPending))); } catch { }
-        }
+        setPendingOrgIds(pendingIds);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     };
     fetchData();
-  }, [volId]);
+  }, []);
 
   const handleJoin = async (orgId: number) => {
     setJoining(orgId);
     try {
       await api.joinOrganization(orgId);
-      const newPending = new Set([...pendingOrgIds, orgId]);
-      setPendingOrgIds(newPending);
-      sessionStorage.setItem(`altruism_pending_orgs_${volId}`, JSON.stringify([...newPending]));
+      setPendingOrgIds((prev) => new Set([...prev, orgId]));
     } catch (e: any) {
       if (e.message?.includes("Already")) {
-        const newPending = new Set([...pendingOrgIds, orgId]);
-        setPendingOrgIds(newPending);
+        setPendingOrgIds((prev) => new Set([...prev, orgId]));
       }
     }
     setJoining(null);

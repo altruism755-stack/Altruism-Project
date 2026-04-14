@@ -18,6 +18,7 @@ from routes.reports import router as reports_router
 from routes.organizations import router as organizations_router
 from routes.event_applications import router as event_applications_router
 from routes.announcements import router as announcements_router
+from routes.admin import router as admin_router
 
 app = FastAPI(title="Altruism API", redirect_slashes=False)
 
@@ -60,6 +61,7 @@ app.include_router(reports_router)
 app.include_router(organizations_router)
 app.include_router(event_applications_router)
 app.include_router(announcements_router)
+app.include_router(admin_router)
 
 # Serve uploaded profile pictures
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads", "profiles")
@@ -77,6 +79,39 @@ def health():
 @app.on_event("startup")
 def startup():
     init_schema()
+    _seed_platform_admin()
+
+
+def _seed_platform_admin():
+    """Ensure the default platform admin account exists at startup."""
+    from database import get_connection
+    from auth import hash_password
+
+    conn = get_connection()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM users WHERE email = ?", ("platform@altruism.org",)
+        ).fetchone()
+        if not existing:
+            hashed = hash_password("platform")
+            cur = conn.execute(
+                "INSERT INTO users (email, password, role) VALUES (?, ?, 'volunteer')",
+                ("platform@altruism.org", hashed),
+            )
+            user_id = cur.lastrowid
+            conn.execute(
+                "INSERT OR IGNORE INTO platform_admins (user_id) VALUES (?)", (user_id,)
+            )
+            conn.commit()
+            print("[seed] Created platform admin: platform@altruism.org / platform")
+        else:
+            # Ensure the user is in platform_admins even if seeded before
+            conn.execute(
+                "INSERT OR IGNORE INTO platform_admins (user_id) VALUES (?)", (existing["id"],)
+            )
+            conn.commit()
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

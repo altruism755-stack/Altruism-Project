@@ -42,18 +42,30 @@ export const api = {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
     return request(`/volunteers${qs}`);
   },
+  getVolunteerMe: () => request("/volunteers/me"),
   getVolunteer: (id: number) => request(`/volunteers/${id}`),
   updateVolunteer: (id: number, data: any) =>
     request(`/volunteers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   updateVolunteerStatus: (id: number, status: string) =>
     request(`/volunteers/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
 
-  // Supervisors
+  // Supervisors (org-admin)
   getSupervisors: () => request("/supervisors"),
   createSupervisor: (data: any) =>
     request("/supervisors", { method: "POST", body: JSON.stringify(data) }),
   deleteSupervisor: (id: number) =>
     request(`/supervisors/${id}`, { method: "DELETE" }),
+
+  // Supervisor self-service
+  getMyProfile: () => request("/supervisors/me"),
+  getMyVolunteers: () => request("/supervisors/me/volunteers"),
+  getMyPendingRequests: () => request("/supervisors/me/pending-requests"),
+  getMyEvents: () => request("/supervisors/me/events"),
+  getMyActivities: () => request("/supervisors/me/activities"),
+  approveMyRequest: (volId: number, data: any) =>
+    request(`/supervisors/me/requests/${volId}/approve`, { method: "PUT", body: JSON.stringify(data) }),
+  rejectMyRequest: (volId: number) =>
+    request(`/supervisors/me/requests/${volId}/reject`, { method: "PUT" }),
 
   // Events
   getEvents: (params?: Record<string, string>) => {
@@ -100,6 +112,8 @@ export const api = {
     request(`/organizations/${orgId}/members/${volId}/reject`, { method: "PUT" }),
   removeOrgMember: (orgId: number, volId: number) =>
     request(`/organizations/${orgId}/members/${volId}`, { method: "DELETE" }),
+  importVolunteersCSV: (orgId: number, csv: string) =>
+    request(`/organizations/${orgId}/import-csv`, { method: "POST", body: JSON.stringify({ csv }) }),
 
   // Reports
   getReportSummary: () => request("/reports/summary"),
@@ -128,6 +142,33 @@ export const api = {
     request(`/event-applications/${appId}/approve`, { method: "PUT" }),
   rejectApplication: (appId: number) =>
     request(`/event-applications/${appId}/reject`, { method: "PUT" }),
+
+  // Platform admin — organizations
+  adminListOrganizations: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(`/admin/organizations${qs}`);
+  },
+  adminGetOrganization: (id: number) => request(`/admin/organizations/${id}`),
+  adminApproveOrganization: (id: number) =>
+    request(`/admin/organizations/${id}/approve`, { method: "PUT" }),
+  adminRejectOrganization: (id: number, reason: string) =>
+    request(`/admin/organizations/${id}/reject`, { method: "PUT", body: JSON.stringify({ reason }) }),
+  adminPlatformStats: () => request(`/admin/stats`),
+
+  // Platform admin — volunteers
+  adminListVolunteers: (params?: { status?: string; search?: string }) => {
+    const qs = params ? "?" + new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString() : "";
+    return request(`/admin/volunteers${qs}`);
+  },
+  adminUpdateVolunteerStatus: (id: number, status: string) =>
+    request(`/admin/volunteers/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
+
+  // Platform admin — admin management
+  adminListAdmins: () => request(`/admin/platform-admins`),
+  adminAddAdmin: (email: string) =>
+    request(`/admin/platform-admins`, { method: "POST", body: JSON.stringify({ email }) }),
+  adminRemoveAdmin: (userId: number) =>
+    request(`/admin/platform-admins/${userId}`, { method: "DELETE" }),
 
   // Announcements
   getAnnouncements: (orgIds?: number[]) => {

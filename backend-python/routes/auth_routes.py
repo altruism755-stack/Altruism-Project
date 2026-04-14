@@ -13,15 +13,29 @@ class RegisterBody(BaseModel):
     email: str
     password: str
     role: str
+    # Volunteer fields
     name: Optional[str] = None
     phone: Optional[str] = None
     city: Optional[str] = None
     skills: Optional[list] = None
     aboutMe: Optional[str] = None
+    dateOfBirth: Optional[str] = None
+    governorate: Optional[str] = None
+    nationalId: Optional[str] = None
+    # Organization fields (enhanced)
     orgName: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     website: Optional[str] = None
+    orgType: Optional[str] = None        # NGO, Company, Student Activity, etc.
+    officialEmail: Optional[str] = None
+    foundedYear: Optional[str] = None
+    location: Optional[str] = None       # city / governorate
+    socialLinks: Optional[str] = None
+    logoUrl: Optional[str] = None
+    documentsUrl: Optional[str] = None
+    submitterName: Optional[str] = None
+    submitterRole: Optional[str] = None
 
 
 class LoginBody(BaseModel):
@@ -48,15 +62,19 @@ def register(body: RegisterBody):
             )
             user_id = cur.lastrowid
             db.execute(
-                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, about_me, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')",
+                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, about_me, date_of_birth, governorate, national_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
                 (user_id, body.name or "", body.email, body.phone or "", body.city or "",
-                 json.dumps(body.skills or []), body.aboutMe or ""),
+                 json.dumps(body.skills or []), body.aboutMe or "",
+                 body.dateOfBirth or "", body.governorate or "", body.nationalId or ""),
             )
             vol = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user_id,)).fetchone())
             token = generate_token({"id": user_id, "email": body.email, "role": "volunteer"})
             return {"token": token, "user": {"id": user_id, "email": body.email, "role": "volunteer"}, "volunteer": vol}
 
         if body.role == "org_admin":
+            if not body.orgName:
+                raise HTTPException(400, "Organization name is required")
+
             cur = db.execute(
                 "INSERT INTO users (email, password, role) VALUES (?, ?, 'org_admin')",
                 (body.email, hashed),
@@ -64,13 +82,28 @@ def register(body: RegisterBody):
             user_id = cur.lastrowid
             initials = "".join(w[0] for w in (body.orgName or "").split() if w)[:2].upper()
             db.execute(
-                "INSERT INTO organizations (name, description, category, initials, website, phone, admin_user_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (body.orgName or "", body.description or "", body.category or "", initials,
-                 body.website or "", body.phone or "", user_id),
+                """INSERT INTO organizations (
+                    name, description, category, initials, website, phone, admin_user_id,
+                    status, org_type, official_email, founded_year, location, social_links,
+                    logo_url, documents_url, submitter_name, submitter_role
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    body.orgName, body.description or "", body.category or "", initials,
+                    body.website or "", body.phone or "", user_id,
+                    body.orgType or "", body.officialEmail or body.email, body.foundedYear or "",
+                    body.location or "", body.socialLinks or "",
+                    body.logoUrl or "", body.documentsUrl or "",
+                    body.submitterName or "", body.submitterRole or "",
+                ),
             )
             org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user_id,)).fetchone())
             token = generate_token({"id": user_id, "email": body.email, "role": "org_admin"})
-            return {"token": token, "user": {"id": user_id, "email": body.email, "role": "org_admin"}, "organization": org}
+            return {
+                "token": token,
+                "user": {"id": user_id, "email": body.email, "role": "org_admin"},
+                "organization": org,
+                "message": "Registration submitted. Your organization will be reviewed by the platform admin.",
+            }
 
         raise HTTPException(400, "Invalid role. Use 'volunteer' or 'org_admin'")
 
@@ -87,6 +120,7 @@ def login(body: LoginBody):
 
         token = generate_token(user)
         profile = None
+        org_status = None
 
         if user["role"] == "volunteer":
             profile = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user["id"],)).fetchone())
@@ -94,11 +128,23 @@ def login(body: LoginBody):
             profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user["id"],)).fetchone())
         elif user["role"] == "org_admin":
             profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user["id"],)).fetchone())
+            if profile:
+                org_status = profile.get("status") or "approved"
+
+        # Check if this user is also a platform admin
+        pa_row = db.execute(
+            "SELECT user_id FROM platform_admins WHERE user_id = ?", (user["id"],)
+        ).fetchone()
+        is_platform_admin = pa_row is not None
 
         return {
             "token": token,
-            "user": {"id": user["id"], "email": user["email"], "role": user["role"]},
+            "user": {
+                "id": user["id"], "email": user["email"], "role": user["role"],
+                "is_platform_admin": is_platform_admin,
+            },
             "profile": profile,
+            "org_status": org_status,
         }
 
 
@@ -118,5 +164,10 @@ def me(current_user: dict = Depends(get_current_user)):
             profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user["id"],)).fetchone())
         elif user["role"] == "org_admin":
             profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user["id"],)).fetchone())
+
+        pa_row = db.execute(
+            "SELECT user_id FROM platform_admins WHERE user_id = ?", (user["id"],)
+        ).fetchone()
+        user["is_platform_admin"] = pa_row is not None
 
         return {"user": user, "profile": profile}

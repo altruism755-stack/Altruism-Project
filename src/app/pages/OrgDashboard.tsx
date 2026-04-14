@@ -427,6 +427,10 @@ export function OrgDashboard() {
   const [events, setEvents]     = useState<any[]>([]);
   const [loading, setLoading]   = useState(true);
   const [tab, setTab]           = useState<MainTab>("volunteers");
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText]   = useState("");
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadAll = useCallback(async () => {
     if (!orgId) return;
@@ -500,7 +504,72 @@ export function OrgDashboard() {
               {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
             </p>
           </div>
+          <button
+            onClick={() => { setShowImport(true); setCsvText(""); setImportResult(null); }}
+            style={{
+              height: 38, padding: "0 16px", backgroundColor: "#fff",
+              color: "#1E293B", border: "1px solid #E2E8F0", borderRadius: 8,
+              fontSize: 13, fontWeight: 500, cursor: "pointer",
+            }}
+          >
+            Import Volunteers (CSV)
+          </button>
         </div>
+
+        {/* CSV import modal */}
+        {showImport && (
+          <div onClick={() => setShowImport(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 600, padding: 28 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 8 }}>Import Volunteers from CSV</div>
+              <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6, marginBottom: 14 }}>
+                Paste CSV content with headers: <code style={{ backgroundColor: "#F1F5F9", padding: "1px 5px", borderRadius: 3 }}>name,email,phone,city,skills,department</code>.
+                Each volunteer is created with default password <strong>volunteer123</strong> and added to this organization as Active.
+              </div>
+              <textarea
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder={"name,email,phone,city,skills\nAhmed Ali,ahmed@example.com,01012345678,Cairo,Teaching\nMona Khalil,mona@example.com,01098765432,Alexandria,\"Event Planning,Communication\""}
+                style={{ width: "100%", minHeight: 180, padding: 12, fontSize: 13, fontFamily: "monospace", border: "1px solid #E2E8F0", borderRadius: 8, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+              />
+
+              {importResult && (
+                <div style={{ marginTop: 12, padding: 12, backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 13, color: "#15803D" }}>
+                  Imported <strong>{importResult.created}</strong> volunteers.
+                  {importResult.skipped > 0 && <> Skipped <strong>{importResult.skipped}</strong> (already existed or missing fields).</>}
+                  {importResult.errors?.length > 0 && (
+                    <div style={{ marginTop: 6, color: "#B91C1C" }}>
+                      Errors: {importResult.errors.slice(0, 3).join("; ")}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2" style={{ marginTop: 16, justifyContent: "flex-end" }}>
+                <button onClick={() => setShowImport(false)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+                  Close
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!csvText.trim()) return;
+                    setImporting(true);
+                    try {
+                      const res = await api.importVolunteersCSV(orgId, csvText);
+                      setImportResult(res);
+                      loadAll();
+                    } catch (e: any) {
+                      setImportResult({ created: 0, skipped: 0, errors: [e.message || "Failed"] });
+                    }
+                    setImporting(false);
+                  }}
+                  disabled={importing || !csvText.trim()}
+                  style={{ height: 36, padding: "0 18px", backgroundColor: importing || !csvText.trim() ? "#86EFAC" : "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: importing ? "wait" : "pointer" }}
+                >
+                  {importing ? "Importing..." : "Import"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 28 }}>

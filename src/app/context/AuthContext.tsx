@@ -4,14 +4,16 @@ interface User {
   id: number;
   email: string;
   role: "volunteer" | "supervisor" | "org_admin";
+  is_platform_admin?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   profile: any;
+  orgStatus: "pending" | "approved" | "rejected" | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (data: any) => Promise<boolean>;
+  register: (data: any) => Promise<{ ok: boolean; message?: string; orgStatus?: string }>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -21,12 +23,13 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 // Fallback demo credentials when backend is unavailable
-const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string }> = {
+const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string; is_platform_admin?: boolean }> = {
   "admin@resala.org":      { password: "admin",      role: "org_admin",  name: "Resala" },
   "admin@redcrescent.org": { password: "admin",      role: "org_admin",  name: "Egyptian Red Crescent" },
   "admin@enactus.org":     { password: "admin",      role: "org_admin",  name: "Enactus Egypt" },
   "amira@resala.org":      { password: "supervisor", role: "supervisor", name: "Dr. Amira Khalil" },
   "volunteer@example.com": { password: "volunteer",  role: "volunteer",  name: "Yara Hassan" },
+  "platform@altruism.org": { password: "platform",  role: "volunteer",  name: "Platform Admin", is_platform_admin: true },
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -39,7 +42,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const stored = sessionStorage.getItem("altruism_profile");
     return stored ? JSON.parse(stored) : null;
   });
+  const [orgStatus, setOrgStatus] = useState<"pending" | "approved" | "rejected" | null>(() => {
+    const s = sessionStorage.getItem("altruism_org_status");
+    return (s as any) || null;
+  });
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (orgStatus) sessionStorage.setItem("altruism_org_status", orgStatus);
+    else sessionStorage.removeItem("altruism_org_status");
+  }, [orgStatus]);
 
   useEffect(() => {
     if (user) sessionStorage.setItem("altruism_user", JSON.stringify(user));
@@ -69,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         setToken(data.token);
         setProfile(data.profile);
+        setOrgStatus(data.org_status || null);
         setIsLoading(false);
         return true;
       }
@@ -79,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Demo fallback
     const demo = DEMO_USERS[email];
     if (demo && demo.password === password) {
-      const u: User = { id: 1, email, role: demo.role };
+      const u: User = { id: 1, email, role: demo.role, is_platform_admin: demo.is_platform_admin };
       setUser(u);
       setToken("demo-token");
       setProfile({ name: demo.name });
@@ -91,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const register = async (data: any): Promise<boolean> => {
+  const register = async (data: any): Promise<{ ok: boolean; message?: string; orgStatus?: string }> => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/auth/register`, {
@@ -104,8 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(result.user);
         setToken(result.token);
         setProfile(result.profile || result.volunteer || result.organization);
+        const status = result.organization?.status || null;
+        if (status) setOrgStatus(status);
         setIsLoading(false);
-        return true;
+        return { ok: true, message: result.message, orgStatus: status };
       }
     } catch {
       // Fallback — just simulate
@@ -115,20 +130,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ id: Date.now(), email: data.email, role });
     setToken("demo-token");
     setIsLoading(false);
-    return true;
+    return { ok: true };
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
     setProfile(null);
+    setOrgStatus(null);
     sessionStorage.removeItem("altruism_user");
     sessionStorage.removeItem("altruism_token");
     sessionStorage.removeItem("altruism_profile");
+    sessionStorage.removeItem("altruism_org_status");
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, profile, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, profile, orgStatus, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

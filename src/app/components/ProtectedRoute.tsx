@@ -4,13 +4,22 @@ import { useAuth } from "../context/AuthContext";
 interface Props {
   children: React.ReactNode;
   allowedRoles?: ("volunteer" | "supervisor" | "org_admin")[];
+  requirePlatformAdmin?: boolean;
+  requireApprovedOrg?: boolean;
 }
 
-export function ProtectedRoute({ children, allowedRoles }: Props) {
-  const { user } = useAuth();
+export function ProtectedRoute({ children, allowedRoles, requirePlatformAdmin, requireApprovedOrg }: Props) {
+  const { user, orgStatus } = useAuth();
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (requirePlatformAdmin) {
+    if (!user.is_platform_admin) {
+      return <Navigate to="/" replace />;
+    }
+    return <>{children}</>;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -21,6 +30,11 @@ export function ProtectedRoute({ children, allowedRoles }: Props) {
       org_admin: "/org",
     };
     return <Navigate to={redirectMap[user.role] || "/"} replace />;
+  }
+
+  // Gate org_admin features on organization approval status
+  if (requireApprovedOrg && user.role === "org_admin" && orgStatus && orgStatus !== "approved") {
+    return <Navigate to="/org/pending" replace />;
   }
 
   return <>{children}</>;
