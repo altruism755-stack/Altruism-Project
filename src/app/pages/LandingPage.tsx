@@ -24,16 +24,6 @@ const C = {
   teal: "#06B6D4",
 };
 
-function BrandIcon({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="16" fill={C.primary} opacity={0.2} />
-      <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={C.primary} />
-      <path d="M16 14V24" stroke="#DCFCE7" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M16 18C16 18 13 16 12 14" stroke="#DCFCE7" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 const features = [
   {
@@ -93,9 +83,8 @@ export function LandingPage() {
       {/* ═══ NAVBAR ═══ */}
       <nav style={{ backgroundColor: C.navBg, height: 64, width: "100%", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
         <div className="flex items-center justify-between" style={{ maxWidth: 1280, margin: "0 auto", height: "100%", padding: "0 32px" }}>
-          <div className="flex items-center gap-2">
-            <BrandIcon size={32} />
-            <span style={{ fontSize: 18, fontWeight: 700, color: C.white, letterSpacing: "-0.02em" }}>Altruism</span>
+          <div>
+            <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.white, letterSpacing: "0.01em" }}>Altruism</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             {["Features", "How It Works", "For Organizations"].map((link) => (
@@ -258,9 +247,8 @@ export function LandingPage() {
         <div style={{ maxWidth: 1280, margin: "0 auto" }}>
           <div className="grid" style={{ gridTemplateColumns: "2.5fr 1fr 1fr 1fr", gap: 48, marginBottom: 56 }}>
             <div>
-              <div className="flex items-center gap-2" style={{ marginBottom: 16 }}>
-                <BrandIcon size={30} />
-                <span style={{ fontSize: 17, fontWeight: 700, color: C.white }}>Altruism</span>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.white, letterSpacing: "0.01em" }}>Altruism</span>
               </div>
               <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.7, maxWidth: 280 }}>A platform bridging non-profit organizations, student activities, and volunteers together.</p>
             </div>

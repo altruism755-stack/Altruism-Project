@@ -206,5 +206,20 @@ def init_schema():
         )
     """)
 
+    # Organization admins table — scoped per org, managed by org owners & platform admins
+    # Migration: if old schema (user_id PK, no org_id) exists, recreate it
+    _cols = {row[1] for row in conn.execute("PRAGMA table_info(org_admins)").fetchall()}
+    if _cols and "org_id" not in _cols:
+        conn.execute("DROP TABLE org_admins")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS org_admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            org_id INTEGER NOT NULL REFERENCES organizations(id),
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, org_id)
+        )
+    """)
+
     conn.commit()
     conn.close()

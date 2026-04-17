@@ -48,14 +48,7 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
           to="/"
           className="flex items-center gap-2 no-underline"
         >
-          {/* Leaf icon */}
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="16" fill={GREEN} opacity={0.2} />
-            <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={GREEN} />
-            <path d="M16 14V24" stroke="#DCFCE7" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M16 18C16 18 13 16 12 14" stroke="#DCFCE7" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
+          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#FFFFFF", letterSpacing: "0.01em", lineHeight: 1 }}>
             Altruism
           </span>
         </Link>

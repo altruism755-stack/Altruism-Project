@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DatePicker } from "../components/DatePicker";
@@ -24,6 +24,10 @@ export function RegisterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [volForm, setVolForm] = useState({ fullName: "", email: "", password: "", phone: "", city: "", skills: "", dateOfBirth: "", governorate: "", nationalId: "" });
+  const [volPicPreview, setVolPicPreview] = useState<string>("");
+  const [volPicData, setVolPicData] = useState<string>("");
+  const [volPicError, setVolPicError] = useState<string>("");
+  const volPicRef = useRef<HTMLInputElement>(null);
   const [orgForm, setOrgForm] = useState({
     orgName: "", email: "", password: "", phone: "",
     officialEmail: "", orgType: "", foundedYear: "", location: "",
@@ -45,6 +49,27 @@ export function RegisterPage() {
   });
 
   const labelStyle = { fontSize: 13, color: "#1E293B", fontWeight: 500 as const, marginBottom: 4, display: "block" as const };
+
+  const handleVolPicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVolPicError("");
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) {
+      setVolPicError("Only JPG and PNG files are allowed.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setVolPicError("Image must be under 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUri = reader.result as string;
+      setVolPicPreview(dataUri);
+      setVolPicData(dataUri);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,6 +115,7 @@ export function RegisterPage() {
           dateOfBirth: volForm.dateOfBirth,
           governorate: volForm.governorate,
           nationalId: volForm.nationalId,
+          ...(volPicData ? { profilePicture: volPicData } : {}),
         };
 
     const result = await register(data);
@@ -111,12 +137,8 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       <nav style={{ backgroundColor: "#0F172A", height: 64, display: "flex", alignItems: "center", padding: "0 32px" }}>
-        <a onClick={() => navigate("/")} className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="16" fill={GREEN} opacity={0.2} />
-            <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={GREEN} />
-          </svg>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Altruism</span>
+        <a onClick={() => navigate("/")} style={{ cursor: "pointer", textDecoration: "none" }}>
+          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>Altruism</span>
         </a>
       </nav>
 
@@ -159,6 +181,34 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {role === "Volunteer" && (
               <>
+                {/* Optional profile picture */}
+                <div className="flex flex-col items-center gap-2" style={{ marginBottom: 4 }}>
+                  <div
+                    onClick={() => volPicRef.current?.click()}
+                    style={{ width: 88, height: 88, borderRadius: "50%", border: `2px dashed ${volPicPreview ? GREEN : "#CBD5E1"}`, overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#F8FAFC", flexShrink: 0 }}
+                    title="Upload profile picture"
+                  >
+                    {volPicPreview ? (
+                      <img src={volPicPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ textAlign: "center", color: "#94A3B8" }}>
+                        <div style={{ fontSize: 24 }}>📷</div>
+                        <div style={{ fontSize: 10, marginTop: 2 }}>Photo</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <label style={{ fontSize: 12, color: GREEN, cursor: "pointer", fontWeight: 500 }}>
+                      {volPicPreview ? "Change photo" : "Upload photo (optional)"}
+                      <input ref={volPicRef} type="file" accept="image/jpeg,image/jpg,image/png" onChange={handleVolPicUpload} style={{ display: "none" }} />
+                    </label>
+                    {volPicPreview && (
+                      <button type="button" onClick={() => { setVolPicPreview(""); setVolPicData(""); }} style={{ fontSize: 12, color: "#EF4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
+                    )}
+                  </div>
+                  {volPicError && <div style={{ fontSize: 12, color: "#DC2626" }}>{volPicError}</div>}
+                </div>
+
                 <div><label style={labelStyle}>Full Name *</label><input required value={volForm.fullName} onChange={(e) => setVolForm((f) => ({ ...f, fullName: e.target.value }))} onFocus={() => setFocused("vfn")} onBlur={() => setFocused(null)} style={inputStyle("vfn")} /></div>
                 <div><label style={labelStyle}>Email *</label><input required type="email" value={volForm.email} onChange={(e) => setVolForm((f) => ({ ...f, email: e.target.value }))} onFocus={() => setFocused("ve")} onBlur={() => setFocused(null)} style={inputStyle("ve")} /></div>
                 <div><label style={labelStyle}>Password *</label><input required type="password" value={volForm.password} onChange={(e) => setVolForm((f) => ({ ...f, password: e.target.value }))} onFocus={() => setFocused("vp")} onBlur={() => setFocused(null)} style={inputStyle("vp")} /></div>

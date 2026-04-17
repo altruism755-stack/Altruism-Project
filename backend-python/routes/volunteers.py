@@ -178,15 +178,48 @@ def upload_profile_picture(volunteer_id: int, body: dict, current_user: dict = D
     elif "webp" in header:
         ext = "webp"
 
+    # Validate type
+    if ext not in ("png", "jpg", "webp"):
+        raise HTTPException(415, "Only JPG and PNG images are allowed")
+
+    # Validate size: 2MB binary limit
+    try:
+        decoded = base64.b64decode(data)
+    except Exception:
+        raise HTTPException(400, "Invalid image data")
+
+    if len(decoded) > 2 * 1024 * 1024:
+        raise HTTPException(413, "Image exceeds 2MB limit")
+
     filename = f"{volunteer_id}_{uuid.uuid4().hex[:8]}.{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
     with open(filepath, "wb") as f:
-        f.write(base64.b64decode(data))
+        f.write(decoded)
 
     with get_db() as db:
+        # Delete old picture file if exists
+        old = db.execute("SELECT profile_picture FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone()
+        if old and old["profile_picture"]:
+            old_path = os.path.join(UPLOAD_DIR, old["profile_picture"])
+            if os.path.exists(old_path):
+                os.remove(old_path)
         db.execute("UPDATE volunteers SET profile_picture = ? WHERE id = ?", (filename, volunteer_id))
         return {"profile_picture": filename}
+
+
+@router.delete("/{volunteer_id}/profile-picture")
+def remove_profile_picture(volunteer_id: int, current_user: dict = Depends(get_current_user)):
+    with get_db() as db:
+        vol = dict_row(db.execute("SELECT profile_picture FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+        if not vol:
+            raise HTTPException(404, "Volunteer not found")
+        if vol["profile_picture"]:
+            filepath = os.path.join(UPLOAD_DIR, vol["profile_picture"])
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        db.execute("UPDATE volunteers SET profile_picture = NULL WHERE id = ?", (volunteer_id,))
+        return {"message": "Profile picture removed"}
 
 
 @router.get("/{volunteer_id}/org/{org_id}")

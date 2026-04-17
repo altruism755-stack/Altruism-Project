@@ -1,4 +1,7 @@
+import base64
 import json
+import os
+import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
@@ -22,6 +25,7 @@ class RegisterBody(BaseModel):
     dateOfBirth: Optional[str] = None
     governorate: Optional[str] = None
     nationalId: Optional[str] = None
+    profilePicture: Optional[str] = None  # base64 data URI, optional
     # Organization fields (enhanced)
     orgName: Optional[str] = None
     description: Optional[str] = None
@@ -68,6 +72,25 @@ def register(body: RegisterBody):
                  body.dateOfBirth or "", body.governorate or "", body.nationalId or ""),
             )
             vol = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user_id,)).fetchone())
+
+            # Save optional profile picture
+            if body.profilePicture and vol:
+                try:
+                    from routes.volunteers import UPLOAD_DIR
+                    pic_data = body.profilePicture
+                    header, data = pic_data.split(",", 1) if "," in pic_data else ("", pic_data)
+                    ext = "jpg" if ("jpeg" in header or "jpg" in header) else "png"
+                    decoded = base64.b64decode(data)
+                    if len(decoded) <= 2 * 1024 * 1024:
+                        filename = f"{vol['id']}_{uuid.uuid4().hex[:8]}.{ext}"
+                        filepath = os.path.join(UPLOAD_DIR, filename)
+                        with open(filepath, "wb") as f:
+                            f.write(decoded)
+                        db.execute("UPDATE volunteers SET profile_picture = ? WHERE id = ?", (filename, vol["id"]))
+                        vol["profile_picture"] = filename
+                except Exception:
+                    pass  # image save failure is non-fatal
+
             token = generate_token({"id": user_id, "email": body.email, "role": "volunteer"})
             return {"token": token, "user": {"id": user_id, "email": body.email, "role": "volunteer"}, "volunteer": vol}
 

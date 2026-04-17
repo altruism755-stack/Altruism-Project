@@ -2,9 +2,14 @@ import csv
 import io
 import json
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles, hash_password
+from auth import get_current_user, require_roles, require_approved_org_admin, hash_password
+
+
+class AddOrgAdminBody(BaseModel):
+    email: str
 
 router = APIRouter(prefix="/api/organizations", tags=["organizations"])
 
@@ -229,3 +234,60 @@ def remove_org_member(
             (org_id, vol_id),
         )
         return {"message": "Volunteer removed from organization"}
+
+
+# ── Organization admin management (org-scoped) ───────────────────────────────
+# org_id is ALWAYS derived from the authenticated user's organization — never
+# accepted from frontend input — to prevent cross-org privilege escalation.
+
+def _get_my_org_id(db, user_id: int) -> int:
+    org = dict_row(db.execute(
+        "SELECT id FROM organizations WHERE admin_user_id = ?", (user_id,)
+    ).fetchone())
+    if not org:
+        raise HTTPException(404, "Organization not found for this user")
+    return org["id"]
+
+
+@router.get("/me/admins")
+def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        rows = dict_rows(db.execute(
+            "SELECT oa.id, oa.user_id, u.email, oa.created_at "
+            "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
+            "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
+            (org_id,),
+        ).fetchall())
+        return {"admins": rows}
+
+
+@router.post("/me/admins", status_code=201)
+def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
+        if not user:
+            raise HTTPException(404, f"No user found with email '{body.email}'")
+        if user["id"] == current_user["id"]:
+            raise HTTPException(400, "You are already the organization owner")
+        existing = db.execute(
+            "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], org_id)
+        ).fetchone()
+        if existing:
+            raise HTTPException(409, "User is already an organization admin")
+        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], org_id))
+        return {"message": f"{body.email} is now an organization admin"}
+
+
+@router.delete("/me/admins/{admin_id}")
+def remove_my_org_admin(admin_id: int, current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        row = dict_row(db.execute(
+            "SELECT id, user_id FROM org_admins WHERE id = ? AND org_id = ?", (admin_id, org_id)
+        ).fetchone())
+        if not row:
+            raise HTTPException(404, "Organization admin not found")
+        db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
+        return {"message": "Organization admin removed"}

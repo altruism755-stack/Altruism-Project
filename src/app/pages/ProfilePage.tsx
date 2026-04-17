@@ -213,6 +213,9 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploadingPic, setUploadingPic] = useState(false);
+  const [removingPic, setRemovingPic] = useState(false);
+  const [picError, setPicError] = useState("");
+  const [picSuccess, setPicSuccess] = useState("");
 
   const [form, setForm] = useState({
     fullName: "", phone: "", city: "", skills: "", aboutMe: "",
@@ -319,17 +322,48 @@ export function ProfilePage() {
   const handleProfilePicture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPicError("");
+    setPicSuccess("");
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) {
+      setPicError("Only JPG and PNG files are allowed.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setPicError("Image must be under 2MB.");
+      return;
+    }
     setUploadingPic(true);
     try {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = reader.result as string;
-        await api.uploadProfilePicture(volRecordId, base64);
-        fetchProfile();
-        setUploadingPic(false);
+        try {
+          const base64 = reader.result as string;
+          await api.uploadProfilePicture(volRecordId, base64);
+          setPicSuccess("Profile picture updated.");
+          fetchProfile();
+        } catch (err: any) {
+          setPicError(err.message || "Upload failed.");
+        } finally {
+          setUploadingPic(false);
+        }
       };
       reader.readAsDataURL(file);
     } catch { setUploadingPic(false); }
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    setRemovingPic(true);
+    setPicError("");
+    setPicSuccess("");
+    try {
+      await api.removeProfilePicture(volRecordId);
+      setPicSuccess("Profile picture removed.");
+      fetchProfile();
+    } catch (err: any) {
+      setPicError(err.message || "Failed to remove picture.");
+    } finally {
+      setRemovingPic(false);
+    }
   };
 
   const totalHours = volunteer?.totalHours || 0;
@@ -369,26 +403,40 @@ export function ProfilePage() {
             <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
               <div className="flex flex-col items-center" style={{ marginBottom: 20 }}>
                 {/* Profile picture */}
-                <div style={{ position: "relative", marginBottom: 12 }}>
-                  {profilePicUrl ? (
-                    <img src={profilePicUrl} alt="Profile" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: `3px solid ${GREEN}` }} />
-                  ) : (
-                    <div style={{ width: 80, height: 80, borderRadius: "50%", background: `linear-gradient(135deg, ${GREEN}, #22C55E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff" }}>
-                      {(volunteer?.name || "").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                    </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                  <div style={{ position: "relative" }}>
+                    {profilePicUrl ? (
+                      <img src={profilePicUrl} alt="Profile" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: `3px solid ${GREEN}` }} />
+                    ) : (
+                      <div style={{ width: 80, height: 80, borderRadius: "50%", background: `linear-gradient(135deg, ${GREEN}, #22C55E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff" }}>
+                        {(volunteer?.name || "").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => { setPicError(""); setPicSuccess(""); fileInputRef.current?.click(); }}
+                      style={{
+                        position: "absolute", bottom: -2, right: -2, width: 28, height: 28, borderRadius: "50%",
+                        backgroundColor: "#fff", border: "2px solid #E2E8F0", display: "flex", alignItems: "center",
+                        justifyContent: "center", cursor: "pointer", fontSize: 14,
+                      }}
+                      title="Change profile picture"
+                      disabled={uploadingPic}
+                    >
+                      {uploadingPic ? "⋯" : "✏"}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png" onChange={handleProfilePicture} style={{ display: "none" }} />
+                  </div>
+                  {profilePicUrl && (
+                    <button
+                      onClick={handleRemoveProfilePicture}
+                      disabled={removingPic}
+                      style={{ fontSize: 11, color: "#EF4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                    >
+                      {removingPic ? "Removing..." : "Remove photo"}
+                    </button>
                   )}
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      position: "absolute", bottom: -2, right: -2, width: 28, height: 28, borderRadius: "50%",
-                      backgroundColor: "#fff", border: "2px solid #E2E8F0", display: "flex", alignItems: "center",
-                      justifyContent: "center", cursor: "pointer", fontSize: 14,
-                    }}
-                    title="Upload profile picture"
-                  >
-                    {uploadingPic ? "..." : "\u270F"}
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProfilePicture} style={{ display: "none" }} />
+                  {picError && <div style={{ fontSize: 11, color: "#DC2626", textAlign: "center" }}>{picError}</div>}
+                  {picSuccess && <div style={{ fontSize: 11, color: "#15803D", textAlign: "center" }}>{picSuccess}</div>}
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B" }}>{volunteer?.name}</div>
                 <div style={{ fontSize: 13, color: "#94A3B8" }}>{volunteer?.email}</div>

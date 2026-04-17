@@ -129,6 +129,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ image }),
     }),
+  removeProfilePicture: (volunteerId: number) =>
+    request(`/volunteers/${volunteerId}/profile-picture`, { method: "DELETE" }),
 
   // Volunteer org dashboard
   getVolunteerOrgDashboard: (volunteerId: number, orgId: number) =>
@@ -169,6 +171,23 @@ export const api = {
     request(`/admin/platform-admins`, { method: "POST", body: JSON.stringify({ email }) }),
   adminRemoveAdmin: (userId: number) =>
     request(`/admin/platform-admins/${userId}`, { method: "DELETE" }),
+
+  // Org admin — managing admins for own organization (org_id from server token, never from client)
+  orgListAdmins: () => request(`/organizations/me/admins`),
+  orgAddAdmin: (email: string) =>
+    request(`/organizations/me/admins`, { method: "POST", body: JSON.stringify({ email }) }),
+  orgRemoveAdmin: (adminId: number) =>
+    request(`/organizations/me/admins/${adminId}`, { method: "DELETE" }),
+
+  // Platform admin — organization admin management (global, with org selector)
+  adminListOrgAdmins: (orgId?: number) => {
+    const qs = orgId ? `?org_id=${orgId}` : "";
+    return request(`/admin/org-admins${qs}`);
+  },
+  adminAddOrgAdmin: (email: string, orgId: number) =>
+    request(`/admin/org-admins`, { method: "POST", body: JSON.stringify({ email, org_id: orgId }) }),
+  adminRemoveOrgAdmin: (adminId: number) =>
+    request(`/admin/org-admins/${adminId}`, { method: "DELETE" }),
 
   // Announcements
   getAnnouncements: (orgIds?: number[]) => {

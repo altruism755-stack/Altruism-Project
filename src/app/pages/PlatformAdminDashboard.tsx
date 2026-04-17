@@ -37,6 +37,16 @@ export function PlatformAdminDashboard() {
   const [adminSuccess, setAdminSuccess] = useState("");
   const [adminsLoading, setAdminsLoading] = useState(false);
 
+  // Org admins state (platform-level management)
+  const [allApprovedOrgs, setAllApprovedOrgs] = useState<any[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<number | "">("");
+  const [orgAdmins, setOrgAdmins] = useState<any[]>([]);
+  const [newOrgAdminEmail, setNewOrgAdminEmail] = useState("");
+  const [orgAdminError, setOrgAdminError] = useState("");
+  const [orgAdminSuccess, setOrgAdminSuccess] = useState("");
+  const [orgAdminsLoading, setOrgAdminsLoading] = useState(false);
+  const [orgAdminConfirmId, setOrgAdminConfirmId] = useState<number | null>(null);
+
   const loadStats = useCallback(async () => {
     try {
       const s = await api.adminPlatformStats();
@@ -72,6 +82,22 @@ export function PlatformAdminDashboard() {
     finally { setAdminsLoading(false); }
   }, []);
 
+  const loadAllApprovedOrgs = useCallback(async () => {
+    try {
+      const res = await api.adminListOrganizations("approved");
+      setAllApprovedOrgs(res.organizations || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  const loadOrgAdmins = useCallback(async (orgId?: number) => {
+    setOrgAdminsLoading(true);
+    try {
+      const res = await api.adminListOrgAdmins(orgId);
+      setOrgAdmins(res.admins || []);
+    } catch { /* ignore */ }
+    finally { setOrgAdminsLoading(false); }
+  }, []);
+
   // Initial load
   useEffect(() => {
     Promise.all([loadStats(), loadOrgs()]).finally(() => setLoading(false));
@@ -79,7 +105,13 @@ export function PlatformAdminDashboard() {
 
   useEffect(() => { loadOrgs(); }, [loadOrgs]);
   useEffect(() => { if (mainTab === "volunteers") loadVolunteers(); }, [mainTab, loadVolunteers]);
-  useEffect(() => { if (mainTab === "admins") loadAdmins(); }, [mainTab, loadAdmins]);
+  useEffect(() => {
+    if (mainTab === "admins") {
+      loadAdmins();
+      loadAllApprovedOrgs();
+      loadOrgAdmins();
+    }
+  }, [mainTab, loadAdmins, loadAllApprovedOrgs, loadOrgAdmins]);
 
   const handleApprove = async (orgId: number) => {
     await api.adminApproveOrganization(orgId);
@@ -122,16 +154,34 @@ export function PlatformAdminDashboard() {
     } catch (e: any) { setAdminError(e.message || "Failed to remove admin"); }
   };
 
+  const handleAddOrgAdmin = async () => {
+    setOrgAdminError(""); setOrgAdminSuccess("");
+    if (!newOrgAdminEmail.trim() || !selectedOrgId) return;
+    try {
+      const res = await api.adminAddOrgAdmin(newOrgAdminEmail.trim(), Number(selectedOrgId));
+      setNewOrgAdminEmail("");
+      setOrgAdminSuccess(res.message || `Access granted.`);
+      await loadOrgAdmins(Number(selectedOrgId));
+    } catch (e: any) { setOrgAdminError(e.message || "Failed to add organization admin"); }
+  };
+
+  const handleRemoveOrgAdmin = async (adminId: number) => {
+    try {
+      await api.adminRemoveOrgAdmin(adminId);
+      setOrgAdminConfirmId(null);
+      await loadOrgAdmins(selectedOrgId ? Number(selectedOrgId) : undefined);
+    } catch (e: any) {
+      setOrgAdminError(e.message || "Failed to remove organization admin");
+      setOrgAdminConfirmId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Navbar */}
       <nav className="w-full flex items-center justify-between px-8" style={{ backgroundColor: NAV, height: 64, flexShrink: 0 }}>
         <div className="flex items-center gap-3">
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="16" fill={GREEN} opacity={0.2} />
-            <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={GREEN} />
-          </svg>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Altruism</span>
+          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>Altruism</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: "#FCD34D", backgroundColor: "rgba(252,211,77,0.15)", borderRadius: 4, padding: "2px 8px", marginLeft: 8 }}>PLATFORM ADMIN</span>
         </div>
         <div className="flex items-center gap-3">
@@ -338,8 +388,8 @@ export function PlatformAdminDashboard() {
               </div>
             </div>
 
-            {/* Admin list */}
-            <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+            {/* Platform admin list */}
+            <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", marginBottom: 32 }}>
               <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F8FAFC" }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>Current Platform Admins ({admins.length})</span>
               </div>
@@ -362,6 +412,109 @@ export function PlatformAdminDashboard() {
                         <button onClick={() => handleRemoveAdmin(a.user_id, a.email)} style={{ ...btnStyle("#fff", "#EF4444", "1px solid #FECACA"), fontSize: 12, height: 30, padding: "0 12px" }}>Remove</button>
                       )}
                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ── Organization Admin Management ── */}
+            {/* Removal confirmation modal */}
+            {orgAdminConfirmId !== null && (
+              <>
+                <div onClick={() => setOrgAdminConfirmId(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.4)", zIndex: 60 }} />
+                <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 400, backgroundColor: "#fff", borderRadius: 16, zIndex: 61, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 8px 0" }}>Remove Organization Admin</h3>
+                  <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 24px 0" }}>This person will lose organization admin access. You can re-add them at any time.</p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setOrgAdminConfirmId(null)} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                    <button onClick={() => handleRemoveOrgAdmin(orgAdminConfirmId)} style={{ flex: 1, height: 40, backgroundColor: "#EF4444", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: "0 0 4px 0" }}>Organization Admin Management</h3>
+              <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 16px 0" }}>Grant or revoke organization admin access. Admins are scoped to their organization only.</p>
+
+              {/* Org selector */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Select Organization</label>
+                <select
+                  value={selectedOrgId}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? "" : Number(e.target.value);
+                    setSelectedOrgId(val as number | "");
+                    setOrgAdminError(""); setOrgAdminSuccess("");
+                    loadOrgAdmins(val ? Number(val) : undefined);
+                  }}
+                  style={{ width: "100%", height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", backgroundColor: "#fff", color: "#1E293B" }}
+                >
+                  <option value="">— All organizations —</option>
+                  {allApprovedOrgs.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Email + Grant */}
+              {orgAdminError   && <div style={{ fontSize: 13, color: "#B91C1C", backgroundColor: "#FEE2E2", padding: "8px 12px", borderRadius: 6, marginBottom: 10 }}>{orgAdminError}</div>}
+              {orgAdminSuccess && <div style={{ fontSize: 13, color: "#15803D", backgroundColor: "#DCFCE7", padding: "8px 12px", borderRadius: 6, marginBottom: 10 }}>{orgAdminSuccess}</div>}
+              <div className="flex gap-3">
+                <input
+                  type="email"
+                  placeholder="user@example.com"
+                  value={newOrgAdminEmail}
+                  onChange={(e) => setNewOrgAdminEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddOrgAdmin()}
+                  disabled={!selectedOrgId}
+                  style={{ flex: 1, height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", opacity: selectedOrgId ? 1 : 0.5 }}
+                />
+                <button
+                  onClick={handleAddOrgAdmin}
+                  disabled={!selectedOrgId || !newOrgAdminEmail.trim()}
+                  style={{ ...btnStyle(NAV, "#fff"), opacity: (!selectedOrgId || !newOrgAdminEmail.trim()) ? 0.4 : 1 }}
+                >
+                  Grant Access
+                </button>
+              </div>
+              {!selectedOrgId && (
+                <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 8 }}>Select an organization above to grant access.</p>
+              )}
+            </div>
+
+            {/* Org admin list */}
+            <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F8FAFC" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>
+                  {selectedOrgId
+                    ? `Organization Admins — ${allApprovedOrgs.find((o) => o.id === selectedOrgId)?.name ?? ""} (${orgAdmins.length})`
+                    : `All Organization Admins (${orgAdmins.length})`
+                  }
+                </span>
+              </div>
+              {orgAdminsLoading ? (
+                <div style={{ padding: 32, textAlign: "center", color: "#94A3B8" }}>Loading...</div>
+              ) : orgAdmins.length === 0 ? (
+                <div style={{ padding: 32, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+                  {selectedOrgId ? "No organization admins for this organization." : "No organization admins found across any organization."}
+                </div>
+              ) : (
+                orgAdmins.map((a, idx) => (
+                  <div key={a.id} className="flex items-center justify-between" style={{ padding: "14px 20px", borderBottom: idx < orgAdmins.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.email}</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                        {!selectedOrgId && <span style={{ fontWeight: 500, color: "#64748B" }}>{a.org_name} · </span>}
+                        Added {a.created_at?.split("T")[0]}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setOrgAdminConfirmId(a.id)}
+                      style={{ ...btnStyle("#fff", "#EF4444", "1px solid #FECACA"), fontSize: 12, height: 30, padding: "0 12px" }}
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))
               )}

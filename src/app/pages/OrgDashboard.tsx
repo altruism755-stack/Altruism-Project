@@ -413,11 +413,132 @@ function ActivitiesTab({ events, onRefresh }: { events: any[]; onRefresh: () => 
   );
 }
 
+// ─── Org Admins tab ───────────────────────────────────────────────────────────
+function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
+  const [admins, setAdmins]       = useState<any[]>([]);
+  const [email, setEmail]         = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState("");
+  const [success, setSuccess]     = useState("");
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { const r = await api.orgListAdmins(); setAdmins(r.admins || []); } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleGrant = async () => {
+    setError(""); setSuccess("");
+    if (!email.trim()) return;
+    try {
+      await api.orgAddAdmin(email.trim());
+      setSuccess(`${email.trim()} is now an organization admin.`);
+      setEmail("");
+      load();
+    } catch (e: any) {
+      setError(e.message || "Failed to grant access");
+    }
+  };
+
+  const handleRemove = async (id: number) => {
+    try {
+      await api.orgRemoveAdmin(id);
+      setConfirmId(null);
+      load();
+    } catch (e: any) {
+      setError(e.message || "Failed to remove admin");
+      setConfirmId(null);
+    }
+  };
+
+  return (
+    <div>
+      {/* Confirm removal modal */}
+      {confirmId !== null && (
+        <>
+          <div onClick={() => setConfirmId(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 50 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 400, backgroundColor: "#fff", borderRadius: 16, zIndex: 51, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+            <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 8px 0" }}>Remove Organization Admin</h3>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 24px 0" }}>
+              This person will lose organization admin access. You can re-add them later.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmId(null)} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => handleRemove(confirmId)} style={{ flex: 1, height: 40, backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Add form */}
+      <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: "0 0 4px 0" }}>Add Organization Admin</h3>
+        <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 14px 0" }}>Enter the email of an existing user to grant them admin access to your organization.</p>
+        {error   && <div style={{ fontSize: 13, color: "#B91C1C", backgroundColor: "#FEE2E2", padding: "8px 12px", borderRadius: 6, marginBottom: 10 }}>{error}</div>}
+        {success && <div style={{ fontSize: 13, color: "#15803D", backgroundColor: "#DCFCE7", padding: "8px 12px", borderRadius: 6, marginBottom: 10 }}>{success}</div>}
+        <div className="flex gap-3">
+          <input
+            type="email"
+            placeholder="user@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGrant()}
+            style={{ flex: 1, height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }}
+          />
+          <button
+            onClick={handleGrant}
+            style={{ height: 40, padding: "0 18px", backgroundColor: "#0F172A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            Grant Access
+          </button>
+        </div>
+      </div>
+
+      {/* Admin list */}
+      <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F8FAFC" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>Current Organization Admins ({admins.length})</span>
+        </div>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading...</div>
+        ) : admins.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>No additional organization admins yet.</div>
+        ) : (
+          admins.map((a, idx) => (
+            <div key={a.id} className="flex items-center justify-between" style={{ padding: "14px 20px", borderBottom: idx < admins.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.email}</div>
+                <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Added {a.created_at?.split("T")[0]}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                {a.email === currentUserEmail && (
+                  <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "2px 8px" }}>You</span>
+                )}
+                {a.email !== currentUserEmail && (
+                  <button
+                    onClick={() => setConfirmId(a.id)}
+                    style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, cursor: "pointer" }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
-type MainTab = "volunteers" | "supervisors" | "activities";
+type MainTab = "volunteers" | "supervisors" | "activities" | "admins";
 
 export function OrgDashboard() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const orgName = profile?.name || "Organization";
   const orgId: number = profile?.id || 0;
 
@@ -489,6 +610,7 @@ export function OrgDashboard() {
     { key: "volunteers",  label: "Volunteers",  badge: pending.length || undefined },
     { key: "supervisors", label: "Supervisors" },
     { key: "activities",  label: "Activities",  badge: activeEv.length || undefined },
+    { key: "admins",      label: "Admins" },
   ];
 
   return (
@@ -627,6 +749,9 @@ export function OrgDashboard() {
             )}
             {tab === "activities" && (
               <ActivitiesTab events={events} onRefresh={loadAll} />
+            )}
+            {tab === "admins" && (
+              <OrgAdminsTab currentUserEmail={user?.email || ""} />
             )}
           </div>
         </div>

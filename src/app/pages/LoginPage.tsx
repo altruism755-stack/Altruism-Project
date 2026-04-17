@@ -39,12 +39,8 @@ export function LoginPage() {
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Simple nav */}
       <nav style={{ backgroundColor: "#0F172A", height: 64, display: "flex", alignItems: "center", padding: "0 32px" }}>
-        <a onClick={() => navigate("/")} className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="16" fill={GREEN} opacity={0.2} />
-            <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={GREEN} />
-          </svg>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Altruism</span>
+        <a onClick={() => navigate("/")} style={{ cursor: "pointer", textDecoration: "none" }}>
+          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>Altruism</span>
         </a>
       </nav>
 
@@ -60,11 +56,8 @@ export function LoginPage() {
         <div style={{ width: 440, backgroundColor: "#FFFFFF", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.08)", padding: 40 }}>
           {/* Logo */}
           <div className="flex flex-col items-center" style={{ marginBottom: 32 }}>
-            <svg width="40" height="40" viewBox="0 0 32 32" fill="none" style={{ marginBottom: 12 }}>
-              <circle cx="16" cy="16" r="16" fill={GREEN} opacity={0.2} />
-              <path d="M16 8C16 8 9 12 9 18C9 21.3 12.1 24 16 24C19.9 24 23 21.3 23 18C23 12 16 8 16 8Z" fill={GREEN} />
-            </svg>
-            <span style={{ fontSize: 20, fontWeight: 700, color: "#1E293B" }}>Altruism</span>
+            <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 600, color: "#1E293B", letterSpacing: "0.01em", lineHeight: 1 }}>Altruism</span>
+            <span style={{ fontSize: 11, color: "#94A3B8", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 4, fontWeight: 500 }}>Volunteer Management Platform</span>
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">

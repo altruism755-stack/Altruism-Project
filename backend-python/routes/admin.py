@@ -13,6 +13,11 @@ class AddAdminBody(BaseModel):
     email: str
 
 
+class AddOrgAdminBody(BaseModel):
+    email: str
+    org_id: int
+
+
 @router.get("/organizations")
 def list_organizations_for_review(
     status: Optional[str] = None,
@@ -184,3 +189,53 @@ def remove_platform_admin(user_id: int, current_user: dict = Depends(require_pla
             raise HTTPException(404, "Platform admin not found")
         db.execute("DELETE FROM platform_admins WHERE user_id = ?", (user_id,))
         return {"message": "Platform admin removed"}
+
+
+# ── Organization admin management (platform-level) ──────────────────────────
+
+@router.get("/org-admins")
+def list_org_admins(
+    org_id: Optional[int] = None,
+    current_user: dict = Depends(require_platform_admin),
+):
+    with get_db() as db:
+        query = (
+            "SELECT oa.id, oa.user_id, u.email, o.id as org_id, o.name as org_name, oa.created_at "
+            "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
+            "JOIN organizations o ON oa.org_id = o.id"
+        )
+        params: list = []
+        if org_id:
+            query += " WHERE oa.org_id = ?"
+            params.append(org_id)
+        query += " ORDER BY o.name ASC, oa.created_at ASC"
+        rows = dict_rows(db.execute(query, params).fetchall())
+        return {"admins": rows}
+
+
+@router.post("/org-admins", status_code=201)
+def add_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require_platform_admin)):
+    with get_db() as db:
+        org = dict_row(db.execute("SELECT id, name FROM organizations WHERE id = ?", (body.org_id,)).fetchone())
+        if not org:
+            raise HTTPException(404, "Organization not found")
+        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
+        if not user:
+            raise HTTPException(404, f"No user found with email '{body.email}'")
+        existing = db.execute(
+            "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], body.org_id)
+        ).fetchone()
+        if existing:
+            raise HTTPException(409, "User is already an organization admin for this organization")
+        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], body.org_id))
+        return {"message": f"{body.email} is now an organization admin for {org['name']}"}
+
+
+@router.delete("/org-admins/{admin_id}")
+def remove_org_admin(admin_id: int, current_user: dict = Depends(require_platform_admin)):
+    with get_db() as db:
+        row = db.execute("SELECT id FROM org_admins WHERE id = ?", (admin_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Organization admin not found")
+        db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
+        return {"message": "Organization admin removed"}
