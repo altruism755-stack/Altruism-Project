@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DatePicker } from "../components/DatePicker";
+import { Logo } from "../components/Logo";
 
 const GREEN = "#16A34A";
 const GREEN_HOVER = "#15803D";
@@ -138,7 +139,7 @@ export function RegisterPage() {
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       <nav style={{ backgroundColor: "#0F172A", height: 64, display: "flex", alignItems: "center", padding: "0 32px" }}>
         <a onClick={() => navigate("/")} style={{ cursor: "pointer", textDecoration: "none" }}>
-          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>Altruism</span>
+          <Logo size={24} color="#FFFFFF" />
         </a>
       </nav>
 

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router";
 import { useState } from "react";
 import { ResalaLogo, RedCrescentLogo, EnactusLogo } from "../components/OrgLogos";
+import { Logo } from "../components/Logo";
 import heroBg from "../assets/hero-bg.png";
 
 const C = {
@@ -84,7 +85,7 @@ export function LandingPage() {
       <nav style={{ backgroundColor: C.navBg, height: 64, width: "100%", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
         <div className="flex items-center justify-between" style={{ maxWidth: 1280, margin: "0 auto", height: "100%", padding: "0 32px" }}>
           <div>
-            <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.white, letterSpacing: "0.01em" }}>Altruism</span>
+            <Logo size={24} color={C.white} />
           </div>
           <div className="hidden md:flex items-center gap-8">
             {["Features", "How It Works", "For Organizations"].map((link) => (
@@ -248,7 +249,7 @@ export function LandingPage() {
           <div className="grid" style={{ gridTemplateColumns: "2.5fr 1fr 1fr 1fr", gap: 48, marginBottom: 56 }}>
             <div>
               <div style={{ marginBottom: 16 }}>
-                <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.white, letterSpacing: "0.01em" }}>Altruism</span>
+                <Logo size={26} color={C.white} tagline taglineColor={C.gray500} taglineSize={11} />
               </div>
               <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.7, maxWidth: 280 }}>A platform bridging non-profit organizations, student activities, and volunteers together.</p>
             </div>

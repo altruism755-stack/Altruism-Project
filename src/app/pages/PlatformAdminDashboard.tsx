@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
+import { Logo } from "../components/Logo";
 
 const GREEN = "#16A34A";
 const NAV = "#0F172A";
@@ -181,7 +182,7 @@ export function PlatformAdminDashboard() {
       {/* Navbar */}
       <nav className="w-full flex items-center justify-between px-8" style={{ backgroundColor: NAV, height: 64, flexShrink: 0 }}>
         <div className="flex items-center gap-3">
-          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>Altruism</span>
+          <Logo size={24} color="#FFFFFF" />
           <span style={{ fontSize: 11, fontWeight: 600, color: "#FCD34D", backgroundColor: "rgba(252,211,77,0.15)", borderRadius: 4, padding: "2px 8px", marginLeft: 8 }}>PLATFORM ADMIN</span>
         </div>
         <div className="flex items-center gap-3">

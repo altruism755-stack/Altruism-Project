@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
+import { Logo } from "./Logo";
 
 interface NavbarProps {
   role?: "org" | "supervisor" | "volunteer" | "guest";
@@ -48,9 +49,7 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
           to="/"
           className="flex items-center gap-2 no-underline"
         >
-          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#FFFFFF", letterSpacing: "0.01em", lineHeight: 1 }}>
-            Altruism
-          </span>
+          <Logo size={24} color="#FFFFFF" />
         </Link>
 
         <div className="hidden md:flex items-center gap-6">

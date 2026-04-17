@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
+import { Logo } from "../components/Logo";
 
 const GREEN = "#16A34A";
 const GREEN_HOVER = "#15803D";
@@ -40,7 +41,7 @@ export function LoginPage() {
       {/* Simple nav */}
       <nav style={{ backgroundColor: "#0F172A", height: 64, display: "flex", alignItems: "center", padding: "0 32px" }}>
         <a onClick={() => navigate("/")} style={{ cursor: "pointer", textDecoration: "none" }}>
-          <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>Altruism</span>
+          <Logo size={24} color="#FFFFFF" />
         </a>
       </nav>
 
@@ -56,8 +57,7 @@ export function LoginPage() {
         <div style={{ width: 440, backgroundColor: "#FFFFFF", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.08)", padding: 40 }}>
           {/* Logo */}
           <div className="flex flex-col items-center" style={{ marginBottom: 32 }}>
-            <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 600, color: "#1E293B", letterSpacing: "0.01em", lineHeight: 1 }}>Altruism</span>
-            <span style={{ fontSize: 11, color: "#94A3B8", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 4, fontWeight: 500 }}>Volunteer Management Platform</span>
+            <Logo size={44} color="#1E293B" align="center" tagline taglineColor="#64748B" taglineSize={13} />
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
