@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -21,11 +21,25 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 const GOVERNORATES = [
-  "Cairo", "Giza", "Alexandria", "Dakahlia", "Sharqia", "Qalyubia",
-  "Beheira", "Gharbia", "Monufia", "Kafr El Sheikh", "Damietta",
-  "Port Said", "Ismailia", "Suez", "North Sinai", "South Sinai",
-  "Fayoum", "Beni Suef", "Minya", "Asyut", "Sohag", "Qena",
-  "Luxor", "Aswan", "Red Sea", "New Valley", "Matrouh",
+  "Cairo", "Alexandria", "Giza", "Qalyubia", "Sharqia", "Dakahlia", "Beheira",
+  "Minya", "Asyut", "Sohag", "Qena", "Luxor", "Aswan", "Fayoum", "Beni Suef",
+  "Ismailia", "Port Said", "Suez", "Damietta", "Kafr El Sheikh", "Gharbia",
+  "Monufia", "Red Sea", "New Valley", "Matrouh", "North Sinai", "South Sinai",
+];
+
+const SKILLS_LIST = [
+  "Teaching / Tutoring",
+  "Medical / First Aid",
+  "Photography & Videography",
+  "Event Planning",
+  "Social Media Management",
+  "Translation",
+  "Software Development",
+  "Graphic Design",
+  "Fundraising",
+  "Administrative Support",
+  "Environmental Work",
+  "Community Outreach",
 ];
 
 function getDaysInMonth(year: number, month: number) {
@@ -218,9 +232,18 @@ export function ProfilePage() {
   const [picSuccess, setPicSuccess] = useState("");
 
   const [form, setForm] = useState({
-    fullName: "", phone: "", city: "", skills: "", aboutMe: "",
+    fullName: "", phone: "", city: "", aboutMe: "",
     dateOfBirth: "", governorate: "", email: "",
+    gender: "", healthNotes: "", educationLevel: "",
+    priorExperience: false, priorOrg: "", hoursPerWeek: 10,
   });
+  const [formSkills, setFormSkills] = useState<string[]>([]);
+  const [formCustomSkill, setFormCustomSkill] = useState("");
+  const [formAvailability, setFormAvailability] = useState<string[]>([]);
+  const [formLanguages, setFormLanguages] = useState<{ language: string; proficiency: string }[]>([]);
+  const [formCauseAreas, setFormCauseAreas] = useState<string[]>([]);
+  const [formNewLang, setFormNewLang] = useState("");
+  const [formNewLangProf, setFormNewLangProf] = useState("Conversational");
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: "", newPass: "", confirm: "" });
   const [passwordError, setPasswordError] = useState("");
@@ -256,16 +279,34 @@ export function ProfilePage() {
         setPendingApplications((appsRes.applications || []).filter((a: any) => a.status === "Pending"));
       } catch { setPendingApplications([]); }
 
-      const skills = (() => { try { return JSON.parse(volRes.skills || "[]"); } catch { return []; } })();
+      const skills: string[] = (() => { try { return JSON.parse(volRes.skills || "[]"); } catch { return []; } })();
+      const knownSkills = skills.filter((s) => SKILLS_LIST.includes(s));
+      const customSkills = skills.filter((s) => !SKILLS_LIST.includes(s));
+      const editSkills = customSkills.length > 0 ? [...knownSkills, "Other"] : knownSkills;
+      setFormSkills(editSkills);
+      setFormCustomSkill(customSkills.join(", "));
+
+      const avail: string[] = (() => { try { return JSON.parse(volRes.availability || "[]"); } catch { return []; } })();
+      setFormAvailability(avail);
+      const langs: { language: string; proficiency: string }[] = (() => { try { return JSON.parse(volRes.languages || "[]"); } catch { return []; } })();
+      setFormLanguages(langs.length > 0 ? langs : [{ language: "Arabic", proficiency: "Native" }]);
+      const causes: string[] = (() => { try { return JSON.parse(volRes.cause_areas || "[]"); } catch { return []; } })();
+      setFormCauseAreas(causes);
+
       setForm({
         fullName: volRes.name || "",
         phone: volRes.phone || "",
         city: volRes.city || "",
-        skills: Array.isArray(skills) ? skills.join(", ") : "",
         aboutMe: volRes.about_me || "",
         dateOfBirth: volRes.date_of_birth || "",
         governorate: volRes.governorate || "",
         email: volRes.email || "",
+        gender: volRes.gender || "",
+        healthNotes: volRes.health_notes || "",
+        educationLevel: volRes.education_level || "",
+        priorExperience: volRes.prior_experience === 1,
+        priorOrg: volRes.prior_org || "",
+        hoursPerWeek: volRes.hours_per_week || 10,
       });
     } catch (e) { console.error("Failed to load profile:", e); }
     finally { setLoading(false); }
@@ -279,7 +320,9 @@ export function ProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const skillsArray = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
+      const skillsArray = formSkills.includes("Other")
+        ? [...formSkills.filter((s) => s !== "Other"), ...formCustomSkill.split(",").map((s) => s.trim()).filter(Boolean)]
+        : formSkills;
       await api.updateVolunteer(volRecordId, {
         name: form.fullName,
         phone: form.phone,
@@ -289,6 +332,15 @@ export function ProfilePage() {
         date_of_birth: form.dateOfBirth,
         governorate: form.governorate,
         email: form.email,
+        gender: form.gender,
+        health_notes: form.healthNotes,
+        education_level: form.educationLevel,
+        prior_experience: form.priorExperience ? 1 : 0,
+        prior_org: form.priorOrg,
+        hours_per_week: form.hoursPerWeek,
+        availability: formAvailability,
+        languages: formLanguages,
+        cause_areas: formCauseAreas,
       });
       setEditing(false);
       fetchProfile();
@@ -615,12 +667,170 @@ export function ProfilePage() {
                 </div>
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Skills</label>
-                  <textarea value={form.skills} onChange={(e) => setForm((f) => ({ ...f, skills: e.target.value }))} style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
-                  <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>Separate skills with commas</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px", marginTop: 4 }}>
+                    {SKILLS_LIST.map((skill) => (
+                      <label key={skill} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#1E293B", padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formSkills.includes(skill) ? GREEN : "#E2E8F0"}`, backgroundColor: formSkills.includes(skill) ? "#F0FDF4" : "#FAFAFA", transition: "all 150ms", userSelect: "none" as const }}>
+                        <input
+                          type="checkbox"
+                          checked={formSkills.includes(skill)}
+                          onChange={() => setFormSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill])}
+                          style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }}
+                        />
+                        {skill}
+                      </label>
+                    ))}
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#1E293B", padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formSkills.includes("Other") ? GREEN : "#E2E8F0"}`, backgroundColor: formSkills.includes("Other") ? "#F0FDF4" : "#FAFAFA", transition: "all 150ms", userSelect: "none" as const }}>
+                      <input
+                        type="checkbox"
+                        checked={formSkills.includes("Other")}
+                        onChange={() => setFormSkills((prev) => prev.includes("Other") ? prev.filter((s) => s !== "Other") : [...prev, "Other"])}
+                        style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }}
+                      />
+                      Other
+                    </label>
+                  </div>
+                  {formSkills.includes("Other") && (
+                    <input
+                      value={formCustomSkill}
+                      onChange={(e) => setFormCustomSkill(e.target.value)}
+                      placeholder="Describe your skill(s), comma-separated..."
+                      style={{ ...inputStyle, marginTop: 8 }}
+                    />
+                  )}
                 </div>
+                {/* Gender */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Gender</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {["Male", "Female"].map((g) => (
+                      <button key={g} type="button" onClick={() => setForm((f) => ({ ...f, gender: g }))}
+                        style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.gender === g ? GREEN : "#E2E8F0"}`, backgroundColor: form.gender === g ? "#F0FDF4" : "#FAFAFA", color: form.gender === g ? GREEN : "#64748B", fontWeight: form.gender === g ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Education Level */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Education Level</label>
+                  <select value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value }))} style={inputStyle}>
+                    <option value="">Select education level...</option>
+                    {["Below secondary", "Secondary", "Diploma", "Bachelor's", "Master's", "PhD"].map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Availability */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Availability</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px" }}>
+                    {["Weekday mornings", "Weekday afternoons", "Weekday evenings", "Weekends", "Flexible"].map((opt) => (
+                      <label key={opt} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formAvailability.includes(opt) ? GREEN : "#E2E8F0"}`, backgroundColor: formAvailability.includes(opt) ? "#F0FDF4" : "#FAFAFA", userSelect: "none" as const }}>
+                        <input type="checkbox" checked={formAvailability.includes(opt)}
+                          onChange={() => setFormAvailability((prev) => prev.includes(opt) ? prev.filter((a) => a !== opt) : [...prev, opt])}
+                          style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }} />
+                        {opt}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hours per week */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>
+                    Estimated hours per week{" "}
+                    <span style={{ color: GREEN, fontWeight: 700 }}>{form.hoursPerWeek} hrs</span>
+                  </label>
+                  <input type="range" min={1} max={40} step={1} value={form.hoursPerWeek}
+                    onChange={(e) => setForm((f) => ({ ...f, hoursPerWeek: parseInt(e.target.value) }))}
+                    style={{ width: "100%", accentColor: GREEN, cursor: "pointer" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8" }}>
+                    <span>1</span><span>10</span><span>20</span><span>30</span><span>40</span>
+                  </div>
+                </div>
+
+                {/* Languages */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Languages Spoken</label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+                    {formLanguages.map((lang, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <div style={{ flex: 1, height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, display: "flex", alignItems: "center", backgroundColor: "#F8FAFC" }}>{lang.language}</div>
+                        <select value={lang.proficiency} onChange={(e) => setFormLanguages((prev) => prev.map((l, i) => i === idx ? { ...l, proficiency: e.target.value } : l))}
+                          style={{ height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 8px", fontSize: 13, outline: "none", backgroundColor: "#FFFFFF" }}>
+                          {["Basic", "Conversational", "Fluent", "Native"].map((p) => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        {formLanguages.length > 1 && (
+                          <button type="button" onClick={() => setFormLanguages((prev) => prev.filter((_, i) => i !== idx))}
+                            style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input value={formNewLang} onChange={(e) => setFormNewLang(e.target.value)}
+                      placeholder="Add a language..." style={{ flex: 1, height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                    <select value={formNewLangProf} onChange={(e) => setFormNewLangProf(e.target.value)}
+                      style={{ height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 8px", fontSize: 13, outline: "none", backgroundColor: "#FFFFFF" }}>
+                      {["Basic", "Conversational", "Fluent", "Native"].map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <button type="button" onClick={() => { if (!formNewLang.trim()) return; setFormLanguages((prev) => [...prev, { language: formNewLang.trim(), proficiency: formNewLangProf }]); setFormNewLang(""); }}
+                      style={{ height: 38, padding: "0 14px", borderRadius: 8, border: `1.5px solid ${GREEN}`, backgroundColor: "#F0FDF4", color: GREEN, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      + Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cause Areas */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Cause Areas / Interests</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 10px" }}>
+                    {["Children & Youth", "Elderly", "Environment", "Education", "Health", "Disability", "Refugees", "Animal Welfare", "Others"].map((c) => (
+                      <label key={c} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formCauseAreas.includes(c) ? GREEN : "#E2E8F0"}`, backgroundColor: formCauseAreas.includes(c) ? "#F0FDF4" : "#FAFAFA", userSelect: "none" as const }}>
+                        <input type="checkbox" checked={formCauseAreas.includes(c)}
+                          onChange={() => setFormCauseAreas((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])}
+                          style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }} />
+                        {c}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Prior Experience */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Prior Volunteer Experience</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {([false, true] as const).map((val) => (
+                      <button key={String(val)} type="button" onClick={() => setForm((f) => ({ ...f, priorExperience: val }))}
+                        style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.priorExperience === val ? GREEN : "#E2E8F0"}`, backgroundColor: form.priorExperience === val ? "#F0FDF4" : "#FAFAFA", color: form.priorExperience === val ? GREEN : "#64748B", fontWeight: form.priorExperience === val ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
+                        {val ? "Yes" : "No"}
+                      </button>
+                    ))}
+                  </div>
+                  {form.priorExperience && (
+                    <div style={{ marginTop: 8 }}>
+                      <input value={form.priorOrg} onChange={(e) => setForm((f) => ({ ...f, priorOrg: e.target.value.slice(0, 200) }))}
+                        placeholder="Which organization(s)?" style={{ ...inputStyle }} />
+                      <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.priorOrg.length}/200</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Health Notes */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Health / Mobility Notes <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <textarea value={form.healthNotes} onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, 300) }))}
+                    placeholder="Any physical limitations organizations should know about..."
+                    style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
+                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.healthNotes.length}/300</div>
+                </div>
+
                 <div style={{ marginTop: 12 }}>
                   <label style={labelStyle}>About Me</label>
-                  <textarea value={form.aboutMe} onChange={(e) => setForm((f) => ({ ...f, aboutMe: e.target.value }))} style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
+                  <textarea value={form.aboutMe} onChange={(e) => setForm((f) => ({ ...f, aboutMe: e.target.value.slice(0, 500) }))} style={{ ...inputStyle, height: 90, padding: "10px 12px", resize: "vertical" as const }} placeholder="Tell organizations about yourself..." />
+                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.aboutMe.length}/500</div>
                 </div>
                 <div className="flex gap-3" style={{ marginTop: 20 }}>
                   <button onClick={handleSave} disabled={saving} style={{ flex: 1, height: 42, backgroundColor: saving ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
@@ -663,13 +873,16 @@ export function ProfilePage() {
                 <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 20px 0" }}>Personal Information</h3>
                 <div className="grid grid-cols-2 gap-y-4 gap-x-8">
                   {[
-                    { label: "Full Name", value: volunteer?.name },
-                    { label: "Email", value: volunteer?.email },
-                    { label: "Phone", value: volunteer?.phone || "\u2014" },
-                    { label: "Date of Birth", value: volunteer?.date_of_birth || "\u2014" },
-                    { label: "National ID", value: volunteer?.national_id || "\u2014" },
-                    { label: "Governorate", value: volunteer?.governorate || "\u2014" },
-                    { label: "City", value: volunteer?.city || "\u2014" },
+                    { label: "Full Name",    value: volunteer?.name },
+                    { label: "Email",        value: volunteer?.email },
+                    { label: "Phone",        value: volunteer?.phone || "\u2014" },
+                    { label: "Gender",       value: volunteer?.gender || "\u2014" },
+                    { label: "Date of Birth",value: volunteer?.date_of_birth || "\u2014" },
+                    { label: "National ID",  value: volunteer?.national_id || "\u2014" },
+                    { label: "Governorate",  value: volunteer?.governorate || "\u2014" },
+                    { label: "City",         value: volunteer?.city || "\u2014" },
+                    { label: "Education",    value: volunteer?.education_level || "\u2014" },
+                    { label: "Hrs / Week",   value: volunteer?.hours_per_week ? `${volunteer.hours_per_week} hrs` : "\u2014" },
                   ].map((item) => (
                     <div key={item.label}>
                       <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 2 }}>{item.label}</div>
@@ -677,6 +890,24 @@ export function ProfilePage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Prior Experience */}
+                {volunteer?.prior_experience === 1 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Prior Volunteer Experience</div>
+                    <div style={{ fontSize: 14, color: "#1E293B" }}>{volunteer.prior_org || "Yes"}</div>
+                  </div>
+                )}
+
+                {/* Health Notes */}
+                {volunteer?.health_notes && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Health / Mobility Notes</div>
+                    <div style={{ fontSize: 14, color: "#1E293B", lineHeight: 1.5 }}>{volunteer.health_notes}</div>
+                  </div>
+                )}
+
+                {/* Skills */}
                 {volunteer?.skills && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Skills</div>
@@ -687,6 +918,44 @@ export function ProfilePage() {
                     </div>
                   </div>
                 )}
+
+                {/* Availability */}
+                {volunteer?.availability && (() => { try { return JSON.parse(volunteer.availability); } catch { return []; } })().length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Availability</div>
+                    <div className="flex flex-wrap gap-2">
+                      {((() => { try { return JSON.parse(volunteer.availability); } catch { return []; } })() as string[]).map((a: string, i: number) => (
+                        <span key={i} style={{ fontSize: 12, backgroundColor: "#EFF6FF", color: "#2563EB", padding: "4px 10px", borderRadius: 20, fontWeight: 500 }}>{a}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Languages */}
+                {volunteer?.languages && (() => { try { return JSON.parse(volunteer.languages); } catch { return []; } })().length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Languages</div>
+                    <div className="flex flex-wrap gap-2">
+                      {((() => { try { return JSON.parse(volunteer.languages); } catch { return []; } })() as { language: string; proficiency: string }[]).map((l, i) => (
+                        <span key={i} style={{ fontSize: 12, backgroundColor: "#F5F3FF", color: "#7C3AED", padding: "4px 10px", borderRadius: 20, fontWeight: 500 }}>{l.language} — {l.proficiency}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cause Areas */}
+                {volunteer?.cause_areas && (() => { try { return JSON.parse(volunteer.cause_areas); } catch { return []; } })().length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Cause Areas</div>
+                    <div className="flex flex-wrap gap-2">
+                      {((() => { try { return JSON.parse(volunteer.cause_areas); } catch { return []; } })() as string[]).map((c: string, i: number) => (
+                        <span key={i} style={{ fontSize: 12, backgroundColor: "#FFF7ED", color: "#C2410C", padding: "4px 10px", borderRadius: 20, fontWeight: 500 }}>{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* About Me */}
                 {volunteer?.about_me && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>About Me</div>

@@ -26,6 +26,15 @@ class RegisterBody(BaseModel):
     governorate: Optional[str] = None
     nationalId: Optional[str] = None
     profilePicture: Optional[str] = None  # base64 data URI, optional
+    gender: Optional[str] = None
+    healthNotes: Optional[str] = None
+    availability: Optional[list] = None
+    hoursPerWeek: Optional[int] = None
+    languages: Optional[list] = None
+    educationLevel: Optional[str] = None
+    priorExperience: Optional[bool] = None
+    priorOrg: Optional[str] = None
+    causeAreas: Optional[list] = None
     # Organization fields (enhanced)
     orgName: Optional[str] = None
     description: Optional[str] = None
@@ -66,10 +75,18 @@ def register(body: RegisterBody):
             )
             user_id = cur.lastrowid
             db.execute(
-                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, about_me, date_of_birth, governorate, national_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
+                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, about_me, "
+                "date_of_birth, governorate, national_id, gender, health_notes, availability, "
+                "hours_per_week, languages, education_level, prior_experience, prior_org, "
+                "cause_areas, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
                 (user_id, body.name or "", body.email, body.phone or "", body.city or "",
                  json.dumps(body.skills or []), body.aboutMe or "",
-                 body.dateOfBirth or "", body.governorate or "", body.nationalId or ""),
+                 body.dateOfBirth or "", body.governorate or "", body.nationalId or "",
+                 body.gender or "", body.healthNotes or "",
+                 json.dumps(body.availability or []), body.hoursPerWeek or 0,
+                 json.dumps(body.languages or []), body.educationLevel or "",
+                 1 if body.priorExperience else 0, body.priorOrg or "",
+                 json.dumps(body.causeAreas or [])),
             )
             vol = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user_id,)).fetchone())
 

@@ -177,6 +177,24 @@ def init_schema():
     except Exception:
         pass
 
+    # Extended volunteer profile fields
+    new_vol_columns = [
+        ("gender", "TEXT"),
+        ("health_notes", "TEXT"),
+        ("availability", "TEXT"),
+        ("hours_per_week", "INTEGER DEFAULT 0"),
+        ("languages", "TEXT"),
+        ("education_level", "TEXT"),
+        ("prior_experience", "INTEGER DEFAULT 0"),
+        ("prior_org", "TEXT"),
+        ("cause_areas", "TEXT"),
+    ]
+    for col, ddl in new_vol_columns:
+        try:
+            conn.execute(f"ALTER TABLE volunteers ADD COLUMN {col} {ddl}")
+        except Exception:
+            pass
+
     # Organization approval workflow + enhanced registration fields
     org_extra_columns = [
         ("status", "TEXT DEFAULT 'approved'"),   # pending / approved / rejected

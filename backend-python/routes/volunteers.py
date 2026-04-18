@@ -123,6 +123,15 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         about_me = body.get("about_me")
         date_of_birth = body.get("date_of_birth")
         governorate = body.get("governorate")
+        gender = body.get("gender")
+        health_notes = body.get("health_notes")
+        availability = body.get("availability")
+        hours_per_week = body.get("hours_per_week")
+        languages = body.get("languages")
+        education_level = body.get("education_level")
+        prior_experience = body.get("prior_experience")
+        prior_org = body.get("prior_org")
+        cause_areas = body.get("cause_areas")
 
         db.execute(
             "UPDATE volunteers SET "
@@ -130,9 +139,28 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
             "city = COALESCE(?, city), skills = COALESCE(?, skills), "
             "about_me = COALESCE(?, about_me), "
             "date_of_birth = COALESCE(?, date_of_birth), "
-            "governorate = COALESCE(?, governorate) WHERE id = ?",
+            "governorate = COALESCE(?, governorate), "
+            "gender = COALESCE(?, gender), "
+            "health_notes = COALESCE(?, health_notes), "
+            "availability = COALESCE(?, availability), "
+            "hours_per_week = COALESCE(?, hours_per_week), "
+            "languages = COALESCE(?, languages), "
+            "education_level = COALESCE(?, education_level), "
+            "prior_experience = COALESCE(?, prior_experience), "
+            "prior_org = COALESCE(?, prior_org), "
+            "cause_areas = COALESCE(?, cause_areas) "
+            "WHERE id = ?",
             (name, phone, city, json.dumps(skills) if skills is not None else None,
-             about_me, date_of_birth, governorate, volunteer_id),
+             about_me, date_of_birth, governorate,
+             gender, health_notes,
+             json.dumps(availability) if availability is not None else None,
+             hours_per_week,
+             json.dumps(languages) if languages is not None else None,
+             education_level,
+             (1 if prior_experience else 0) if prior_experience is not None else None,
+             prior_org,
+             json.dumps(cause_areas) if cause_areas is not None else None,
+             volunteer_id),
         )
 
         # Handle email update
