@@ -18,6 +18,52 @@ const GOVERNORATES = [
   "Monufia", "Red Sea", "New Valley", "Matrouh", "North Sinai", "South Sinai",
 ];
 
+const NATIONALITIES = [
+  // ── Egypt (default) ──
+  "Egyptian",
+  // ── Africa ──
+  "Algerian", "Angolan", "Beninese", "Botswanan", "Burkinabe", "Burundian",
+  "Cameroonian", "Cape Verdean", "Central African", "Chadian", "Comorian",
+  "Congolese", "Djiboutian", "Equatorial Guinean", "Eritrean", "Ethiopian",
+  "Gabonese", "Gambian", "Ghanaian", "Guinean", "Guinea-Bissauan", "Ivorian",
+  "Kenyan", "Lesothan", "Liberian", "Libyan", "Malagasy", "Malawian", "Malian",
+  "Mauritanian", "Mauritian", "Moroccan", "Mozambican", "Namibian", "Nigerien",
+  "Nigerian", "Rwandan", "Senegalese", "Sierra Leonean", "Somali",
+  "South African", "South Sudanese", "Sudanese", "Swazi", "Tanzanian",
+  "Togolese", "Tunisian", "Ugandan", "Zambian", "Zimbabwean",
+  // ── Middle East ──
+  "Bahraini", "Emirati", "Iranian", "Iraqi", "Israeli", "Jordanian",
+  "Kuwaiti", "Lebanese", "Omani", "Palestinian", "Qatari", "Saudi", "Syrian",
+  "Yemeni",
+  // ── Asia ──
+  "Afghan", "Armenian", "Azerbaijani", "Bangladeshi", "Bhutanese", "Bruneian",
+  "Cambodian", "Chinese", "Filipino", "Georgian", "Indian", "Indonesian",
+  "Japanese", "Kazakh", "North Korean", "South Korean", "Kyrgyz", "Lao",
+  "Malaysian", "Maldivian", "Mongolian", "Myanmarese", "Nepali", "Pakistani",
+  "Singaporean", "Sri Lankan", "Tajik", "Thai", "Timorese", "Turkmen",
+  "Uzbek", "Vietnamese",
+  // ── Europe ──
+  "Albanian", "Andorran", "Austrian", "Belarusian", "Belgian", "Bosnian",
+  "British", "Bulgarian", "Croatian", "Cypriot", "Czech", "Danish", "Dutch",
+  "Estonian", "Finnish", "French", "German", "Greek", "Hungarian", "Icelandic",
+  "Irish", "Italian", "Kosovar", "Latvian", "Lithuanian", "Luxembourgish",
+  "Macedonian", "Maltese", "Moldovan", "Montenegrin", "Norwegian", "Polish",
+  "Portuguese", "Romanian", "Russian", "Serbian", "Slovak", "Slovenian",
+  "Spanish", "Swedish", "Swiss", "Turkish", "Ukrainian",
+  // ── Americas ──
+  "American", "Argentinian", "Bahamian", "Barbadian", "Belizean", "Bolivian",
+  "Brazilian", "Canadian", "Chilean", "Colombian", "Costa Rican", "Cuban",
+  "Dominican", "Ecuadorian", "Grenadian", "Guatemalan", "Guyanese", "Haitian",
+  "Honduran", "Jamaican", "Mexican", "Nicaraguan", "Panamanian", "Paraguayan",
+  "Peruvian", "Salvadoran", "Surinamese", "Trinidadian", "Uruguayan",
+  "Venezuelan",
+  // ── Oceania ──
+  "Australian", "Fijian", "New Zealander", "Papua New Guinean", "Samoan",
+  "Tongan",
+  // ── Other ──
+  "Other",
+];
+
 const SKILLS_LIST = [
   "Teaching / Tutoring", "Medical / First Aid", "Photography & Videography",
   "Event Planning", "Social Media Management", "Translation",
@@ -27,23 +73,43 @@ const SKILLS_LIST = [
 
 const AVAILABILITY_SPECIFIC = ["Weekday mornings", "Weekday afternoons", "Weekday evenings", "Weekends"];
 
-const CAUSE_AREAS = [
-  "Children & Youth", "Elderly", "Environment", "Education", "Health",
-  "Disability", "Refugees", "Animal Welfare", "Others",
+const MAX_CAUSES = 5;
+
+const CAUSE_GROUPS: { label: string; causes: string[] }[] = [
+  { label: "Social & Humanitarian",  causes: ["Poverty Alleviation", "Food & Clothing Distribution", "Refugee & Migrant Support", "Disability Support", "Elderly Care", "Child Protection & Orphan Care", "Women Empowerment"] },
+  { label: "Children & Youth",       causes: ["Youth Development", "Street Children Outreach", "Child Education Support", "After-School Programs"] },
+  { label: "Education & Skills",     causes: ["Education & Tutoring", "Literacy Programs", "Career Mentorship", "Youth Entrepreneurship", "Awareness Campaigns"] },
+  { label: "Health & Emergency",     causes: ["Healthcare Access", "Blood Donation", "Emergency & Disaster Relief", "Mental Health Support", "First Aid & Safety"] },
+  { label: "Environment",            causes: ["Environmental Cleanup", "Climate Action", "Animal Welfare", "Sustainability"] },
+  { label: "Community & Events",     causes: ["Community Engagement", "Event Planning & Coordination", "Fundraising", "Arts & Culture", "Sports & Recreation", "Ramadan & Seasonal Programs"] },
+  { label: "Professional & General", causes: ["Administrative Support", "Media & Content Creation", "Translation & Interpretation", "General Volunteering"] },
 ];
 
+const ALL_PREDEFINED_CAUSES = new Set(CAUSE_GROUPS.flatMap((g) => g.causes));
+
 const EDUCATION_LEVELS = [
-  "Below secondary", "Secondary", "Diploma", "Bachelor's", "Master's", "PhD",
+  "High School Student",
+  "High School Graduate",
+  "University Student",
+  "University Graduate",
+  "Postgraduate (Diploma / Master / PhD)",
+  "Other",
 ];
+
+const STUDY_YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year+"];
+
+type ExperienceEntry = {
+  orgName: string; department: string; departmentOther: string;
+  role: string; duration: string; description: string;
+};
 
 const PROFICIENCY_LEVELS = ["Basic", "Conversational", "Fluent", "Native"];
 
 const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
   { label: "Communications & Outreach", options: ["PR", "Media", "Content Creation"] },
   { label: "Operations", options: ["HR", "Event Management", "Logistics", "Fundraising", "Partnerships"] },
-  { label: "Other", options: ["Emergencies", "General", "Other"] },
+  { label: "Other", options: ["Emergencies", "General"] },
 ];
-const DEPARTMENT_OTHER_MAX = 50;
 
 const STEP1_FIELDS = ["fullName", "email", "password", "confirmPassword"];
 const STEP2_FIELDS = ["nationalId", "dateOfBirth", "governorate", "phone", "city", "gender"];
@@ -118,6 +184,17 @@ function validateNationalId(v: string): string {
   return "";
 }
 
+function validatePassportNumber(v: string): string {
+  const trimmed = v.trim();
+  if (!trimmed) return "Passport number is required.";
+  if (trimmed.length < 5) return "Passport number must be at least 5 characters.";
+  if (trimmed.length > 20) return "Passport number must be no more than 20 characters.";
+  if (!/^[A-Z0-9][A-Z0-9-]{3,18}[A-Z0-9]$/.test(trimmed))
+    return "Passport number may contain uppercase letters, digits, and hyphens only.";
+  if (/--/.test(trimmed)) return "Passport number cannot contain consecutive hyphens.";
+  return "";
+}
+
 function validateDob(v: string): string {
   if (!v) return "Date of birth is required.";
   const dob = new Date(v);
@@ -127,7 +204,7 @@ function validateDob(v: string): string {
   const y = today.getFullYear() - dob.getFullYear();
   const m = today.getMonth() - dob.getMonth();
   const age = m < 0 || (m === 0 && today.getDate() < dob.getDate()) ? y - 1 : y;
-  if (age < 16) return "You must be at least 16 years old to register.";
+  if (age < 15) return "You must be at least 15 years old to register.";
   return "";
 }
 
@@ -147,15 +224,6 @@ function validateCity(v: string): string {
   return "";
 }
 
-function validateSkills(selected: string[], custom: string): string {
-  if (selected.length === 0) return "Please select at least one skill.";
-  if (selected.includes("Other")) {
-    if (!custom.trim()) return "Please describe your other skill.";
-    if (custom.trim().length < 2) return "Custom skill must be at least 2 characters.";
-  }
-  return "";
-}
-
 // ── Component ─────────────────────────────────────────────────────────
 
 export function RegisterPage() {
@@ -171,31 +239,27 @@ export function RegisterPage() {
   // ── Volunteer field state ──
   const [volForm, setVolForm] = useState({
     fullName: "", email: "", password: "", confirmPassword: "",
-    nationalId: "", dateOfBirth: "", governorate: "",
+    nationality: "Egyptian", nationalId: "", dateOfBirth: "", governorate: "",
     phone: "", city: "", gender: "", department: "", healthNotes: "",
-    about: "", educationLevel: "", priorExperience: false, priorOrg: "",
-    hoursPerWeek: 5,
+    educationLevel: "", educationOther: "",
+    universityName: "", faculty: "", studyYear: "", fieldOfStudy: "",
+    hoursPerWeek: null as number | null,
   });
   const [volSkills, setVolSkills] = useState<string[]>([]);
   const [volCustomSkill, setVolCustomSkill] = useState("");
   const [availability, setAvailability] = useState<string[]>([]);
-  const [causeAreas, setCauseAreas] = useState<string[]>([]);
-  const [causeOtherText, setCauseOtherText] = useState("");
-  const [departmentOther, setDepartmentOther] = useState("");
-  const [languages, setLanguages] = useState<{ language: string; proficiency: string }[]>([
-    { language: "", proficiency: "Native" },
-  ]);
+  const [rankedCauses, setRankedCauses] = useState<string[]>([]);
+  const [customCauseInput, setCustomCauseInput] = useState("");
+  const [languages, setLanguages] = useState<{ language: string; proficiency: string }[]>([]);
+  const [priorHasExperience, setPriorHasExperience] = useState<boolean | null>(null);
+  const [experiences, setExperiences] = useState<ExperienceEntry[]>([]);
+  const [expTouched, setExpTouched] = useState<Record<string, boolean>>({});
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // ── Profile picture ──
-  const [volPicPreview, setVolPicPreview] = useState("");
-  const [volPicData, setVolPicData] = useState("");
-  const [volPicError, setVolPicError] = useState("");
-  const volPicRef = useRef<HTMLInputElement>(null);
-  const departmentOtherRef = useRef<HTMLInputElement>(null);
+  const dragCauseIdx = useRef<number | null>(null);
 
   // ── Organization form ──
   const [orgForm, setOrgForm] = useState({
@@ -215,30 +279,57 @@ export function RegisterPage() {
       : volForm.confirmPassword !== volForm.password
         ? "Passwords do not match."
         : "",
-    nationalId:      validateNationalId(volForm.nationalId),
+    nationalId:      volForm.nationality === "Egyptian"
+      ? validateNationalId(volForm.nationalId)
+      : validatePassportNumber(volForm.nationalId),
     dateOfBirth:     validateDob(volForm.dateOfBirth),
     governorate:     volForm.governorate ? "" : "Please select a governorate.",
     phone:           validatePhone(volForm.phone),
     city:            validateCity(volForm.city),
     gender:          volForm.gender ? "" : "Please select your gender.",
-    departmentOther: volForm.department === "Other" && departmentOther.trim().length < 2
-      ? "Please enter your department (min 2 characters)."
-      : "",
-    skills:          validateSkills(volSkills, volCustomSkill),
-    availability:    availability.length === 0 ? "Please select at least one availability option." : "",
+    skills:          volSkills.includes("Other") && !volCustomSkill.trim()
+      ? "Please describe your other skill."
+      : volSkills.includes("Other") && volCustomSkill.trim().length < 2
+        ? "Custom skill must be at least 2 characters."
+        : "",
+    availability:    "",
     educationLevel:  volForm.educationLevel ? "" : "Please select your education level.",
-    languages:       languages.length === 0
-      ? "Please add at least one language."
-      : languages.some((l) => !l.language.trim())
+    universityName:  volForm.educationLevel === "University Student" && !volForm.universityName.trim()
+      ? "Please enter your university name." : "",
+    faculty:         volForm.educationLevel === "University Student" && !volForm.faculty.trim()
+      ? "Please enter your faculty or major." : "",
+    studyYear:       volForm.educationLevel === "University Student" && !volForm.studyYear
+      ? "Please select your academic year." : "",
+    fieldOfStudy:    (volForm.educationLevel === "University Graduate" || volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)") && !volForm.fieldOfStudy.trim()
+      ? "Please enter your field of study." : "",
+    educationOther:  volForm.educationLevel === "Other" && !volForm.educationOther.trim()
+      ? "Please describe your education background." : "",
+    languages:       languages.length === 0 ? "" :
+      languages.some((l) => !l.language.trim())
         ? "All language fields must be filled in."
-        : new Set(languages.map((l) => l.language.trim().toLowerCase())).size !== languages.length
-          ? "Duplicate languages are not allowed."
-          : "",
-  }), [volForm, volSkills, volCustomSkill, availability, departmentOther, languages]);
+        : languages.some((l) => l.language.trim().length > 0 && !/^[\u0600-\u06FFa-zA-Z\s\-]+$/.test(l.language.trim()))
+          ? "Language names must contain letters only — no numbers or special characters."
+          : new Set(languages.map((l) => l.language.trim().toLowerCase())).size !== languages.length
+            ? "Duplicate languages are not allowed."
+            : "",
+    priorExperiences: priorHasExperience === true
+      ? experiences.length === 0
+        ? "Please add at least one experience or select 'No'."
+        : experiences.some(
+            (e) => !e.orgName.trim() || !e.department ||
+              (e.department === "Other" && e.departmentOther.trim().length < 2)
+          )
+          ? "Please complete all required fields in each experience entry."
+          : ""
+      : "",
+  }), [volForm, volSkills, volCustomSkill, availability, languages, priorHasExperience, experiences, rankedCauses]);
 
   const step1Valid = STEP1_FIELDS.every((f) => !errors[f as keyof typeof errors]);
-  const step2Valid = STEP2_FIELDS.every((f) => !errors[f as keyof typeof errors]) && !errors.departmentOther;
-  const step3Valid = !errors.skills && !errors.availability && !errors.educationLevel && !errors.languages && termsAccepted;
+  const step2Valid = STEP2_FIELDS.every((f) => !errors[f as keyof typeof errors])
+    && !errors.educationLevel && !errors.universityName && !errors.faculty
+    && !errors.studyYear && !errors.fieldOfStudy && !errors.educationOther;
+  const step3Valid = !errors.skills && !errors.languages && !errors.priorExperiences
+    && termsAccepted;
 
   // ── Helpers ──
   const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -296,8 +387,31 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
     touch("availability");
   };
 
-  const toggleCause = (c: string) => {
-    setCauseAreas((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
+  const addCause = (cause: string) => {
+    if (rankedCauses.includes(cause) || rankedCauses.length >= MAX_CAUSES) return;
+    setRankedCauses((prev) => [...prev, cause]);
+  };
+
+  const removeCause = (idx: number) => {
+    setRankedCauses((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const addCustomCause = () => {
+    const text = customCauseInput.trim();
+    if (!text || text.length < 2 || rankedCauses.length >= MAX_CAUSES) return;
+    if (rankedCauses.some((c) => c.toLowerCase() === text.toLowerCase())) return;
+    setRankedCauses((prev) => [...prev, text]);
+    setCustomCauseInput("");
+  };
+
+  const moveCause = (from: number, to: number) => {
+    if (to < 0 || to >= rankedCauses.length) return;
+    setRankedCauses((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
   };
 
   const addLanguage = () => {
@@ -313,25 +427,45 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
     touch("languages");
   };
 
-  const handleVolPicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setVolPicError("");
-    if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) {
-      setVolPicError("Only JPG and PNG files are allowed.");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setVolPicError("Image must be under 2MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const uri = reader.result as string;
-      setVolPicPreview(uri);
-      setVolPicData(uri);
-    };
-    reader.readAsDataURL(file);
+  const addExperience = () => {
+    setExperiences((prev) => [...prev, { orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }]);
+    touch("priorExperiences");
+  };
+
+  const removeExperience = (idx: number) => {
+    setExperiences((prev) => prev.filter((_, i) => i !== idx));
+    setExpTouched((prev) => {
+      const next = { ...prev };
+      Object.keys(next).filter((k) => k.startsWith(`exp_${idx}_`)).forEach((k) => delete next[k]);
+      return next;
+    });
+    touch("priorExperiences");
+  };
+
+  const updateExperience = (idx: number, field: keyof ExperienceEntry, value: string) => {
+    setExperiences((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+  };
+
+  const touchExp = (idx: number, field: string) => {
+    setExpTouched((prev) => ({ ...prev, [`exp_${idx}_${field}`]: true }));
+    touch("priorExperiences");
+  };
+
+  const getExpError = (idx: number, field: string): string => {
+    if (!expTouched[`exp_${idx}_${field}`]) return "";
+    const e = experiences[idx];
+    if (!e) return "";
+    if (field === "orgName" && !e.orgName.trim()) return "Organization name is required.";
+    if (field === "department" && !e.department) return "Please select a department.";
+    if (field === "deptOther" && e.department === "Other" && e.departmentOther.trim().length < 2)
+      return "Please specify a department name (min 2 characters).";
+    return "";
+  };
+
+  const expBorder = (idx: number, field: string, hasError: boolean) => {
+    const key = `exp_${idx}_${field}`;
+    if (!expTouched[key]) return focused === `exp_${idx}_${field}` ? BLUE : "#E2E8F0";
+    return hasError ? RED : GREEN;
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -343,8 +477,13 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
   };
 
   const handleNext = () => {
-    if (step === 1 && step1Valid) { setStep(2); scrollTop(); }
-    else if (step === 2 && step2Valid) { setStep(3); scrollTop(); }
+    if (step === 1) {
+      if (step1Valid) { setStep(2); scrollTop(); }
+      else setTouched((t) => ({ ...t, fullName: true, email: true, password: true, confirmPassword: true }));
+    } else if (step === 2) {
+      if (step2Valid) { setStep(3); scrollTop(); }
+      else setTouched((t) => ({ ...t, nationalId: true, dateOfBirth: true, governorate: true, phone: true, city: true, gender: true, educationLevel: true, universityName: true, faculty: true, studyYear: true, fieldOfStudy: true, educationOther: true }));
+    }
   };
 
   const handleBack = () => {
@@ -361,9 +500,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
       ? [...volSkills.filter((s) => s !== "Other"), volCustomSkill.trim()]
       : volSkills;
 
-    const allCauses = causeAreas.includes("Others") && causeOtherText.trim()
-      ? [...causeAreas.filter((c) => c !== "Others"), causeOtherText.trim()]
-      : causeAreas;
+    const allCauses = [...rankedCauses];
 
     const data =
       role === "Organization"
@@ -384,22 +521,39 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
             name: volForm.fullName, phone: volForm.phone,
             city: volForm.city, skills: allSkills,
             dateOfBirth: volForm.dateOfBirth, governorate: volForm.governorate,
-            nationalId: volForm.nationalId, aboutMe: volForm.about,
+            nationality: volForm.nationality,
+            nationalId: volForm.nationalId,
             gender: volForm.gender,
-            department: volForm.department === "Other" ? departmentOther.trim() : volForm.department,
+            department: volForm.department,
             healthNotes: volForm.healthNotes,
-            availability, hoursPerWeek: volForm.hoursPerWeek,
-            languages, educationLevel: volForm.educationLevel,
-            priorExperience: volForm.priorExperience, priorOrg: volForm.priorOrg,
+            availability, ...(volForm.hoursPerWeek !== null ? { hoursPerWeek: volForm.hoursPerWeek } : {}),
+            languages,
+            educationLevel: volForm.educationLevel === "Other" ? volForm.educationOther.trim() : volForm.educationLevel,
+            universityName: volForm.universityName,
+            faculty: volForm.faculty,
+            studyYear: volForm.studyYear,
+            fieldOfStudy: volForm.fieldOfStudy,
+            priorExperience: priorHasExperience === true,
+            priorOrg: priorHasExperience === true
+              ? experiences.map((e) => e.orgName.trim()).filter(Boolean).join(", ")
+              : "",
+            experiences: priorHasExperience === true ? experiences.map((e) => ({
+              orgName: e.orgName.trim(),
+              department: e.department === "Other" ? e.departmentOther.trim() : e.department,
+              role: e.role.trim(),
+              duration: e.duration.trim(),
+              description: e.description.trim(),
+            })) : [],
             causeAreas: allCauses,
-            ...(volPicData ? { profilePicture: volPicData } : {}),
           };
 
+    console.log("[Register] payload:", JSON.stringify(data, null, 2));
     const result = await register(data);
+    console.log("[Register] response:", result);
     setIsSubmitting(false);
 
     if (!result.ok) {
-      setSubmitError("Registration failed. Please check your details and try again.");
+      setSubmitError(result.message ?? "Registration failed. Please check your details and try again.");
       return;
     }
     navigate(role === "Organization" ? "/org/pending" : "/dashboard/profile");
@@ -476,38 +630,12 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   <>
                     <SectionHeader>Account</SectionHeader>
 
-                    {/* Profile picture */}
-                    <div className="flex flex-col items-center gap-2" style={{ marginBottom: 4 }}>
-                      <div
-                        onClick={() => volPicRef.current?.click()}
-                        style={{ width: 88, height: 88, borderRadius: "50%", border: `2px dashed ${volPicPreview ? GREEN : "#CBD5E1"}`, overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#F8FAFC" }}
-                        title="Upload profile picture"
-                        role="button"
-                        aria-label="Upload profile picture"
-                      >
-                        {volPicPreview
-                          ? <img src={volPicPreview} alt="Profile preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <div style={{ textAlign: "center", color: "#94A3B8" }}><div style={{ fontSize: 24 }}>📷</div><div style={{ fontSize: 10, marginTop: 2 }}>Photo</div></div>
-                        }
-                      </div>
-                      <div className="flex gap-2">
-                        <label htmlFor="vol-pic-input" style={{ fontSize: 12, color: GREEN, cursor: "pointer", fontWeight: 500 }}>
-                          {volPicPreview ? "Change photo" : "Upload photo (optional)"}
-                        </label>
-                        <input id="vol-pic-input" ref={volPicRef} type="file" accept="image/jpeg,image/jpg,image/png" onChange={handleVolPicUpload} style={{ display: "none" }} />
-                        {volPicPreview && (
-                          <button type="button" onClick={() => { setVolPicPreview(""); setVolPicData(""); }}
-                            style={{ fontSize: 12, color: RED, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      {volPicError && <div style={{ fontSize: 12, color: RED }}>{volPicError}</div>}
-                    </div>
-
                     {/* Full Name */}
                     <div>
                       <label htmlFor="fullName" style={labelStyle}>Full Name <span style={{ color: RED }}>*</span></label>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>
+                        Enter your full name as it appears on your national ID — first, middle, and last name.
+                      </p>
                       <input id="fullName"
                         value={volForm.fullName}
                         onChange={(e) => setVolForm((f) => ({ ...f, fullName: e.target.value }))}
@@ -547,8 +675,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                           onBlur={() => onBlur("password")}
                           style={{ ...fieldStyle("password"), paddingRight: 44 }}
                           autoComplete="new-password"
-                          placeholder="Min. 8 characters"
-                          maxLength={64}
+                          placeholder="Min. 8 characters, max. 64"
                         />
                         <button type="button" onClick={() => setShowPassword((s) => !s)}
                           aria-label={showPassword ? "Hide password" : "Show password"}
@@ -587,7 +714,6 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                           style={{ ...fieldStyle("confirmPassword"), paddingRight: 44 }}
                           autoComplete="new-password"
                           placeholder="Re-enter your password"
-                          maxLength={64}
                         />
                         <button type="button" onClick={() => setShowConfirmPassword((s) => !s)}
                           aria-label={showConfirmPassword ? "Hide password" : "Show password"}
@@ -605,22 +731,52 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   <>
                     <SectionHeader>Profile</SectionHeader>
 
-                    {/* National ID */}
+                    {/* Nationality */}
                     <div>
-                      <label htmlFor="nationalId" style={labelStyle}>National ID <span style={{ color: RED }}>*</span></label>
+                      <label htmlFor="nationality" style={labelStyle}>Nationality <span style={{ color: RED }}>*</span></label>
+                      <select id="nationality"
+                        value={volForm.nationality}
+                        onChange={(e) => {
+                          setVolForm((f) => ({ ...f, nationality: e.target.value, nationalId: "" }));
+                          touch("nationality");
+                        }}
+                        onFocus={() => onFocus("nationality")}
+                        onBlur={() => onBlur("nationality")}
+                        style={fieldStyle("nationality")}
+                      >
+                        {NATIONALITIES.map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+
+                    {/* National ID / Passport Number */}
+                    <div>
+                      <label htmlFor="nationalId" style={labelStyle}>
+                        {volForm.nationality === "Egyptian" ? "National ID" : "Passport Number"}{" "}
+                        <span style={{ color: RED }}>*</span>
+                      </label>
                       <input id="nationalId"
                         value={volForm.nationalId}
-                        onChange={(e) => setVolForm((f) => ({ ...f, nationalId: e.target.value.replace(/\D/g, "").slice(0, 14) }))}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setVolForm((f) => ({
+                            ...f,
+                            nationalId: volForm.nationality === "Egyptian"
+                              ? raw.replace(/\D/g, "").slice(0, 14)
+                              : raw.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20),
+                          }));
+                        }}
                         onFocus={() => onFocus("nationalId")}
                         onBlur={() => onBlur("nationalId")}
                         style={fieldStyle("nationalId")}
-                        placeholder="14-digit national ID number"
-                        inputMode="numeric"
-                        maxLength={14}
+                        placeholder={volForm.nationality === "Egyptian" ? "14-digit national ID number" : "Passport number (6–20 characters)"}
+                        inputMode={volForm.nationality === "Egyptian" ? "numeric" : "text"}
+                        maxLength={volForm.nationality === "Egyptian" ? 14 : 20}
                       />
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
                         <Err field="nationalId" />
-                        <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: "auto" }}>{volForm.nationalId.length}/14</span>
+                        <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: "auto" }}>
+                          {volForm.nationalId.length}/{volForm.nationality === "Egyptian" ? 14 : 20}
+                        </span>
                       </div>
                     </div>
 
@@ -713,73 +869,13 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       <Err field="gender" />
                     </div>
 
-                    {/* Department (optional) */}
-                    <div>
-                      <label htmlFor="department" style={labelStyle}>
-                        Department{" "}
-                        <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
-                      </label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>
-                        Pick the area you'd most like to contribute to — you can change it later.
-                      </p>
-                      <select id="department"
-                        value={volForm.department}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setVolForm((f) => ({ ...f, department: val }));
-                          if (val !== "Other") {
-                            setDepartmentOther("");
-                            setTouched((t) => ({ ...t, departmentOther: false }));
-                          } else {
-                            setTimeout(() => departmentOtherRef.current?.focus(), 0);
-                          }
-                        }}
-                        onFocus={() => onFocus("department")}
-                        onBlur={() => setFocused(null)}
-                        style={fieldStyle("department")}
-                      >
-                        <option value="">Select a department…</option>
-                        {DEPARTMENT_GROUPS.map((group) => (
-                          <optgroup key={group.label} label={group.label}>
-                            {group.options.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                      {volForm.department === "Other" && (
-                        <div style={{ marginTop: 10 }}>
-                          <label htmlFor="departmentOther" style={{ ...labelStyle, fontSize: 12 }}>
-                            Specify your department <span style={{ color: RED }}>*</span>
-                          </label>
-                          <input
-                            id="departmentOther"
-                            ref={departmentOtherRef}
-                            value={departmentOther}
-                            onChange={(e) => setDepartmentOther(e.target.value.slice(0, DEPARTMENT_OTHER_MAX))}
-                            onFocus={() => onFocus("departmentOther")}
-                            onBlur={() => onBlur("departmentOther")}
-                            placeholder="e.g. Research, Legal, IT…"
-                            maxLength={DEPARTMENT_OTHER_MAX}
-                            style={fieldStyle("departmentOther")}
-                          />
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 3, gap: 8 }}>
-                            <Err field="departmentOther" />
-                            <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: "auto", flexShrink: 0 }}>
-                              {departmentOther.length}/{DEPARTMENT_OTHER_MAX}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
                     {/* Health / Mobility Notes */}
                     <div>
                       <label htmlFor="healthNotes" style={labelStyle}>
                         Health or Mobility Notes{" "}
                         <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
                       </label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>Any physical limitations organizations should know about for field activities?</p>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>Share any physical limitations that may affect your ability to participate in certain activities. This information is confidential and used only for activity matching.</p>
                       <textarea id="healthNotes"
                         value={volForm.healthNotes}
                         onChange={(e) => setVolForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, 300) }))}
@@ -797,6 +893,129 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                         {volForm.healthNotes.length}/300
                       </div>
                     </div>
+
+                    {/* Education Level */}
+                    <div>
+                      <label htmlFor="educationLevel" style={labelStyle}>Education Level <span style={{ color: RED }}>*</span></label>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>
+                        This helps us match you with suitable opportunities.
+                      </p>
+                      <select id="educationLevel"
+                        value={volForm.educationLevel}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setVolForm((f) => ({
+                            ...f,
+                            educationLevel: val,
+                            educationOther: "",
+                            universityName: "",
+                            faculty: "",
+                            studyYear: "",
+                            fieldOfStudy: "",
+                          }));
+                          touch("educationLevel");
+                        }}
+                        onFocus={() => onFocus("educationLevel")}
+                        onBlur={() => onBlur("educationLevel")}
+                        style={fieldStyle("educationLevel")}
+                      >
+                        <option value="">Select your education level…</option>
+                        {EDUCATION_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                      <Err field="educationLevel" />
+
+                      {/* University Student — extra fields */}
+                      {volForm.educationLevel === "University Student" && (
+                        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1.5px solid #E2E8F0" }}>
+                          <div>
+                            <label htmlFor="universityName" style={{ ...labelStyle, fontSize: 12 }}>
+                              University Name <span style={{ color: RED }}>*</span>
+                            </label>
+                            <p style={{ fontSize: 11, color: "#64748B", margin: "0 0 5px 0" }}>
+                              If your university has multiple branches, please include your branch / campus.
+                            </p>
+                            <input id="universityName"
+                              value={volForm.universityName}
+                              onChange={(e) => setVolForm((f) => ({ ...f, universityName: e.target.value }))}
+                              onFocus={() => onFocus("universityName")}
+                              onBlur={() => onBlur("universityName")}
+                              placeholder="e.g., Cairo University or Sadat Academy – Maadi"
+                              style={fieldStyle("universityName", 40)}
+                            />
+                            <Err field="universityName" />
+                          </div>
+                          <div>
+                            <label htmlFor="faculty" style={{ ...labelStyle, fontSize: 12 }}>
+                              Faculty / Major <span style={{ color: RED }}>*</span>
+                            </label>
+                            <input id="faculty"
+                              value={volForm.faculty}
+                              onChange={(e) => setVolForm((f) => ({ ...f, faculty: e.target.value }))}
+                              onFocus={() => onFocus("faculty")}
+                              onBlur={() => onBlur("faculty")}
+                              placeholder="e.g. Computer Science, Medicine, Law…"
+                              style={fieldStyle("faculty", 40)}
+                            />
+                            <Err field="faculty" />
+                          </div>
+                          <div>
+                            <label htmlFor="studyYear" style={{ ...labelStyle, fontSize: 12 }}>
+                              Academic Year <span style={{ color: RED }}>*</span>
+                            </label>
+                            <select id="studyYear"
+                              value={volForm.studyYear}
+                              onChange={(e) => { setVolForm((f) => ({ ...f, studyYear: e.target.value })); touch("studyYear"); }}
+                              onFocus={() => onFocus("studyYear")}
+                              onBlur={() => onBlur("studyYear")}
+                              style={fieldStyle("studyYear", 40)}
+                            >
+                              <option value="">Select academic year…</option>
+                              {STUDY_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                            <Err field="studyYear" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* University Graduate / Postgraduate — Field of Study */}
+                      {(volForm.educationLevel === "University Graduate" || volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
+                        <div style={{ marginTop: 12, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1.5px solid #E2E8F0" }}>
+                          <label htmlFor="fieldOfStudy" style={{ ...labelStyle, fontSize: 12 }}>
+                            Field of Study <span style={{ color: RED }}>*</span>
+                          </label>
+                          <input id="fieldOfStudy"
+                            value={volForm.fieldOfStudy}
+                            onChange={(e) => setVolForm((f) => ({ ...f, fieldOfStudy: e.target.value }))}
+                            onFocus={() => onFocus("fieldOfStudy")}
+                            onBlur={() => onBlur("fieldOfStudy")}
+                            placeholder="e.g. Engineering, Pharmacy, Business…"
+                            style={fieldStyle("fieldOfStudy", 40)}
+                          />
+                          <Err field="fieldOfStudy" />
+                        </div>
+                      )}
+
+                      {/* Other — custom input */}
+                      {volForm.educationLevel === "Other" && (
+                        <div style={{ marginTop: 12, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1.5px solid #E2E8F0" }}>
+                          <label htmlFor="educationOther" style={{ ...labelStyle, fontSize: 12 }}>
+                            Please specify <span style={{ color: RED }}>*</span>
+                          </label>
+                          <input id="educationOther"
+                            value={volForm.educationOther}
+                            onChange={(e) => setVolForm((f) => ({ ...f, educationOther: e.target.value.slice(0, 100) }))}
+                            onFocus={() => onFocus("educationOther")}
+                            onBlur={() => onBlur("educationOther")}
+                            placeholder="Describe your education background…"
+                            style={fieldStyle("educationOther", 40)}
+                          />
+                          <Err field="educationOther" />
+                          <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>
+                            {volForm.educationOther.length}/100
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
 
@@ -805,10 +1024,42 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   <>
                     <SectionHeader>Preferences & Skills</SectionHeader>
 
+                    {/* Preferred Department */}
+                    <div>
+                      <label htmlFor="department" style={labelStyle}>
+                        Preferred Department{" "}
+                        <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                      </label>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>
+                        Pick the area you'd most like to contribute to — you can change it later.
+                      </p>
+                      <select id="department"
+                        value={volForm.department}
+                        onChange={(e) => setVolForm((f) => ({ ...f, department: e.target.value }))}
+                        onFocus={() => onFocus("department")}
+                        onBlur={() => setFocused(null)}
+                        style={fieldStyle("department")}
+                      >
+                        <option value="">Select a department…</option>
+                        {DEPARTMENT_GROUPS.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.options.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+
                     {/* Skills */}
                     <div>
-                      <label style={labelStyle}>Skills <span style={{ color: RED }}>*</span></label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px 0" }}>Select 1–5 skills that apply:</p>
+                      <label style={labelStyle}>Skills <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <span style={{ fontSize: 12, color: "#64748B" }}>Select up to {MAX_SKILLS}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: volSkills.length === 0 ? "#94A3B8" : volSkills.length >= MAX_SKILLS ? GREEN : "#1E293B" }}>
+                          {volSkills.length} / {MAX_SKILLS}
+                        </span>
+                      </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px" }}>
                         {SKILLS_LIST.map((skill) => {
                           const checked = volSkills.includes(skill);
@@ -829,13 +1080,13 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       </div>
                       {volSkills.includes("Other") && (
                         <div style={{ marginTop: 10 }}>
-                          <label htmlFor="customSkill" style={{ ...labelStyle, fontSize: 12 }}>Describe your other skill <span style={{ color: RED }}>*</span></label>
+                          <label htmlFor="customSkill" style={{ ...labelStyle, fontSize: 12 }}>Describe your other skills <span style={{ color: RED }}>*</span></label>
                           <input id="customSkill"
                             value={volCustomSkill}
                             onChange={(e) => { setVolCustomSkill(e.target.value); touch("skills"); }}
                             onFocus={() => setFocused("skills_custom")}
                             onBlur={() => { setFocused(null); touch("skills"); }}
-                            placeholder="e.g. Sign Language, Pottery, Carpentry…"
+                            placeholder="e.g. Sign Language…"
                             style={{
                               width: "100%", height: 40, outline: "none", boxSizing: "border-box",
                               border: `1.5px solid ${focused === "skills_custom" ? BLUE : "#E2E8F0"}`,
@@ -847,91 +1098,83 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       <Err field="skills" />
                     </div>
 
-                    {/* About You */}
-                    <div>
-                      <label htmlFor="about" style={labelStyle}>
-                        About You{" "}
-                        <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
-                      </label>
-                      <textarea id="about"
-                        value={volForm.about}
-                        onChange={(e) => setVolForm((f) => ({ ...f, about: e.target.value.slice(0, 500) }))}
-                        onFocus={() => setFocused("about")}
-                        onBlur={() => setFocused(null)}
-                        placeholder="Tell organizations about your motivation, experience, and goals…"
-                        style={{
-                          width: "100%", height: 90, outline: "none", boxSizing: "border-box",
-                          border: `1.5px solid ${focused === "about" ? BLUE : "#E2E8F0"}`,
-                          borderRadius: 8, padding: "10px 12px", fontSize: 14, resize: "vertical",
-                          fontFamily: "inherit", backgroundColor: "#FFFFFF",
-                        }}
-                      />
-                      <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>
-                        {volForm.about.length}/500
-                      </div>
-                    </div>
-
                     {/* Availability */}
                     <div>
-                      <label style={labelStyle}>Availability <span style={{ color: RED }}>*</span></label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px 0" }}>When can you volunteer?</p>
+                      <label style={labelStyle}>Availability <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                      <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 12px 0" }}>Select all time slots that match your availability. </p>
 
-                      {/* Specific time slots — muted when Flexible is active */}
-                      <div
-                        style={{
-                          display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px",
-                          opacity: availability.includes("Flexible") ? 0.5 : 1,
-                          transition: "opacity 200ms ease",
-                        }}
-                      >
-                        {AVAILABILITY_SPECIFIC.map((opt) => (
-                          <label key={opt} style={checkboxCardStyle(availability.includes(opt))}>
-                            <input
-                              type="checkbox"
-                              checked={availability.includes(opt)}
-                              onChange={() => toggleAvailability(opt)}
-                              style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }}
-                            />
-                            {opt}
-                          </label>
-                        ))}
+                      {/* Pill chips — muted when Flexible is active */}
+                      <div style={{
+                        display: "flex", flexWrap: "wrap", gap: 8,
+                        opacity: availability.includes("Flexible") ? 0.45 : 1,
+                        transition: "opacity 200ms ease",
+                      }}>
+                        {AVAILABILITY_SPECIFIC.map((opt) => {
+                          const active = availability.includes(opt);
+                          return (
+                            <button key={opt} type="button"
+                              onClick={() => toggleAvailability(opt)}
+                              style={{
+                                height: 34, padding: "0 14px", borderRadius: 20,
+                                border: `1.5px solid ${active ? GREEN : "#D1D5DB"}`,
+                                backgroundColor: active ? "#DCFCE7" : "#FFFFFF",
+                                color: active ? "#15803D" : "#4B5563",
+                                fontSize: 13, fontWeight: active ? 600 : 400,
+                                cursor: "pointer", transition: "all 150ms", userSelect: "none",
+                                display: "flex", alignItems: "center", gap: 6,
+                              }}>
+                              {active && (
+                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                  <path d="M2 6L5 9L10 3" stroke="#15803D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                              {opt}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {/* OR divider */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0 10px 0" }}>
-                        <div style={{ flex: 1, height: 1, backgroundColor: "#E2E8F0" }} />
-                        <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: "0.08em" }}>OR</span>
-                        <div style={{ flex: 1, height: 1, backgroundColor: "#E2E8F0" }} />
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 12px 0" }}>
+                        <div style={{ flex: 1, height: 1, backgroundColor: "#F1F5F9" }} />
+                        <span style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 500, letterSpacing: "0.06em" }}>or</span>
+                        <div style={{ flex: 1, height: 1, backgroundColor: "#F1F5F9" }} />
                       </div>
 
-                      {/* Flexible — meta option, full width */}
-                      <label
+                      {/* Flexible — full-width row */}
+                      <button type="button"
+                        onClick={() => toggleAvailability("Flexible")}
                         style={{
-                          display: "flex", alignItems: "flex-start", gap: 10,
-                          cursor: "pointer", padding: "12px 14px", borderRadius: 8,
+                          width: "100%", display: "flex", alignItems: "center", gap: 12,
+                          padding: "11px 14px", borderRadius: 10, cursor: "pointer",
                           border: `1.5px solid ${availability.includes("Flexible") ? GREEN : "#E2E8F0"}`,
-                          backgroundColor: availability.includes("Flexible") ? "#F0FDF4" : "#FAFAFA",
-                          transition: "all 150ms", userSelect: "none",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={availability.includes("Flexible")}
-                          onChange={() => toggleAvailability("Flexible")}
-                          style={{ accentColor: GREEN, width: 16, height: 16, flexShrink: 0, marginTop: 2 }}
-                        />
-                        <div style={{ flex: 1 }}>
+                          backgroundColor: availability.includes("Flexible") ? "#F0FDF4" : "#FFFFFF",
+                          transition: "all 150ms", textAlign: "left",
+                        }}>
+                        {/* Custom toggle indicator */}
+                        <div style={{
+                          width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                          border: `2px solid ${availability.includes("Flexible") ? GREEN : "#D1D5DB"}`,
+                          backgroundColor: availability.includes("Flexible") ? GREEN : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          transition: "all 150ms",
+                        }}>
+                          {availability.includes("Flexible") && (
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
                           <div style={{
-                            fontSize: 14, fontWeight: 600,
+                            fontSize: 13, fontWeight: 600,
                             color: availability.includes("Flexible") ? GREEN : "#1E293B",
-                          }}>
-                            Flexible
-                          </div>
-                          <div style={{ fontSize: 12, color: "#64748B", marginTop: 2, lineHeight: 1.45 }}>
-                            I'm open to any time slot — this overrides the options above.
+                          }}>Flexible</div>
+                          <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>
+                            Open to any time slot
                           </div>
                         </div>
-                      </label>
+                      </button>
 
                       <Err field="availability" />
                     </div>
@@ -939,18 +1182,21 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                     {/* Hours per week — number input */}
                     <div>
                       <label htmlFor="hoursPerWeek" style={labelStyle}>
-                        Estimated hours per week{" "}
+                        Preferred weekly commitment (hours){" "}
                         <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
                       </label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>Helps us assign suitable tasks. </p>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>How many hours per week are you typically available to volunteer?</p>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <input id="hoursPerWeek"
                           type="number"
                           min={1} max={40} step={1}
-                          value={volForm.hoursPerWeek}
+                          value={volForm.hoursPerWeek ?? ""}
+                          placeholder="e.g., 5"
                           onChange={(e) => {
-                            const v = Math.min(40, Math.max(1, parseInt(e.target.value) || 1));
-                            setVolForm((f) => ({ ...f, hoursPerWeek: v }));
+                            const raw = e.target.value;
+                            if (raw === "") { setVolForm((f) => ({ ...f, hoursPerWeek: null })); return; }
+                            const v = Math.min(40, Math.max(1, parseInt(raw)));
+                            if (!isNaN(v)) setVolForm((f) => ({ ...f, hoursPerWeek: v }));
                           }}
                           style={{
                             width: 120, height: 42, outline: "none", boxSizing: "border-box",
@@ -967,7 +1213,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
 
                     {/* Languages */}
                     <div>
-                      <label style={labelStyle}>Languages Spoken <span style={{ color: RED }}>*</span></label>
+                      <label style={labelStyle}>Languages Spoken <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                       <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px 0" }}>Add languages you can communicate in. </p>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {languages.map((lang, idx) => {
@@ -983,6 +1229,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                                 onBlur={() => { setFocused(null); touch("languages"); }}
                                 placeholder="e.g. Arabic, English, French…"
                                 aria-label={`Language ${idx + 1}`}
+                                maxLength={50}
                                 style={{
                                   flex: 1, height: 40, outline: "none", boxSizing: "border-box",
                                   border: `1.5px solid ${isDuplicate ? RED : focused === `lang_${idx}` ? BLUE : "#E2E8F0"}`,
@@ -1031,99 +1278,320 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       </button>
                     </div>
 
-                    {/* Education Level */}
-                    <div>
-                      <label htmlFor="educationLevel" style={labelStyle}>Education Level <span style={{ color: RED }}>*</span></label>
-                      <select id="educationLevel"
-                        value={volForm.educationLevel}
-                        onChange={(e) => { setVolForm((f) => ({ ...f, educationLevel: e.target.value })); touch("educationLevel"); }}
-                        onFocus={() => onFocus("educationLevel")}
-                        onBlur={() => onBlur("educationLevel")}
-                        style={fieldStyle("educationLevel")}
-                      >
-                        <option value="">Select your highest qualification…</option>
-                        {EDUCATION_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                      </select>
-                      <Err field="educationLevel" />
-                    </div>
-
                     {/* Prior Volunteer Experience */}
                     <div>
-                      <label style={labelStyle}>Prior Volunteer Experience</label>
+                      <label style={labelStyle}>
+                        Prior Volunteer Experience{" "}
+                        <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                      </label>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>
+                        Have you volunteered with any organization before?
+                      </p>
+
+                      {/* Yes / No toggle */}
                       <div style={{ display: "flex", gap: 10 }} role="group" aria-label="Prior volunteer experience">
-                        {([false, true] as const).map((val) => (
+                        {([true, false] as const).map((val) => (
                           <button key={String(val)} type="button"
-                            onClick={() => setVolForm((f) => ({ ...f, priorExperience: val }))}
-                            aria-pressed={volForm.priorExperience === val}
+                            onClick={() => {
+                              setPriorHasExperience(val);
+                              if (!val) { setExperiences([]); setExpTouched({}); }
+                              else if (experiences.length === 0) {
+                                setExperiences([{ orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }]);
+                              }
+                              touch("priorExperiences");
+                            }}
+                            aria-pressed={priorHasExperience === val}
                             style={{
                               flex: 1, height: 42, borderRadius: 8,
-                              border: `1.5px solid ${volForm.priorExperience === val ? GREEN : "#E2E8F0"}`,
-                              backgroundColor: volForm.priorExperience === val ? "#F0FDF4" : "#FAFAFA",
-                              color: volForm.priorExperience === val ? GREEN : "#64748B",
-                              fontWeight: volForm.priorExperience === val ? 600 : 400,
+                              border: `1.5px solid ${priorHasExperience === val ? GREEN : "#E2E8F0"}`,
+                              backgroundColor: priorHasExperience === val ? "#F0FDF4" : "#FAFAFA",
+                              color: priorHasExperience === val ? GREEN : "#64748B",
+                              fontWeight: priorHasExperience === val ? 600 : 400,
                               fontSize: 14, cursor: "pointer", transition: "all 150ms",
                             }}>
                             {val ? "Yes" : "No"}
                           </button>
                         ))}
                       </div>
-                      {volForm.priorExperience && (
-                        <div style={{ marginTop: 10 }}>
-                          <label htmlFor="priorOrg" style={{ ...labelStyle, fontSize: 12 }}>Organization name(s)</label>
-                          <input id="priorOrg"
-                            value={volForm.priorOrg}
-                            onChange={(e) => setVolForm((f) => ({ ...f, priorOrg: e.target.value.slice(0, 200) }))}
-                            onFocus={() => setFocused("priorOrg")}
-                            onBlur={() => setFocused(null)}
-                            placeholder="e.g. Resala, Egyptian Red Crescent…"
-                            style={{
-                              width: "100%", height: 42, outline: "none", boxSizing: "border-box",
-                              border: `1.5px solid ${focused === "priorOrg" ? BLUE : "#E2E8F0"}`,
-                              borderRadius: 8, padding: "0 12px", fontSize: 14, backgroundColor: "#FFFFFF",
-                            }}
-                          />
-                          <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>
-                            {volForm.priorOrg.length}/200
+
+                      {/* Experience entries — shown only when Yes */}
+                      {priorHasExperience === true && (
+                        <div style={{ marginTop: 14 }}>
+                          <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 12px 0" }}>
+                            Please add at least one experience
+                          </p>
+
+                          {/* Entry cards */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            {experiences.map((exp, idx) => {
+                              const orgErr  = getExpError(idx, "orgName");
+                              const deptErr = getExpError(idx, "department");
+                              const deptOtherErr = getExpError(idx, "deptOther");
+                              return (
+                                <div key={idx} style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "16px 16px 14px", backgroundColor: "#FAFAFA" }}>
+                                  {/* Card header */}
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                      Experience {idx + 1}
+                                    </span>
+                                    <button type="button" onClick={() => removeExperience(idx)}
+                                      aria-label={`Remove experience ${idx + 1}`}
+                                      style={{ width: 28, height: 28, borderRadius: 6, border: "1.5px solid #E2E8F0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 150ms, color 150ms" }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = RED; e.currentTarget.style.color = RED; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#94A3B8"; }}>
+                                      ×
+                                    </button>
+                                  </div>
+
+                                  {/* Organization Name — required */}
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label htmlFor={`exp-org-${idx}`} style={{ ...labelStyle, fontSize: 12 }}>
+                                      Organization Name <span style={{ color: RED }}>*</span>
+                                    </label>
+                                    <input id={`exp-org-${idx}`}
+                                      value={exp.orgName}
+                                      onChange={(e) => updateExperience(idx, "orgName", e.target.value)}
+                                      onFocus={() => setFocused(`exp_${idx}_orgName`)}
+                                      onBlur={() => { setFocused(null); touchExp(idx, "orgName"); }}
+                                      placeholder="e.g. Resala, Egyptian Red Crescent…"
+                                      style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${expBorder(idx, "orgName", !!orgErr)}`, borderRadius: 8, padding: "0 12px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
+                                    />
+                                    {orgErr && <div style={{ display: "flex", gap: 4, marginTop: 4 }}><span style={{ color: RED, fontSize: 12 }}>⚠</span><span style={{ fontSize: 12, color: RED }}>{orgErr}</span></div>}
+                                  </div>
+
+                                  {/* Department — required */}
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label htmlFor={`exp-dept-${idx}`} style={{ ...labelStyle, fontSize: 12 }}>
+                                      Department <span style={{ color: RED }}>*</span>
+                                    </label>
+                                    <select id={`exp-dept-${idx}`}
+                                      value={exp.department}
+                                      onChange={(e) => { updateExperience(idx, "department", e.target.value); if (e.target.value !== "Other") updateExperience(idx, "departmentOther", ""); }}
+                                      onFocus={() => setFocused(`exp_${idx}_department`)}
+                                      onBlur={() => { setFocused(null); touchExp(idx, "department"); }}
+                                      style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${expBorder(idx, "department", !!deptErr)}`, borderRadius: 8, padding: "0 8px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
+                                    >
+                                      <option value="">Select department…</option>
+                                      {DEPARTMENT_GROUPS.map((group) => (
+                                        <optgroup key={group.label} label={group.label}>
+                                          {group.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                                        </optgroup>
+                                      ))}
+                                    </select>
+                                    {deptErr && <div style={{ display: "flex", gap: 4, marginTop: 4 }}><span style={{ color: RED, fontSize: 12 }}>⚠</span><span style={{ fontSize: 12, color: RED }}>{deptErr}</span></div>}
+                                    {exp.department === "Other" && (
+                                      <div style={{ marginTop: 8 }}>
+                                        <input
+                                          value={exp.departmentOther}
+                                          onChange={(e) => updateExperience(idx, "departmentOther", e.target.value.slice(0, 50))}
+                                          onFocus={() => setFocused(`exp_${idx}_deptOther`)}
+                                          onBlur={() => { setFocused(null); touchExp(idx, "deptOther"); }}
+                                          placeholder="Specify department…"
+                                          maxLength={50}
+                                          style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${expBorder(idx, "deptOther", !!deptOtherErr)}`, borderRadius: 8, padding: "0 12px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
+                                        />
+                                        {deptOtherErr && <div style={{ display: "flex", gap: 4, marginTop: 4 }}><span style={{ color: RED, fontSize: 12 }}>⚠</span><span style={{ fontSize: 12, color: RED }}>{deptOtherErr}</span></div>}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Role — optional */}
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label htmlFor={`exp-role-${idx}`} style={{ ...labelStyle, fontSize: 12 }}>
+                                      Role / Position <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
+                                    </label>
+                                    <input id={`exp-role-${idx}`}
+                                      value={exp.role}
+                                      onChange={(e) => updateExperience(idx, "role", e.target.value)}
+                                      onFocus={() => setFocused(`exp_${idx}_role`)}
+                                      onBlur={() => setFocused(null)}
+                                      placeholder="e.g. Team Leader, Coordinator…"
+                                      style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${focused === `exp_${idx}_role` ? BLUE : "#E2E8F0"}`, borderRadius: 8, padding: "0 12px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
+                                    />
+                                  </div>
+
+                                  {/* Duration — optional */}
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label htmlFor={`exp-dur-${idx}`} style={{ ...labelStyle, fontSize: 12 }}>
+                                      Duration <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
+                                    </label>
+                                    <input id={`exp-dur-${idx}`}
+                                      value={exp.duration}
+                                      onChange={(e) => updateExperience(idx, "duration", e.target.value)}
+                                      onFocus={() => setFocused(`exp_${idx}_duration`)}
+                                      onBlur={() => setFocused(null)}
+                                      placeholder="e.g. 6 months, Jan 2023 – Jun 2023…"
+                                      style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${focused === `exp_${idx}_duration` ? BLUE : "#E2E8F0"}`, borderRadius: 8, padding: "0 12px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
+                                    />
+                                  </div>
+
+                                  {/* Description — optional */}
+                                  <div>
+                                    <label htmlFor={`exp-desc-${idx}`} style={{ ...labelStyle, fontSize: 12 }}>
+                                      Description <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
+                                    </label>
+                                    <textarea id={`exp-desc-${idx}`}
+                                      value={exp.description}
+                                      onChange={(e) => updateExperience(idx, "description", e.target.value.slice(0, 300))}
+                                      onFocus={() => setFocused(`exp_${idx}_description`)}
+                                      onBlur={() => setFocused(null)}
+                                      placeholder="Briefly describe what you did…"
+                                      style={{ width: "100%", height: 72, outline: "none", boxSizing: "border-box", border: `1.5px solid ${focused === `exp_${idx}_description` ? BLUE : "#E2E8F0"}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, resize: "vertical", fontFamily: "inherit", backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
+                                    />
+                                    <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 1 }}>{exp.description.length}/300</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
+
+                          {/* Top-level error (no entries added) */}
+                          {touched["priorExperiences"] && errors.priorExperiences && (
+                            <div style={{ display: "flex", gap: 4, marginTop: 8, alignItems: "flex-start" }}>
+                              <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
+                              <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{errors.priorExperiences}</span>
+                            </div>
+                          )}
+
+                          {/* Add Experience button */}
+                          <button type="button" onClick={addExperience}
+                            style={{ marginTop: 12, height: 38, padding: "0 16px", borderRadius: 8, border: `1.5px solid ${GREEN}`, backgroundColor: "#F0FDF4", color: GREEN, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                            + Add Experience
+                          </button>
                         </div>
                       )}
                     </div>
 
-                    {/* Cause Areas */}
+                    {/* Cause Areas — ranked preference */}
                     <div>
                       <label style={labelStyle}>
                         Cause Areas / Interests{" "}
                         <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
                       </label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px 0" }}>What causes are you most passionate about?</p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 10px" }}>
-                        {CAUSE_AREAS.map((c) => (
-                          <label key={c} style={checkboxCardStyle(causeAreas.includes(c))}>
-                            <input
-                              type="checkbox"
-                              checked={causeAreas.includes(c)}
-                              onChange={() => toggleCause(c)}
-                              style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }}
-                            />
-                            <span style={{ fontSize: 12 }}>{c}</span>
-                          </label>
-                        ))}
-                      </div>
-                      {causeAreas.includes("Others") && (
-                        <div style={{ marginTop: 10 }}>
-                          <label htmlFor="causeOther" style={{ ...labelStyle, fontSize: 12 }}>Describe your interest</label>
-                          <input id="causeOther"
-                            value={causeOtherText}
-                            onChange={(e) => setCauseOtherText(e.target.value)}
-                            onFocus={() => setFocused("causeOther")}
-                            onBlur={() => setFocused(null)}
-                            placeholder="e.g. Street children, Arts education…"
-                            style={{
-                              width: "100%", height: 40, outline: "none", boxSizing: "border-box",
-                              border: `1.5px solid ${focused === "causeOther" ? BLUE : "#E2E8F0"}`,
-                              borderRadius: 8, padding: "0 12px", fontSize: 13, backgroundColor: "#FFFFFF",
-                            }}
-                          />
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 14px 0" }}>
+                        Rank the causes based on your interest (most preferred first) — up to {MAX_CAUSES}
+                      </p>
+
+                      {/* ── Ranked priority list ── */}
+                      {rankedCauses.length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                            Your Priorities ({rankedCauses.length}/{MAX_CAUSES}) — drag to reorder
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {rankedCauses.map((cause, idx) => {
+                              const isCustom = !ALL_PREDEFINED_CAUSES.has(cause);
+                              const accent = isCustom ? BLUE : GREEN;
+                              const bg = isCustom ? "#EFF6FF" : "#F0FDF4";
+                              const handleColor = isCustom ? "#93C5FD" : "#86EFAC";
+                              const textColor = isCustom ? "#1D4ED8" : "#15803D";
+                              const btnBorder = isCustom ? "#BFDBFE" : "#BBF7D0";
+                              return (
+                              <div
+                                key={cause}
+                                draggable
+                                onDragStart={() => { dragCauseIdx.current = idx; }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  if (dragCauseIdx.current !== null && dragCauseIdx.current !== idx) {
+                                    moveCause(dragCauseIdx.current, idx);
+                                  }
+                                  dragCauseIdx.current = null;
+                                }}
+                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${accent}`, backgroundColor: bg, cursor: "grab", userSelect: "none" }}
+                              >
+                                {/* Rank badge */}
+                                <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: accent, color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  {idx + 1}
+                                </div>
+                                {/* Drag handle */}
+                                <span style={{ color: handleColor, fontSize: 15, lineHeight: 1, flexShrink: 0 }} aria-hidden>⠿</span>
+                                {/* Cause name */}
+                                <span style={{ flex: 1, fontSize: 13, color: textColor, fontWeight: 500, fontStyle: isCustom ? "italic" : "normal" }}>{cause}{isCustom && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: BLUE, fontStyle: "normal", opacity: 0.7 }}>custom</span>}</span>
+                                {/* Up / Down */}
+                                <button type="button" onClick={() => moveCause(idx, idx - 1)} disabled={idx === 0}
+                                  aria-label={`Move ${cause} up`}
+                                  style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === 0 ? "#D1FAE5" : "#16A34A", cursor: idx === 0 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms" }}>
+                                  ↑
+                                </button>
+                                <button type="button" onClick={() => moveCause(idx, idx + 1)} disabled={idx === rankedCauses.length - 1}
+                                  aria-label={`Move ${cause} down`}
+                                  style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === rankedCauses.length - 1 ? "#D1FAE5" : "#16A34A", cursor: idx === rankedCauses.length - 1 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms" }}>
+                                  ↓
+                                </button>
+                                {/* Remove */}
+                                <button type="button" onClick={() => removeCause(idx)}
+                                  aria-label={`Remove ${cause}`}
+                                  style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms" }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = RED; e.currentTarget.style.color = RED; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#BBF7D0"; e.currentTarget.style.color = "#94A3B8"; }}>
+                                  ×
+                                </button>
+                              </div>
+                            );
+                            })}
+                          </div>
+
+                        </div>
+                      )}
+
+                      {/* ── Available cause pool ── */}
+                      {rankedCauses.length < MAX_CAUSES ? (
+                        <div style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", backgroundColor: "#FAFAFA" }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                            {rankedCauses.length === 0 ? "Select causes to rank" : "Add more"}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            {CAUSE_GROUPS.map((group) => {
+                              const available = group.causes.filter((c) => !rankedCauses.includes(c));
+                              if (available.length === 0) return null;
+                              return (
+                                <div key={group.label}>
+                                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, marginBottom: 6 }}>{group.label}</div>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                    {available.map((cause) => (
+                                      <button key={cause} type="button" onClick={() => addCause(cause)}
+                                        style={{ height: 30, padding: "0 12px", borderRadius: 20, border: "1.5px solid #E2E8F0", backgroundColor: "#fff", color: "#374151", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 150ms", display: "flex", alignItems: "center", gap: 4 }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = GREEN; e.currentTarget.style.color = GREEN; e.currentTarget.style.backgroundColor = "#F0FDF4"; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#374151"; e.currentTarget.style.backgroundColor = "#fff"; }}>
+                                        <span style={{ fontSize: 11, opacity: 0.6 }}>+</span> {cause}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Custom interest input */}
+                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                              Add Custom Interest
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <input
+                                value={customCauseInput}
+                                onChange={(e) => setCustomCauseInput(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomCause(); } }}
+                                placeholder="e.g. Street Arts, Sports for Youth…"
+                                maxLength={60}
+                                style={{ flex: 1, height: 36, padding: "0 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#1E293B", outline: "none", backgroundColor: "#fff" }}
+                              />
+                              <button
+                                type="button"
+                                onClick={addCustomCause}
+                                disabled={customCauseInput.trim().length < 2}
+                                style={{ height: 36, padding: "0 14px", borderRadius: 8, border: `1.5px solid ${customCauseInput.trim().length >= 2 ? GREEN : "#E2E8F0"}`, backgroundColor: customCauseInput.trim().length >= 2 ? "#F0FDF4" : "#F8FAFC", color: customCauseInput.trim().length >= 2 ? GREEN : "#CBD5E1", fontSize: 13, fontWeight: 600, cursor: customCauseInput.trim().length >= 2 ? "pointer" : "default", transition: "all 150ms", flexShrink: 0 }}
+                              >
+                                + Add
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ padding: "10px 14px", borderRadius: 9, backgroundColor: "#F0FDF4", border: "1.5px solid #BBF7D0", fontSize: 12, color: "#15803D", textAlign: "center" }}>
+                          Maximum {MAX_CAUSES} causes selected — remove one to add another
                         </div>
                       )}
                     </div>
@@ -1165,7 +1633,6 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   )}
                   {step < 3 && (
                     <button type="button" onClick={handleNext}
-                      disabled={!currentStepValid}
                       style={{
                         flex: 1, height: 44, borderRadius: 8, border: "none",
                         backgroundColor: currentStepValid ? GREEN : "#CBD5E1",
@@ -1180,20 +1647,40 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                     </button>
                   )}
                   {step === 3 && (
-                    <button type="submit"
-                      disabled={!step3Valid || isSubmitting}
-                      style={{
-                        flex: 1, height: 44, borderRadius: 8, border: "none",
-                        backgroundColor: step3Valid ? GREEN : "#CBD5E1",
-                        color: "#fff", fontSize: 15, fontWeight: 600,
-                        cursor: (step3Valid && !isSubmitting) ? "pointer" : "not-allowed",
-                        transition: "background-color 200ms",
+                    <div
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        if (!step3Valid) {
+                          setTouched((t) => ({ ...t, skills: true, availability: true, languages: true, priorExperiences: true, departmentOther: true }));
+                          if (experiences.length > 0) {
+                            setExpTouched((t) => {
+                              const next = { ...t };
+                              experiences.forEach((_, idx) => {
+                                next[`exp_${idx}_orgName`] = true;
+                                next[`exp_${idx}_department`] = true;
+                                next[`exp_${idx}_deptOther`] = true;
+                              });
+                              return next;
+                            });
+                          }
+                        }
                       }}
-                      onMouseEnter={(e) => { if (step3Valid) e.currentTarget.style.backgroundColor = GREEN_HOVER; }}
-                      onMouseLeave={(e) => { if (step3Valid) e.currentTarget.style.backgroundColor = GREEN; }}
                     >
-                      {isSubmitting ? "Creating Account…" : "Create Account"}
-                    </button>
+                      <button type="submit"
+                        disabled={!step3Valid || isSubmitting}
+                        style={{
+                          width: "100%", height: 44, borderRadius: 8, border: "none",
+                          backgroundColor: step3Valid ? GREEN : "#CBD5E1",
+                          color: "#fff", fontSize: 15, fontWeight: 600,
+                          cursor: (step3Valid && !isSubmitting) ? "pointer" : "not-allowed",
+                          transition: "background-color 200ms",
+                        }}
+                        onMouseEnter={(e) => { if (step3Valid) e.currentTarget.style.backgroundColor = GREEN_HOVER; }}
+                        onMouseLeave={(e) => { if (step3Valid) e.currentTarget.style.backgroundColor = GREEN; }}
+                      >
+                        {isSubmitting ? "Creating Account…" : "Create Account"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </>

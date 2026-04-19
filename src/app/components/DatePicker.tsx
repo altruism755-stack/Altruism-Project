@@ -52,14 +52,19 @@ export function DatePicker({
   const [viewYear, setViewYear]   = useState(() => parseYear(value));
   const [viewMonth, setViewMonth] = useState(() => parseMonth(value));
   const containerRef              = useRef<HTMLDivElement>(null);
+  const openRef                   = useRef(open);
+  openRef.current = open;
 
-  // Sync calendar position when value changes externally
+  // Sync internal state when value changes externally (e.g. form reset or parent update).
+  // Skip when the calendar is currently open to avoid overwriting the user's in-progress selection.
   useEffect(() => {
-    if (value) {
-      setTentative(value);
-      setViewYear(parseYear(value));
-      setViewMonth(parseMonth(value));
-    }
+    if (openRef.current) return;
+    const y = value ? parseInt(value.split("-")[0], 10) : (today.getFullYear() - 20);
+    const m = value ? parseInt(value.split("-")[1], 10) - 1 : today.getMonth();
+    setTentative(value);
+    setViewYear(y);
+    setViewMonth(m);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   // Close on outside click (reset tentative without confirming)
@@ -85,6 +90,7 @@ export function DatePicker({
   };
 
   const handleConfirm = () => {
+    console.log("[DatePicker] confirming date:", tentative);
     onChange(tentative);
     setOpen(false);
     onBlur?.();

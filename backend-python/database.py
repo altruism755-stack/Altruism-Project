@@ -188,6 +188,13 @@ def init_schema():
         ("prior_experience", "INTEGER DEFAULT 0"),
         ("prior_org", "TEXT"),
         ("cause_areas", "TEXT"),
+        ("nationality", "TEXT"),
+        ("university_name", "TEXT"),
+        ("faculty", "TEXT"),
+        ("study_year", "TEXT"),
+        ("field_of_study", "TEXT"),
+        ("department", "TEXT"),
+        ("experiences", "TEXT"),
     ]
     for col, ddl in new_vol_columns:
         try:

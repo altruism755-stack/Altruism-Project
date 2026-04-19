@@ -21,7 +21,6 @@ class RegisterBody(BaseModel):
     phone: Optional[str] = None
     city: Optional[str] = None
     skills: Optional[list] = None
-    aboutMe: Optional[str] = None
     dateOfBirth: Optional[str] = None
     governorate: Optional[str] = None
     nationalId: Optional[str] = None
@@ -34,7 +33,14 @@ class RegisterBody(BaseModel):
     educationLevel: Optional[str] = None
     priorExperience: Optional[bool] = None
     priorOrg: Optional[str] = None
+    experiences: Optional[list] = None
     causeAreas: Optional[list] = None
+    nationality: Optional[str] = None
+    universityName: Optional[str] = None
+    faculty: Optional[str] = None
+    studyYear: Optional[str] = None
+    fieldOfStudy: Optional[str] = None
+    department: Optional[str] = None
     # Organization fields (enhanced)
     orgName: Optional[str] = None
     description: Optional[str] = None
@@ -75,18 +81,24 @@ def register(body: RegisterBody):
             )
             user_id = cur.lastrowid
             db.execute(
-                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, about_me, "
+                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, "
                 "date_of_birth, governorate, national_id, gender, health_notes, availability, "
                 "hours_per_week, languages, education_level, prior_experience, prior_org, "
-                "cause_areas, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
-                (user_id, body.name or "", body.email, body.phone or "", body.city or "",
-                 json.dumps(body.skills or []), body.aboutMe or "",
-                 body.dateOfBirth or "", body.governorate or "", body.nationalId or "",
-                 body.gender or "", body.healthNotes or "",
+                "experiences, cause_areas, nationality, university_name, faculty, study_year, "
+                "field_of_study, department, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
+                (user_id, body.name or "", body.email, body.phone or None, body.city or None,
+                 json.dumps(body.skills or []),
+                 body.dateOfBirth or None, body.governorate or None, body.nationalId or None,
+                 body.gender or None, body.healthNotes or None,
                  json.dumps(body.availability or []), body.hoursPerWeek or 0,
-                 json.dumps(body.languages or []), body.educationLevel or "",
-                 1 if body.priorExperience else 0, body.priorOrg or "",
-                 json.dumps(body.causeAreas or [])),
+                 json.dumps(body.languages or []), body.educationLevel or None,
+                 1 if body.priorExperience else 0, body.priorOrg or None,
+                 json.dumps(body.experiences or []),
+                 json.dumps(body.causeAreas or []),
+                 body.nationality or None, body.universityName or None,
+                 body.faculty or None, body.studyYear or None, body.fieldOfStudy or None,
+                 body.department or None),
             )
             vol = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user_id,)).fetchone())
 

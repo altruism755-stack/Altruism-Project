@@ -120,7 +120,6 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         phone = body.get("phone")
         city = body.get("city")
         skills = body.get("skills")
-        about_me = body.get("about_me")
         date_of_birth = body.get("date_of_birth")
         governorate = body.get("governorate")
         gender = body.get("gender")
@@ -131,13 +130,18 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         education_level = body.get("education_level")
         prior_experience = body.get("prior_experience")
         prior_org = body.get("prior_org")
+        experiences = body.get("experiences")
         cause_areas = body.get("cause_areas")
+        university_name = body.get("university_name")
+        faculty = body.get("faculty")
+        study_year = body.get("study_year")
+        field_of_study = body.get("field_of_study")
+        department = body.get("department")
 
         db.execute(
             "UPDATE volunteers SET "
             "name = COALESCE(?, name), phone = COALESCE(?, phone), "
             "city = COALESCE(?, city), skills = COALESCE(?, skills), "
-            "about_me = COALESCE(?, about_me), "
             "date_of_birth = COALESCE(?, date_of_birth), "
             "governorate = COALESCE(?, governorate), "
             "gender = COALESCE(?, gender), "
@@ -148,10 +152,16 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
             "education_level = COALESCE(?, education_level), "
             "prior_experience = COALESCE(?, prior_experience), "
             "prior_org = COALESCE(?, prior_org), "
-            "cause_areas = COALESCE(?, cause_areas) "
+            "experiences = COALESCE(?, experiences), "
+            "cause_areas = COALESCE(?, cause_areas), "
+            "university_name = COALESCE(?, university_name), "
+            "faculty = COALESCE(?, faculty), "
+            "study_year = COALESCE(?, study_year), "
+            "field_of_study = COALESCE(?, field_of_study), "
+            "department = COALESCE(?, department) "
             "WHERE id = ?",
             (name, phone, city, json.dumps(skills) if skills is not None else None,
-             about_me, date_of_birth, governorate,
+             date_of_birth, governorate,
              gender, health_notes,
              json.dumps(availability) if availability is not None else None,
              hours_per_week,
@@ -159,7 +169,10 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
              education_level,
              (1 if prior_experience else 0) if prior_experience is not None else None,
              prior_org,
+             json.dumps(experiences) if experiences is not None else None,
              json.dumps(cause_areas) if cause_areas is not None else None,
+             university_name, faculty, study_year, field_of_study,
+             department,
              volunteer_id),
         )
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -41,6 +41,28 @@ const SKILLS_LIST = [
   "Environmental Work",
   "Community Outreach",
 ];
+
+const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
+  { label: "Communications & Outreach", options: ["PR", "Media", "Content Creation"] },
+  { label: "Operations", options: ["HR", "Event Management", "Logistics", "Fundraising", "Partnerships"] },
+  { label: "Other", options: ["Emergencies", "General"] },
+];
+
+const AVAILABILITY_SPECIFIC = ["Weekday mornings", "Weekday afternoons", "Weekday evenings", "Weekends"];
+
+const MAX_CAUSES = 5;
+
+const CAUSE_GROUPS: { label: string; causes: string[] }[] = [
+  { label: "Social & Humanitarian",  causes: ["Poverty Alleviation", "Food & Clothing Distribution", "Refugee & Migrant Support", "Disability Support", "Elderly Care", "Child Protection & Orphan Care", "Women Empowerment"] },
+  { label: "Children & Youth",       causes: ["Youth Development", "Street Children Outreach", "Child Education Support", "After-School Programs"] },
+  { label: "Education & Skills",     causes: ["Education & Tutoring", "Literacy Programs", "Career Mentorship", "Youth Entrepreneurship", "Awareness Campaigns"] },
+  { label: "Health & Emergency",     causes: ["Healthcare Access", "Blood Donation", "Emergency & Disaster Relief", "Mental Health Support", "First Aid & Safety"] },
+  { label: "Environment",            causes: ["Environmental Cleanup", "Climate Action", "Animal Welfare", "Sustainability"] },
+  { label: "Community & Events",     causes: ["Community Engagement", "Event Planning & Coordination", "Fundraising", "Arts & Culture", "Sports & Recreation", "Ramadan & Seasonal Programs"] },
+  { label: "Professional & General", causes: ["Administrative Support", "Media & Content Creation", "Translation & Interpretation", "General Volunteering"] },
+];
+
+const ALL_PREDEFINED_CAUSES = new Set(CAUSE_GROUPS.flatMap((g) => g.causes));
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -216,6 +238,7 @@ export function ProfilePage() {
   const { profile } = useAuth();
   const volName = profile?.name || "Volunteer";
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCauseIdx = useRef<number | null>(null);
 
   const [volunteer, setVolunteer] = useState<any>(null);
   const [myOrgs, setMyOrgs] = useState<any[]>([]);
@@ -232,16 +255,19 @@ export function ProfilePage() {
   const [picSuccess, setPicSuccess] = useState("");
 
   const [form, setForm] = useState({
-    fullName: "", phone: "", city: "", aboutMe: "",
+    fullName: "", phone: "", city: "", department: "",
     dateOfBirth: "", governorate: "", email: "",
     gender: "", healthNotes: "", educationLevel: "",
-    priorExperience: false, priorOrg: "", hoursPerWeek: 10,
+    universityName: "", faculty: "", studyYear: "", fieldOfStudy: "",
+    priorExperience: false, priorOrg: "", hoursPerWeek: null as number | null,
   });
   const [formSkills, setFormSkills] = useState<string[]>([]);
   const [formCustomSkill, setFormCustomSkill] = useState("");
   const [formAvailability, setFormAvailability] = useState<string[]>([]);
   const [formLanguages, setFormLanguages] = useState<{ language: string; proficiency: string }[]>([]);
   const [formCauseAreas, setFormCauseAreas] = useState<string[]>([]);
+  const [formExperiences, setFormExperiences] = useState<{ orgName: string; department: string; departmentOther: string; role: string; duration: string; description: string }[]>([]);
+  const [customCauseInput, setCustomCauseInput] = useState("");
   const [formNewLang, setFormNewLang] = useState("");
   const [formNewLangProf, setFormNewLangProf] = useState("Conversational");
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -252,6 +278,7 @@ export function ProfilePage() {
   const fetchProfile = async () => {
     try {
       const volRes = await api.getVolunteerMe();
+      console.log("[Profile] loaded volunteer data:", JSON.stringify(volRes, null, 2));
       setVolunteer(volRes);
 
       const orgs: any[] = volRes.organizations || [];
@@ -292,21 +319,27 @@ export function ProfilePage() {
       setFormLanguages(langs.length > 0 ? langs : [{ language: "Arabic", proficiency: "Native" }]);
       const causes: string[] = (() => { try { return JSON.parse(volRes.cause_areas || "[]"); } catch { return []; } })();
       setFormCauseAreas(causes);
+      const exps: { orgName: string; department: string; role: string; duration: string; description: string }[] = (() => { try { return JSON.parse(volRes.experiences || "[]"); } catch { return []; } })();
+      setFormExperiences(exps.map((e) => ({ ...e, departmentOther: "" })));
 
       setForm({
         fullName: volRes.name || "",
         phone: volRes.phone || "",
         city: volRes.city || "",
-        aboutMe: volRes.about_me || "",
+        department: volRes.department || "",
         dateOfBirth: volRes.date_of_birth || "",
         governorate: volRes.governorate || "",
         email: volRes.email || "",
         gender: volRes.gender || "",
         healthNotes: volRes.health_notes || "",
         educationLevel: volRes.education_level || "",
+        universityName: volRes.university_name || "",
+        faculty: volRes.faculty || "",
+        studyYear: volRes.study_year || "",
+        fieldOfStudy: volRes.field_of_study || "",
         priorExperience: volRes.prior_experience === 1,
         priorOrg: volRes.prior_org || "",
-        hoursPerWeek: volRes.hours_per_week || 10,
+        hoursPerWeek: volRes.hours_per_week ?? null,
       });
     } catch (e) { console.error("Failed to load profile:", e); }
     finally { setLoading(false); }
@@ -323,25 +356,42 @@ export function ProfilePage() {
       const skillsArray = formSkills.includes("Other")
         ? [...formSkills.filter((s) => s !== "Other"), ...formCustomSkill.split(",").map((s) => s.trim()).filter(Boolean)]
         : formSkills;
-      await api.updateVolunteer(volRecordId, {
+      const resolvedExperiences = formExperiences.map((e) => ({
+        orgName: e.orgName,
+        department: e.department === "Other" ? e.departmentOther : e.department,
+        role: e.role,
+        duration: e.duration,
+        description: e.description,
+      }));
+      const savePayload = {
         name: form.fullName,
         phone: form.phone,
         city: form.city,
         skills: skillsArray,
-        about_me: form.aboutMe,
         date_of_birth: form.dateOfBirth,
         governorate: form.governorate,
         email: form.email,
         gender: form.gender,
         health_notes: form.healthNotes,
         education_level: form.educationLevel,
+        university_name: form.universityName,
+        faculty: form.faculty,
+        study_year: form.studyYear,
+        field_of_study: form.fieldOfStudy,
+        department: form.department,
         prior_experience: form.priorExperience ? 1 : 0,
-        prior_org: form.priorOrg,
+        prior_org: form.priorExperience
+          ? formExperiences.map((e) => e.orgName.trim()).filter(Boolean).join(", ")
+          : "",
+        experiences: resolvedExperiences,
         hours_per_week: form.hoursPerWeek,
         availability: formAvailability,
         languages: formLanguages,
         cause_areas: formCauseAreas,
-      });
+      };
+      console.log("[Profile] save payload:", JSON.stringify(savePayload, null, 2));
+      const saveResult = await api.updateVolunteer(volRecordId, savePayload);
+      console.log("[Profile] save response:", saveResult);
       setEditing(false);
       fetchProfile();
     } catch (e) { console.error("Failed to save profile:", e); }
@@ -638,34 +688,105 @@ export function ProfilePage() {
                       <label style={{ ...labelStyle, color: "#94A3B8" }}>Date of Birth</label>
                       <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.date_of_birth || "—"}</div>
                     </div>
-                    <div className="col-span-2">
+                    <div>
+                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Nationality</label>
+                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.nationality || "—"}</div>
+                    </div>
+                    <div>
                       <label style={{ ...labelStyle, color: "#94A3B8" }}>National ID</label>
                       <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed", letterSpacing: "0.05em" }}>{volunteer?.national_id || "—"}</div>
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label style={labelStyle}>Email</label>
-                    <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Phone Number</label>
-                    <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Governorate</label>
-                    <select value={form.governorate} onChange={(e) => setForm((f) => ({ ...f, governorate: e.target.value }))} style={inputStyle}>
-                      <option value="">Select Governorate</option>
-                      {GOVERNORATES.map((g) => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>City</label>
-                    <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} style={inputStyle} />
+                {/* Step 1 — Email */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Email</label>
+                  <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={inputStyle} />
+                </div>
+                {/* Step 2 — Personal details */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Phone Number</label>
+                  <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={inputStyle} />
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Governorate</label>
+                  <select value={form.governorate} onChange={(e) => setForm((f) => ({ ...f, governorate: e.target.value }))} style={inputStyle}>
+                    <option value="">Select Governorate</option>
+                    {GOVERNORATES.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>City</label>
+                  <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} style={inputStyle} />
+                </div>
+                {/* Gender */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Gender</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {["Male", "Female"].map((g) => (
+                      <button key={g} type="button" onClick={() => setForm((f) => ({ ...f, gender: g }))}
+                        style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.gender === g ? GREEN : "#E2E8F0"}`, backgroundColor: form.gender === g ? "#F0FDF4" : "#FAFAFA", color: form.gender === g ? GREEN : "#64748B", fontWeight: form.gender === g ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
+                        {g}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div style={{ marginTop: 16 }}>
+                {/* Health Notes */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Health / Mobility Notes <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <textarea value={form.healthNotes} onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, 300) }))}
+                    placeholder="Any physical limitations organizations should know about..."
+                    style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
+                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.healthNotes.length}/300</div>
+                </div>
+                {/* Education Level */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Education Level</label>
+                  <select value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={inputStyle}>
+                    <option value="">Select education level...</option>
+                    {["High School Student", "High School Graduate", "University Student", "University Graduate", "Postgraduate (Diploma / Master / PhD)", "Other"].map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                  {form.educationLevel === "University Student" && (
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div>
+                        <label style={labelStyle}>University Name</label>
+                        <input value={form.universityName} onChange={(e) => setForm((f) => ({ ...f, universityName: e.target.value }))} style={inputStyle} placeholder="e.g. Cairo University" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Faculty / Major</label>
+                        <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} style={inputStyle} placeholder="e.g. Computer Science" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Academic Year</label>
+                        <select value={form.studyYear} onChange={(e) => setForm((f) => ({ ...f, studyYear: e.target.value }))} style={inputStyle}>
+                          <option value="">Select year...</option>
+                          {["1st Year", "2nd Year", "3rd Year", "4th Year+"].map((y) => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  {(form.educationLevel === "University Graduate" || form.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
+                    <div style={{ marginTop: 10 }}>
+                      <label style={labelStyle}>Field of Study</label>
+                      <input value={form.fieldOfStudy} onChange={(e) => setForm((f) => ({ ...f, fieldOfStudy: e.target.value }))} style={inputStyle} placeholder="e.g. Engineering, Medicine..." />
+                    </div>
+                  )}
+                </div>
+                {/* Step 3 — Preferred Department */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Preferred Department <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <select value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} style={inputStyle}>
+                    <option value="">Select a department…</option>
+                    {DEPARTMENT_GROUPS.map((group) => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Skills</label>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px", marginTop: 4 }}>
                     {SKILLS_LIST.map((skill) => (
@@ -698,56 +819,70 @@ export function ProfilePage() {
                     />
                   )}
                 </div>
-                {/* Gender */}
-                <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Gender</label>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    {["Male", "Female"].map((g) => (
-                      <button key={g} type="button" onClick={() => setForm((f) => ({ ...f, gender: g }))}
-                        style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.gender === g ? GREEN : "#E2E8F0"}`, backgroundColor: form.gender === g ? "#F0FDF4" : "#FAFAFA", color: form.gender === g ? GREEN : "#64748B", fontWeight: form.gender === g ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
-                        {g}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Education Level */}
-                <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Education Level</label>
-                  <select value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value }))} style={inputStyle}>
-                    <option value="">Select education level...</option>
-                    {["Below secondary", "Secondary", "Diploma", "Bachelor's", "Master's", "PhD"].map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Availability */}
                 <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Availability</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px" }}>
-                    {["Weekday mornings", "Weekday afternoons", "Weekday evenings", "Weekends", "Flexible"].map((opt) => (
-                      <label key={opt} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formAvailability.includes(opt) ? GREEN : "#E2E8F0"}`, backgroundColor: formAvailability.includes(opt) ? "#F0FDF4" : "#FAFAFA", userSelect: "none" as const }}>
-                        <input type="checkbox" checked={formAvailability.includes(opt)}
-                          onChange={() => setFormAvailability((prev) => prev.includes(opt) ? prev.filter((a) => a !== opt) : [...prev, opt])}
-                          style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }} />
-                        {opt}
-                      </label>
-                    ))}
+                  <label style={labelStyle}>Availability <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 12px 0" }}>Select all time slots that match your availability.</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, opacity: formAvailability.includes("Flexible") ? 0.45 : 1, transition: "opacity 200ms ease" }}>
+                    {AVAILABILITY_SPECIFIC.map((opt) => {
+                      const active = formAvailability.includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setFormAvailability((prev) => {
+                            const without = prev.filter((a) => a !== "Flexible");
+                            const next = without.includes(opt) ? without.filter((a) => a !== opt) : [...without, opt];
+                            const allSpecific = AVAILABILITY_SPECIFIC.every((s) => next.includes(s));
+                            return allSpecific ? ["Flexible"] : next;
+                          })}
+                          style={{ height: 34, padding: "0 14px", borderRadius: 20, border: `1.5px solid ${active ? GREEN : "#D1D5DB"}`, backgroundColor: active ? "#DCFCE7" : "#FFFFFF", color: active ? "#15803D" : "#4B5563", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", transition: "all 150ms", userSelect: "none" as const, display: "flex", alignItems: "center", gap: 6 }}>
+                          {active && <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="#15803D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                          {opt}
+                        </button>
+                      );
+                    })}
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 12px 0" }}>
+                    <div style={{ flex: 1, height: 1, backgroundColor: "#F1F5F9" }} />
+                    <span style={{ fontSize: 11, color: "#CBD5E1", fontWeight: 500, letterSpacing: "0.06em" }}>or</span>
+                    <div style={{ flex: 1, height: 1, backgroundColor: "#F1F5F9" }} />
+                  </div>
+                  <button type="button"
+                    onClick={() => setFormAvailability((prev) => prev.includes("Flexible") ? [] : ["Flexible"])}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderRadius: 10, cursor: "pointer", border: `1.5px solid ${formAvailability.includes("Flexible") ? GREEN : "#E2E8F0"}`, backgroundColor: formAvailability.includes("Flexible") ? "#F0FDF4" : "#FFFFFF", transition: "all 150ms", textAlign: "left" as const }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, border: `2px solid ${formAvailability.includes("Flexible") ? GREEN : "#D1D5DB"}`, backgroundColor: formAvailability.includes("Flexible") ? GREEN : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 150ms" }}>
+                      {formAvailability.includes("Flexible") && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: formAvailability.includes("Flexible") ? GREEN : "#1E293B" }}>Flexible</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>Open to any time slot</div>
+                    </div>
+                  </button>
                 </div>
 
                 {/* Hours per week */}
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>
                     Estimated hours per week{" "}
-                    <span style={{ color: GREEN, fontWeight: 700 }}>{form.hoursPerWeek} hrs</span>
+                    <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
                   </label>
-                  <input type="range" min={1} max={40} step={1} value={form.hoursPerWeek}
-                    onChange={(e) => setForm((f) => ({ ...f, hoursPerWeek: parseInt(e.target.value) }))}
-                    style={{ width: "100%", accentColor: GREEN, cursor: "pointer" }} />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8" }}>
-                    <span>1</span><span>10</span><span>20</span><span>30</span><span>40</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="number" min={1} max={40} step={1}
+                      value={form.hoursPerWeek ?? ""}
+                      placeholder="e.g., 5"
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === "") { setForm((f) => ({ ...f, hoursPerWeek: null })); return; }
+                        const v = Math.min(40, Math.max(1, parseInt(raw)));
+                        if (!isNaN(v)) setForm((f) => ({ ...f, hoursPerWeek: v }));
+                      }}
+                      style={{
+                        width: 120, height: 42, outline: "none", boxSizing: "border-box" as const,
+                        border: "1.5px solid #E2E8F0", borderRadius: 8,
+                        padding: "0 12px", fontSize: 14, backgroundColor: "#FFFFFF",
+                      }}
+                    />
+                    <span style={{ fontSize: 13, color: "#64748B", fontWeight: 500 }}>hrs / week</span>
                   </div>
                 </div>
 
@@ -783,55 +918,199 @@ export function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Cause Areas */}
+                {/* Prior Volunteer Experience — Step 3 */}
                 <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Cause Areas / Interests</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 10px" }}>
-                    {["Children & Youth", "Elderly", "Environment", "Education", "Health", "Disability", "Refugees", "Animal Welfare", "Others"].map((c) => (
-                      <label key={c} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formCauseAreas.includes(c) ? GREEN : "#E2E8F0"}`, backgroundColor: formCauseAreas.includes(c) ? "#F0FDF4" : "#FAFAFA", userSelect: "none" as const }}>
-                        <input type="checkbox" checked={formCauseAreas.includes(c)}
-                          onChange={() => setFormCauseAreas((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])}
-                          style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }} />
-                        {c}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Prior Experience */}
-                <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Prior Volunteer Experience</label>
+                  <label style={labelStyle}>Prior Volunteer Experience <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>Have you volunteered with any organization before?</p>
                   <div style={{ display: "flex", gap: 10 }}>
-                    {([false, true] as const).map((val) => (
-                      <button key={String(val)} type="button" onClick={() => setForm((f) => ({ ...f, priorExperience: val }))}
+                    {([true, false] as const).map((val) => (
+                      <button key={String(val)} type="button"
+                        onClick={() => {
+                          setForm((f) => ({ ...f, priorExperience: val }));
+                          if (!val) setFormExperiences([]);
+                          else if (formExperiences.length === 0) setFormExperiences([{ orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }]);
+                        }}
                         style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.priorExperience === val ? GREEN : "#E2E8F0"}`, backgroundColor: form.priorExperience === val ? "#F0FDF4" : "#FAFAFA", color: form.priorExperience === val ? GREEN : "#64748B", fontWeight: form.priorExperience === val ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
                         {val ? "Yes" : "No"}
                       </button>
                     ))}
                   </div>
                   {form.priorExperience && (
-                    <div style={{ marginTop: 8 }}>
-                      <input value={form.priorOrg} onChange={(e) => setForm((f) => ({ ...f, priorOrg: e.target.value.slice(0, 200) }))}
-                        placeholder="Which organization(s)?" style={{ ...inputStyle }} />
-                      <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.priorOrg.length}/200</div>
+                    <div style={{ marginTop: 14 }}>
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 12px 0" }}>Please add at least one experience.</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {formExperiences.map((exp, idx) => (
+                          <div key={idx} style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "16px 16px 14px", backgroundColor: "#FAFAFA" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>Experience {idx + 1}</span>
+                              <button type="button" onClick={() => setFormExperiences((prev) => prev.filter((_, i) => i !== idx))}
+                                style={{ width: 28, height: 28, borderRadius: 6, border: "1.5px solid #E2E8F0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ ...labelStyle, fontSize: 12 }}>Organization Name <span style={{ color: "#DC2626" }}>*</span></label>
+                              <input value={exp.orgName}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, orgName: e.target.value } : x))}
+                                placeholder="e.g. Resala, Egyptian Red Crescent…"
+                                style={inputStyle} />
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ ...labelStyle, fontSize: 12 }}>Department <span style={{ color: "#DC2626" }}>*</span></label>
+                              <select value={exp.department}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, department: e.target.value, departmentOther: e.target.value !== "Other" ? "" : x.departmentOther } : x))}
+                                style={inputStyle}>
+                                <option value="">Select department…</option>
+                                {DEPARTMENT_GROUPS.map((group) => (
+                                  <optgroup key={group.label} label={group.label}>
+                                    {group.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                                  </optgroup>
+                                ))}
+                                <option value="Other">Other</option>
+                              </select>
+                              {exp.department === "Other" && (
+                                <input value={exp.departmentOther}
+                                  onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, departmentOther: e.target.value.slice(0, 50) } : x))}
+                                  placeholder="Specify department…"
+                                  style={{ ...inputStyle, marginTop: 8 }} />
+                              )}
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ ...labelStyle, fontSize: 12 }}>Role / Position <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
+                              <input value={exp.role}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, role: e.target.value } : x))}
+                                placeholder="e.g. Team Leader, Coordinator…"
+                                style={inputStyle} />
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ ...labelStyle, fontSize: 12 }}>Duration <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
+                              <input value={exp.duration}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, duration: e.target.value } : x))}
+                                placeholder="e.g. 6 months, Jan 2023 – Jun 2023…"
+                                style={inputStyle} />
+                            </div>
+                            <div>
+                              <label style={{ ...labelStyle, fontSize: 12 }}>Description <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
+                              <textarea value={exp.description}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, description: e.target.value.slice(0, 300) } : x))}
+                                placeholder="Briefly describe what you did…"
+                                style={{ ...inputStyle, height: 72, padding: "8px 12px", resize: "vertical" as const }} />
+                              <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 1 }}>{exp.description.length}/300</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button type="button"
+                        onClick={() => setFormExperiences((prev) => [...prev, { orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }])}
+                        style={{ marginTop: 12, height: 38, padding: "0 16px", borderRadius: 8, border: `1.5px solid ${GREEN}`, backgroundColor: "#F0FDF4", color: GREEN, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        + Add Experience
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Health Notes */}
+                {/* Cause Areas — Step 3 */}
                 <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Health / Mobility Notes <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
-                  <textarea value={form.healthNotes} onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, 300) }))}
-                    placeholder="Any physical limitations organizations should know about..."
-                    style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
-                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.healthNotes.length}/300</div>
+                  <label style={labelStyle}>Cause Areas / Interests <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 14px 0" }}>Rank the causes based on your interest (most preferred first) — up to {MAX_CAUSES}</p>
+
+                  {/* Ranked priority list */}
+                  {formCauseAreas.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>
+                        Your Priorities ({formCauseAreas.length}/{MAX_CAUSES}) — drag to reorder
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {formCauseAreas.map((cause, idx) => {
+                          const isCustom = !ALL_PREDEFINED_CAUSES.has(cause);
+                          const accent = isCustom ? "#2563EB" : GREEN;
+                          const bg = isCustom ? "#EFF6FF" : "#F0FDF4";
+                          return (
+                            <div key={cause} draggable
+                              onDragStart={() => { dragCauseIdx.current = idx; }}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (dragCauseIdx.current !== null && dragCauseIdx.current !== idx) {
+                                  setFormCauseAreas((prev) => {
+                                    const next = [...prev];
+                                    const [item] = next.splice(dragCauseIdx.current!, 1);
+                                    next.splice(idx, 0, item);
+                                    return next;
+                                  });
+                                }
+                                dragCauseIdx.current = null;
+                              }}
+                              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${accent}`, backgroundColor: bg, cursor: "grab", userSelect: "none" as const }}>
+                              <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: accent, color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</div>
+                              <span style={{ color: isCustom ? "#93C5FD" : "#86EFAC", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>⠿</span>
+                              <span style={{ flex: 1, fontSize: 13, color: isCustom ? "#1D4ED8" : "#15803D", fontWeight: 500, fontStyle: isCustom ? "italic" : "normal" }}>{cause}</span>
+                              <button type="button" onClick={() => setFormCauseAreas((prev) => prev.map((c, i) => i === idx - 1 ? prev[idx] : i === idx ? prev[idx - 1] : c))}
+                                disabled={idx === 0}
+                                style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === 0 ? "#D1FAE5" : GREEN, cursor: idx === 0 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>↑</button>
+                              <button type="button" onClick={() => setFormCauseAreas((prev) => prev.map((c, i) => i === idx + 1 ? prev[idx] : i === idx ? prev[idx + 1] : c))}
+                                disabled={idx === formCauseAreas.length - 1}
+                                style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === formCauseAreas.length - 1 ? "#D1FAE5" : GREEN, cursor: idx === formCauseAreas.length - 1 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>↓</button>
+                              <button type="button" onClick={() => setFormCauseAreas((prev) => prev.filter((_, i) => i !== idx))}
+                                style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#DC2626"; e.currentTarget.style.color = "#DC2626"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#BBF7D0"; e.currentTarget.style.color = "#94A3B8"; }}>×</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Available cause pool */}
+                  {formCauseAreas.length < MAX_CAUSES ? (
+                    <div style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", backgroundColor: "#FAFAFA" }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>
+                        {formCauseAreas.length === 0 ? "Select causes to rank" : "Add more"}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {CAUSE_GROUPS.map((group) => {
+                          const available = group.causes.filter((c) => !formCauseAreas.includes(c));
+                          if (available.length === 0) return null;
+                          return (
+                            <div key={group.label}>
+                              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, marginBottom: 6 }}>{group.label}</div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {available.map((cause) => (
+                                  <button key={cause} type="button"
+                                    onClick={() => setFormCauseAreas((prev) => prev.length < MAX_CAUSES ? [...prev, cause] : prev)}
+                                    style={{ height: 30, padding: "0 12px", borderRadius: 20, border: "1.5px solid #E2E8F0", backgroundColor: "#fff", color: "#374151", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 150ms", display: "flex", alignItems: "center", gap: 4 }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = GREEN; e.currentTarget.style.color = GREEN; e.currentTarget.style.backgroundColor = "#F0FDF4"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#374151"; e.currentTarget.style.backgroundColor = "#fff"; }}>
+                                    <span style={{ fontSize: 11, opacity: 0.6 }}>+</span> {cause}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>Add Custom Interest</div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input value={customCauseInput} onChange={(e) => setCustomCauseInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const text = customCauseInput.trim(); if (text.length >= 2 && !formCauseAreas.some((c) => c.toLowerCase() === text.toLowerCase()) && formCauseAreas.length < MAX_CAUSES) { setFormCauseAreas((prev) => [...prev, text]); setCustomCauseInput(""); } } }}
+                            placeholder="e.g. Street Arts, Sports for Youth…" maxLength={60}
+                            style={{ flex: 1, height: 36, padding: "0 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#1E293B", outline: "none", backgroundColor: "#fff" }} />
+                          <button type="button"
+                            onClick={() => { const text = customCauseInput.trim(); if (text.length >= 2 && !formCauseAreas.some((c) => c.toLowerCase() === text.toLowerCase()) && formCauseAreas.length < MAX_CAUSES) { setFormCauseAreas((prev) => [...prev, text]); setCustomCauseInput(""); } }}
+                            disabled={customCauseInput.trim().length < 2}
+                            style={{ height: 36, padding: "0 14px", borderRadius: 8, border: `1.5px solid ${customCauseInput.trim().length >= 2 ? GREEN : "#E2E8F0"}`, backgroundColor: customCauseInput.trim().length >= 2 ? "#F0FDF4" : "#F8FAFC", color: customCauseInput.trim().length >= 2 ? GREEN : "#CBD5E1", fontSize: 13, fontWeight: 600, cursor: customCauseInput.trim().length >= 2 ? "pointer" : "default", transition: "all 150ms", flexShrink: 0 }}>
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "10px 14px", borderRadius: 9, backgroundColor: "#F0FDF4", border: "1.5px solid #BBF7D0", fontSize: 12, color: "#15803D", textAlign: "center" as const }}>
+                      Maximum {MAX_CAUSES} causes selected — remove one to add another
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>About Me</label>
-                  <textarea value={form.aboutMe} onChange={(e) => setForm((f) => ({ ...f, aboutMe: e.target.value.slice(0, 500) }))} style={{ ...inputStyle, height: 90, padding: "10px 12px", resize: "vertical" as const }} placeholder="Tell organizations about yourself..." />
-                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.aboutMe.length}/500</div>
-                </div>
                 <div className="flex gap-3" style={{ marginTop: 20 }}>
                   <button onClick={handleSave} disabled={saving} style={{ flex: 1, height: 42, backgroundColor: saving ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
                     {saving ? "Saving..." : "Save Changes"}
@@ -871,18 +1150,25 @@ export function ProfilePage() {
             {!editing && (
               <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24 }}>
                 <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 20px 0" }}>Personal Information</h3>
+                {/* Grid order matches registration Step 1 → Step 2 → Step 3 */}
                 <div className="grid grid-cols-2 gap-y-4 gap-x-8">
                   {[
-                    { label: "Full Name",    value: volunteer?.name },
-                    { label: "Email",        value: volunteer?.email },
-                    { label: "Phone",        value: volunteer?.phone || "\u2014" },
-                    { label: "Gender",       value: volunteer?.gender || "\u2014" },
-                    { label: "Date of Birth",value: volunteer?.date_of_birth || "\u2014" },
-                    { label: "National ID",  value: volunteer?.national_id || "\u2014" },
-                    { label: "Governorate",  value: volunteer?.governorate || "\u2014" },
-                    { label: "City",         value: volunteer?.city || "\u2014" },
-                    { label: "Education",    value: volunteer?.education_level || "\u2014" },
-                    { label: "Hrs / Week",   value: volunteer?.hours_per_week ? `${volunteer.hours_per_week} hrs` : "\u2014" },
+                    { label: "Full Name",           value: volunteer?.name },
+                    { label: "Email",               value: volunteer?.email },
+                    { label: "Nationality",         value: volunteer?.nationality || "\u2014" },
+                    { label: "National ID",         value: volunteer?.national_id || "\u2014" },
+                    { label: "Date of Birth",       value: volunteer?.date_of_birth || "\u2014" },
+                    { label: "Governorate",         value: volunteer?.governorate || "\u2014" },
+                    { label: "Phone",               value: volunteer?.phone || "\u2014" },
+                    { label: "City",               value: volunteer?.city || "\u2014" },
+                    { label: "Gender",              value: volunteer?.gender || "\u2014" },
+                    { label: "Education",           value: volunteer?.education_level || "\u2014" },
+                    ...(volunteer?.university_name ? [{ label: "University",      value: volunteer.university_name }] : []),
+                    ...(volunteer?.faculty         ? [{ label: "Faculty / Major", value: volunteer.faculty }] : []),
+                    ...(volunteer?.study_year      ? [{ label: "Academic Year",   value: volunteer.study_year }] : []),
+                    ...(volunteer?.field_of_study  ? [{ label: "Field of Study",  value: volunteer.field_of_study }] : []),
+                    ...(volunteer?.department      ? [{ label: "Preferred Department", value: volunteer.department }] : []),
+                    { label: "Hrs / Week",          value: volunteer?.hours_per_week ? `${volunteer.hours_per_week} hrs` : "\u2014" },
                   ].map((item) => (
                     <div key={item.label}>
                       <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 2 }}>{item.label}</div>
@@ -891,15 +1177,7 @@ export function ProfilePage() {
                   ))}
                 </div>
 
-                {/* Prior Experience */}
-                {volunteer?.prior_experience === 1 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Prior Volunteer Experience</div>
-                    <div style={{ fontSize: 14, color: "#1E293B" }}>{volunteer.prior_org || "Yes"}</div>
-                  </div>
-                )}
-
-                {/* Health Notes */}
+                {/* Health Notes — Step 2 */}
                 {volunteer?.health_notes && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Health / Mobility Notes</div>
@@ -907,19 +1185,19 @@ export function ProfilePage() {
                   </div>
                 )}
 
-                {/* Skills */}
-                {volunteer?.skills && (
+                {/* Skills — Step 3 */}
+                {volunteer?.skills && (() => { try { return JSON.parse(volunteer.skills); } catch { return []; } })().length > 0 && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Skills</div>
                     <div className="flex flex-wrap gap-2">
-                      {(() => { try { return JSON.parse(volunteer.skills); } catch { return []; } })().map((s: string, i: number) => (
+                      {((() => { try { return JSON.parse(volunteer.skills); } catch { return []; } })() as string[]).map((s: string, i: number) => (
                         <span key={i} style={{ fontSize: 12, backgroundColor: "#DCFCE7", color: "#15803D", padding: "4px 10px", borderRadius: 20, fontWeight: 500 }}>{s}</span>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Availability */}
+                {/* Availability — Step 3 */}
                 {volunteer?.availability && (() => { try { return JSON.parse(volunteer.availability); } catch { return []; } })().length > 0 && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Availability</div>
@@ -931,7 +1209,7 @@ export function ProfilePage() {
                   </div>
                 )}
 
-                {/* Languages */}
+                {/* Languages — Step 3 */}
                 {volunteer?.languages && (() => { try { return JSON.parse(volunteer.languages); } catch { return []; } })().length > 0 && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Languages</div>
@@ -943,7 +1221,37 @@ export function ProfilePage() {
                   </div>
                 )}
 
-                {/* Cause Areas */}
+                {/* Prior Experience — Step 3 */}
+                {volunteer?.prior_experience === 1 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Prior Volunteer Experience</div>
+                    {(() => {
+                      const exps: { orgName: string; department: string; role: string; duration: string; description: string }[] =
+                        (() => { try { return JSON.parse(volunteer.experiences || "[]"); } catch { return []; } })();
+                      if (exps.length > 0) {
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {exps.map((exp, i) => (
+                              <div key={i} style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 12px" }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>{exp.orgName}</div>
+                                {(exp.department || exp.role) && (
+                                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                                    {[exp.department, exp.role].filter(Boolean).join(" · ")}
+                                  </div>
+                                )}
+                                {exp.duration && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>{exp.duration}</div>}
+                                {exp.description && <div style={{ fontSize: 12, color: "#475569", marginTop: 4, lineHeight: 1.4 }}>{exp.description}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return <div style={{ fontSize: 14, color: "#1E293B" }}>{volunteer.prior_org || "Yes"}</div>;
+                    })()}
+                  </div>
+                )}
+
+                {/* Cause Areas — Step 3 */}
                 {volunteer?.cause_areas && (() => { try { return JSON.parse(volunteer.cause_areas); } catch { return []; } })().length > 0 && (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>Cause Areas</div>
@@ -952,14 +1260,6 @@ export function ProfilePage() {
                         <span key={i} style={{ fontSize: 12, backgroundColor: "#FFF7ED", color: "#C2410C", padding: "4px 10px", borderRadius: 20, fontWeight: 500 }}>{c}</span>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* About Me */}
-                {volunteer?.about_me && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>About Me</div>
-                    <div style={{ fontSize: 14, color: "#1E293B", lineHeight: 1.5 }}>{volunteer.about_me}</div>
                   </div>
                 )}
               </div>

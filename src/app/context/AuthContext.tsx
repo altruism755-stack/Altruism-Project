@@ -122,15 +122,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
         return { ok: true, message: result.message, orgStatus: status };
       }
-    } catch {
-      // Fallback — just simulate
-    }
 
-    const role = data.role === "org_admin" ? "org_admin" : "volunteer";
-    setUser({ id: Date.now(), email: data.email, role });
-    setToken("demo-token");
-    setIsLoading(false);
-    return { ok: true };
+      // Parse error body for a raw message to inspect
+      let rawMessage = "";
+      try {
+        const errData = await res.json();
+        rawMessage = errData.message || errData.error || "";
+      } catch { /* ignore */ }
+
+      // Map to a user-facing message based on status code + raw message keywords
+      const raw = rawMessage.toLowerCase();
+      let message: string;
+      if (
+        res.status === 409 ||
+        raw.includes("already exists") ||
+        raw.includes("duplicate") ||
+        raw.includes("email") && raw.includes("taken")
+      ) {
+        message = "An account with this email already exists — try logging in instead.";
+      } else if (res.status === 400) {
+        message = rawMessage || "Some of your details are invalid. Please review and try again.";
+      } else if (res.status === 422) {
+        message = rawMessage || "Please check your details — one or more fields are invalid.";
+      } else if (res.status >= 500) {
+        message = "A server error occurred. Please try again in a moment.";
+      } else {
+        message = rawMessage || "Registration failed. Please check your details and try again.";
+      }
+
+      setIsLoading(false);
+      return { ok: false, message };
+    } catch {
+      setIsLoading(false);
+      return { ok: false, message: "Could not connect to the server. Your registration was not saved." };
+    }
   };
 
   const logout = () => {
