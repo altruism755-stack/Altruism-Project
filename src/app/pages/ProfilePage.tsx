@@ -22,6 +22,26 @@ const GREEN = "#16A34A";
 const RED = "#DC2626";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+function EyeIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
 const certTypeColors: Record<string, { bg: string; text: string }> = {
   Participation: { bg: "#DBEAFE", text: "#1D4ED8" },
   Achievement: { bg: "#FEF3C7", text: "#B45309" },
@@ -251,6 +271,9 @@ export function ProfilePage() {
   const [passwordForm, setPasswordForm] = useState({ current: "", newPass: "", confirm: "" });
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const fetchProfile = async () => {
     try {
@@ -1166,9 +1189,33 @@ export function ProfilePage() {
                   <div className="px-6 pb-6 flex flex-col gap-4" style={{ borderTop: "1px solid #E2E8F0", paddingTop: 20 }}>
                     {passwordError && <div style={{ fontSize: 13, color: "#DC2626", backgroundColor: "#FEE2E2", padding: "8px 12px", borderRadius: 6 }}>{passwordError}</div>}
                     {passwordSuccess && <div style={{ fontSize: 13, color: "#15803D", backgroundColor: "#DCFCE7", padding: "8px 12px", borderRadius: 6 }}>{passwordSuccess}</div>}
-                    <div><label style={labelStyle}>Current Password</label><input type="password" value={passwordForm.current} onChange={(e) => setPasswordForm((f) => ({ ...f, current: e.target.value }))} style={inputStyle} /></div>
-                    <div><label style={labelStyle}>New Password</label><input type="password" value={passwordForm.newPass} onChange={(e) => setPasswordForm((f) => ({ ...f, newPass: e.target.value }))} style={inputStyle} /></div>
-                    <div><label style={labelStyle}>Confirm Password</label><input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm((f) => ({ ...f, confirm: e.target.value }))} style={inputStyle} /></div>
+                    <div>
+                      <label style={labelStyle}>Current Password</label>
+                      <div style={{ position: "relative" }}>
+                        <input type={showCurrentPassword ? "text" : "password"} value={passwordForm.current} onChange={(e) => setPasswordForm((f) => ({ ...f, current: e.target.value }))} style={{ ...inputStyle, paddingRight: 44 }} />
+                        <button type="button" onClick={() => setShowCurrentPassword((s) => !s)} aria-label={showCurrentPassword ? "Hide password" : "Show password"} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex", alignItems: "center", padding: 0 }}>
+                          {showCurrentPassword ? <EyeOffIcon /> : <EyeIcon />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>New Password</label>
+                      <div style={{ position: "relative" }}>
+                        <input type={showNewPassword ? "text" : "password"} value={passwordForm.newPass} onChange={(e) => setPasswordForm((f) => ({ ...f, newPass: e.target.value }))} style={{ ...inputStyle, paddingRight: 44 }} />
+                        <button type="button" onClick={() => setShowNewPassword((s) => !s)} aria-label={showNewPassword ? "Hide password" : "Show password"} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex", alignItems: "center", padding: 0 }}>
+                          {showNewPassword ? <EyeOffIcon /> : <EyeIcon />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Confirm Password</label>
+                      <div style={{ position: "relative" }}>
+                        <input type={showConfirmPassword ? "text" : "password"} value={passwordForm.confirm} onChange={(e) => setPasswordForm((f) => ({ ...f, confirm: e.target.value }))} style={{ ...inputStyle, paddingRight: 44 }} />
+                        <button type="button" onClick={() => setShowConfirmPassword((s) => !s)} aria-label={showConfirmPassword ? "Hide password" : "Show password"} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex", alignItems: "center", padding: 0 }}>
+                          {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                        </button>
+                      </div>
+                    </div>
                     <button onClick={handlePasswordChange} style={{ width: "100%", height: 42, backgroundColor: "#1E293B", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Update Password</button>
                   </div>
                 )}
