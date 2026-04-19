@@ -137,9 +137,13 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         study_year = body.get("study_year")
         field_of_study = body.get("field_of_study")
         department = body.get("department")
+        nationality = body.get("nationality")
+        national_id = body.get("national_id")
 
         db.execute(
             "UPDATE volunteers SET "
+            "nationality = COALESCE(?, nationality), "
+            "national_id = COALESCE(?, national_id), "
             "name = COALESCE(?, name), phone = COALESCE(?, phone), "
             "city = COALESCE(?, city), skills = COALESCE(?, skills), "
             "date_of_birth = COALESCE(?, date_of_birth), "
@@ -160,7 +164,8 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
             "field_of_study = COALESCE(?, field_of_study), "
             "department = COALESCE(?, department) "
             "WHERE id = ?",
-            (name, phone, city, json.dumps(skills) if skills is not None else None,
+            (nationality, national_id,
+             name, phone, city, json.dumps(skills) if skills is not None else None,
              date_of_birth, governorate,
              gender, health_notes,
              json.dumps(availability) if availability is not None else None,

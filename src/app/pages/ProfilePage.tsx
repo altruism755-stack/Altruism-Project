@@ -1,11 +1,22 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
+import {
+  GOVERNORATES, NATIONALITIES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
+  PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
+  DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
+  MAX_SKILLS, MAX_CAUSES, MAX_HEALTH_NOTES, MAX_EXP_DESCRIPTION,
+  MIN_HOURS, MAX_HOURS,
+  type ExperienceEntry, type VolunteerEditableState,
+  buildVolunteerPayload, buildVolunteerRegisterPayload,
+  computeVolunteerErrors, getExperienceFieldError,
+} from "../data/volunteerFormSchema";
 
 const GREEN = "#16A34A";
+const RED = "#DC2626";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const certTypeColors: Record<string, { bg: string; text: string }> = {
@@ -19,51 +30,6 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   Approved: { bg: "#DCFCE7", text: "#15803D" },
   Rejected: { bg: "#FEE2E2", text: "#B91C1C" },
 };
-
-const GOVERNORATES = [
-  "Cairo", "Alexandria", "Giza", "Qalyubia", "Sharqia", "Dakahlia", "Beheira",
-  "Minya", "Asyut", "Sohag", "Qena", "Luxor", "Aswan", "Fayoum", "Beni Suef",
-  "Ismailia", "Port Said", "Suez", "Damietta", "Kafr El Sheikh", "Gharbia",
-  "Monufia", "Red Sea", "New Valley", "Matrouh", "North Sinai", "South Sinai",
-];
-
-const SKILLS_LIST = [
-  "Teaching / Tutoring",
-  "Medical / First Aid",
-  "Photography & Videography",
-  "Event Planning",
-  "Social Media Management",
-  "Translation",
-  "Software Development",
-  "Graphic Design",
-  "Fundraising",
-  "Administrative Support",
-  "Environmental Work",
-  "Community Outreach",
-  "Other",
-];
-
-const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
-  { label: "Communications & Outreach", options: ["PR", "Media", "Content Creation"] },
-  { label: "Operations", options: ["HR", "Event Management", "Logistics", "Fundraising", "Partnerships"] },
-  { label: "Other", options: ["Emergencies", "General"] },
-];
-
-const AVAILABILITY_SPECIFIC = ["Weekday mornings", "Weekday afternoons", "Weekday evenings", "Weekends"];
-
-const MAX_CAUSES = 5;
-
-const CAUSE_GROUPS: { label: string; causes: string[] }[] = [
-  { label: "Social & Humanitarian",  causes: ["Poverty Alleviation", "Food & Clothing Distribution", "Refugee & Migrant Support", "Disability Support", "Elderly Care", "Child Protection & Orphan Care", "Women Empowerment"] },
-  { label: "Children & Youth",       causes: ["Youth Development", "Street Children Outreach", "Child Education Support", "After-School Programs"] },
-  { label: "Education & Skills",     causes: ["Education & Tutoring", "Literacy Programs", "Career Mentorship", "Youth Entrepreneurship", "Awareness Campaigns"] },
-  { label: "Health & Emergency",     causes: ["Healthcare Access", "Blood Donation", "Emergency & Disaster Relief", "Mental Health Support", "First Aid & Safety"] },
-  { label: "Environment",            causes: ["Environmental Cleanup", "Climate Action", "Animal Welfare", "Sustainability"] },
-  { label: "Community & Events",     causes: ["Community Engagement", "Event Planning & Coordination", "Fundraising", "Arts & Culture", "Sports & Recreation", "Ramadan & Seasonal Programs"] },
-  { label: "Professional & General", causes: ["Administrative Support", "Media & Content Creation", "Translation & Interpretation", "General Volunteering"] },
-];
-
-const ALL_PREDEFINED_CAUSES = new Set(CAUSE_GROUPS.flatMap((g) => g.causes));
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -258,10 +224,13 @@ export function ProfilePage() {
   const [form, setForm] = useState({
     fullName: "", phone: "", city: "", department: "",
     dateOfBirth: "", governorate: "", email: "",
+    nationality: "", nationalId: "",
     gender: "", healthNotes: "", educationLevel: "", educationOther: "",
     universityName: "", faculty: "", studyYear: "", fieldOfStudy: "",
-    priorExperience: false, priorOrg: "", hoursPerWeek: null as number | null,
+    priorExperience: null as boolean | null, priorOrg: "", hoursPerWeek: null as number | null,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const markTouched = (k: string) => setTouched((t) => ({ ...t, [k]: true }));
   const [formSkills, setFormSkills] = useState<string[]>([]);
   const [formCustomSkill, setFormCustomSkill] = useState("");
   const [formAvailability, setFormAvailability] = useState<string[]>([]);
@@ -323,9 +292,8 @@ export function ProfilePage() {
       const exps: { orgName: string; department: string; role: string; duration: string; description: string }[] = (() => { try { return JSON.parse(volRes.experiences || "[]"); } catch { return []; } })();
       setFormExperiences(exps);
 
-      const KNOWN_EDU_LEVELS = ["High School Student", "High School Graduate", "University Student", "University Graduate", "Postgraduate (Diploma / Master / PhD)", "Other"];
       const rawEduLevel = volRes.education_level || "";
-      const isKnownLevel = rawEduLevel === "" || KNOWN_EDU_LEVELS.includes(rawEduLevel);
+      const isKnownLevel = rawEduLevel === "" || (EDUCATION_LEVELS as readonly string[]).includes(rawEduLevel);
       const resolvedEduLevel = isKnownLevel ? rawEduLevel : "Other";
       const resolvedEduOther = isKnownLevel ? "" : rawEduLevel;
 
@@ -337,6 +305,8 @@ export function ProfilePage() {
         dateOfBirth: volRes.date_of_birth || "",
         governorate: volRes.governorate || "",
         email: volRes.email || "",
+        nationality: volRes.nationality || "",
+        nationalId: volRes.national_id || "",
         gender: volRes.gender || "",
         healthNotes: volRes.health_notes || "",
         educationLevel: resolvedEduLevel,
@@ -345,7 +315,7 @@ export function ProfilePage() {
         faculty: volRes.faculty || "",
         studyYear: volRes.study_year || "",
         fieldOfStudy: volRes.field_of_study || "",
-        priorExperience: volRes.prior_experience === 1,
+        priorExperience: volRes.prior_experience === 1 ? true : volRes.prior_experience === 0 ? false : null,
         priorOrg: volRes.prior_org || "",
         hoursPerWeek: volRes.hours_per_week ?? null,
       });
@@ -358,46 +328,58 @@ export function ProfilePage() {
   // Use volunteer.id (volunteer record ID), NOT user.id (user table ID)
   const volRecordId = volunteer?.id || 0;
 
+  const volunteerState: VolunteerEditableState = useMemo(() => ({
+    fullName: form.fullName,
+    email: form.email,
+    nationality: form.nationality,
+    nationalId: form.nationalId,
+    dateOfBirth: form.dateOfBirth,
+    governorate: form.governorate,
+    phone: form.phone,
+    city: form.city,
+    gender: form.gender,
+    healthNotes: form.healthNotes,
+    educationLevel: form.educationLevel,
+    educationOther: form.educationOther,
+    universityName: form.universityName,
+    faculty: form.faculty,
+    studyYear: form.studyYear,
+    fieldOfStudy: form.fieldOfStudy,
+    department: form.department,
+    hoursPerWeek: form.hoursPerWeek,
+    skills: formSkills,
+    customSkill: formCustomSkill,
+    availability: formAvailability,
+    languages: formLanguages,
+    priorHasExperience: form.priorExperience,
+    experiences: formExperiences as ExperienceEntry[],
+    causeAreas: formCauseAreas,
+  }), [form, formSkills, formCustomSkill, formAvailability, formLanguages, formExperiences, formCauseAreas]);
+
+  const errors = useMemo(() => computeVolunteerErrors(volunteerState), [volunteerState]);
+  const showErr = (k: string) => touched[k] && errors[k] ? errors[k] : "";
+  const Err = ({ field }: { field: string }) => {
+    const m = showErr(field);
+    return m ? <div style={{ fontSize: 12, color: RED, marginTop: 4 }}>{m}</div> : null;
+  };
+
   const handleSave = async () => {
+    // Touch every field so missing-required errors surface on submit
+    // Identity fields are read-only in Profile — skip them in blocking validation
+    const readOnlyKeys = new Set(["fullName", "email", "nationality", "nationalId", "dateOfBirth"]);
+    const allKeys = Object.keys(errors).filter((k) => !readOnlyKeys.has(k));
+    setTouched(Object.fromEntries(allKeys.map((k) => [k, true])));
+    const firstErr = allKeys.find((k) => errors[k]);
+    if (firstErr) {
+      console.warn("[Profile] validation blocked save:", firstErr, errors[firstErr]);
+      return;
+    }
     setSaving(true);
     try {
-      const skillsArray = formSkills.includes("Other")
-        ? [...formSkills.filter((s) => s !== "Other"), ...formCustomSkill.split(",").map((s) => s.trim()).filter(Boolean)]
-        : formSkills;
-      const resolvedExperiences = formExperiences.map((e) => ({
-        orgName: e.orgName,
-        department: e.department,
-        role: e.role,
-        duration: e.duration,
-        description: e.description,
-      }));
-      const savePayload = {
-        name: form.fullName,
-        phone: form.phone,
-        city: form.city,
-        skills: skillsArray,
-        date_of_birth: form.dateOfBirth,
-        governorate: form.governorate,
-        email: form.email,
-        gender: form.gender,
-        health_notes: form.healthNotes,
-        education_level: form.educationLevel === "Other" ? form.educationOther.trim() : form.educationLevel,
-        university_name: form.universityName,
-        faculty: form.faculty,
-        study_year: form.studyYear,
-        field_of_study: form.fieldOfStudy,
-        department: form.department,
-        prior_experience: form.priorExperience ? 1 : 0,
-        prior_org: form.priorExperience
-          ? formExperiences.map((e) => e.orgName.trim()).filter(Boolean).join(", ")
-          : "",
-        experiences: resolvedExperiences,
-        hours_per_week: form.hoursPerWeek,
-        availability: formAvailability,
-        languages: formLanguages,
-        cause_areas: formCauseAreas,
-      };
-      console.log("[Profile] save payload:", JSON.stringify(savePayload, null, 2));
+      const savePayload = buildVolunteerPayload(volunteerState);
+      console.log("[Profile] save payload (snake_case for PUT):", JSON.stringify(savePayload, null, 2));
+      console.log("[Profile] equivalent register payload (camelCase):",
+        JSON.stringify(buildVolunteerRegisterPayload(volunteerState, ""), null, 2));
       const saveResult = await api.updateVolunteer(volRecordId, savePayload);
       console.log("[Profile] save response:", saveResult);
       setEditing(false);
@@ -693,8 +675,8 @@ export function ProfilePage() {
                       <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.name}</div>
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Date of Birth</label>
-                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.date_of_birth || "—"}</div>
+                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Email</label>
+                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.email}</div>
                     </div>
                     <div>
                       <label style={{ ...labelStyle, color: "#94A3B8" }}>Nationality</label>
@@ -704,12 +686,11 @@ export function ProfilePage() {
                       <label style={{ ...labelStyle, color: "#94A3B8" }}>National ID</label>
                       <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed", letterSpacing: "0.05em" }}>{volunteer?.national_id || "—"}</div>
                     </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Date of Birth</label>
+                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.date_of_birth || "—"}</div>
+                    </div>
                   </div>
-                </div>
-                {/* Step 1 — Email */}
-                <div style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Email</label>
-                  <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={inputStyle} />
                 </div>
                 {/* Step 2 — Personal details */}
                 <div style={{ marginTop: 12 }}>
@@ -742,20 +723,21 @@ export function ProfilePage() {
                 {/* Health Notes */}
                 <div style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Health / Mobility Notes <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
-                  <textarea value={form.healthNotes} onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, 300) }))}
+                  <textarea value={form.healthNotes} onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, MAX_HEALTH_NOTES) }))}
                     placeholder="Any physical limitations organizations should know about..."
                     style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
-                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.healthNotes.length}/300</div>
+                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.healthNotes.length}/{MAX_HEALTH_NOTES}</div>
                 </div>
                 {/* Education Level */}
                 <div style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Education Level</label>
-                  <select value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, educationOther: "", universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={inputStyle}>
+                  <select value={form.educationLevel} onBlur={() => markTouched("educationLevel")} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, educationOther: "", universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={inputStyle}>
                     <option value="">Select education level...</option>
-                    {["High School Student", "High School Graduate", "University Student", "University Graduate", "Postgraduate (Diploma / Master / PhD)", "Other"].map((l) => (
+                    {EDUCATION_LEVELS.map((l) => (
                       <option key={l} value={l}>{l}</option>
                     ))}
                   </select>
+                  <Err field="educationLevel" />
                   {form.educationLevel === "University Student" && (
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                       <div>
@@ -770,7 +752,7 @@ export function ProfilePage() {
                         <label style={labelStyle}>Academic Year</label>
                         <select value={form.studyYear} onChange={(e) => setForm((f) => ({ ...f, studyYear: e.target.value }))} style={inputStyle}>
                           <option value="">Select year...</option>
-                          {["1st Year", "2nd Year", "3rd Year", "4th Year+"].map((y) => <option key={y} value={y}>{y}</option>)}
+                          {STUDY_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                         </select>
                       </div>
                     </div>
@@ -808,7 +790,7 @@ export function ProfilePage() {
                         <input
                           type="checkbox"
                           checked={formSkills.includes(skill)}
-                          onChange={() => setFormSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill])}
+                          onChange={() => setFormSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : (prev.length >= MAX_SKILLS ? prev : [...prev, skill]))}
                           style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }}
                         />
                         {skill}
@@ -872,13 +854,13 @@ export function ProfilePage() {
                   </label>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <input
-                      type="number" min={1} max={40} step={1}
+                      type="number" min={MIN_HOURS} max={MAX_HOURS} step={1}
                       value={form.hoursPerWeek ?? ""}
                       placeholder="e.g., 5"
                       onChange={(e) => {
                         const raw = e.target.value;
                         if (raw === "") { setForm((f) => ({ ...f, hoursPerWeek: null })); return; }
-                        const v = Math.min(40, Math.max(1, parseInt(raw)));
+                        const v = Math.min(MAX_HOURS, Math.max(MIN_HOURS, parseInt(raw)));
                         if (!isNaN(v)) setForm((f) => ({ ...f, hoursPerWeek: v }));
                       }}
                       style={{
@@ -900,7 +882,7 @@ export function ProfilePage() {
                         <div style={{ flex: 1, height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, display: "flex", alignItems: "center", backgroundColor: "#F8FAFC" }}>{lang.language}</div>
                         <select value={lang.proficiency} onChange={(e) => setFormLanguages((prev) => prev.map((l, i) => i === idx ? { ...l, proficiency: e.target.value } : l))}
                           style={{ height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 8px", fontSize: 13, outline: "none", backgroundColor: "#FFFFFF" }}>
-                          {["Basic", "Conversational", "Fluent", "Native"].map((p) => <option key={p} value={p}>{p}</option>)}
+                          {PROFICIENCY_LEVELS.map((p) => <option key={p} value={p}>{p}</option>)}
                         </select>
                         {formLanguages.length > 1 && (
                           <button type="button" onClick={() => setFormLanguages((prev) => prev.filter((_, i) => i !== idx))}
@@ -914,7 +896,7 @@ export function ProfilePage() {
                       placeholder="Add a language..." style={{ flex: 1, height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                     <select value={formNewLangProf} onChange={(e) => setFormNewLangProf(e.target.value)}
                       style={{ height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 8px", fontSize: 13, outline: "none", backgroundColor: "#FFFFFF" }}>
-                      {["Basic", "Conversational", "Fluent", "Native"].map((p) => <option key={p} value={p}>{p}</option>)}
+                      {PROFICIENCY_LEVELS.map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <button type="button" onClick={() => { if (!formNewLang.trim()) return; setFormLanguages((prev) => [...prev, { language: formNewLang.trim(), proficiency: formNewLangProf }]); setFormNewLang(""); }}
                       style={{ height: 38, padding: "0 14px", borderRadius: 8, border: `1.5px solid ${GREEN}`, backgroundColor: "#F0FDF4", color: GREEN, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -954,13 +936,18 @@ export function ProfilePage() {
                             <div style={{ marginBottom: 10 }}>
                               <label style={{ ...labelStyle, fontSize: 12 }}>Organization Name <span style={{ color: "#DC2626" }}>*</span></label>
                               <input value={exp.orgName}
+                                onBlur={() => markTouched(`exp_${idx}_orgName`)}
                                 onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, orgName: e.target.value } : x))}
                                 placeholder="e.g. Resala, Egyptian Red Crescent…"
                                 style={inputStyle} />
+                              {touched[`exp_${idx}_orgName`] && getExperienceFieldError(exp, "orgName") && (
+                                <div style={{ fontSize: 12, color: RED, marginTop: 4 }}>{getExperienceFieldError(exp, "orgName")}</div>
+                              )}
                             </div>
                             <div style={{ marginBottom: 10 }}>
                               <label style={{ ...labelStyle, fontSize: 12 }}>Department <span style={{ color: "#DC2626" }}>*</span></label>
                               <select value={exp.department}
+                                onBlur={() => markTouched(`exp_${idx}_department`)}
                                 onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, department: e.target.value } : x))}
                                 style={inputStyle}>
                                 <option value="">Select department…</option>
@@ -970,6 +957,9 @@ export function ProfilePage() {
                                   </optgroup>
                                 ))}
                               </select>
+                              {touched[`exp_${idx}_department`] && getExperienceFieldError(exp, "department") && (
+                                <div style={{ fontSize: 12, color: RED, marginTop: 4 }}>{getExperienceFieldError(exp, "department")}</div>
+                              )}
                             </div>
                             <div style={{ marginBottom: 10 }}>
                               <label style={{ ...labelStyle, fontSize: 12 }}>Role / Position <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
@@ -988,10 +978,10 @@ export function ProfilePage() {
                             <div>
                               <label style={{ ...labelStyle, fontSize: 12 }}>Description <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
                               <textarea value={exp.description}
-                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, description: e.target.value.slice(0, 300) } : x))}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, description: e.target.value.slice(0, MAX_EXP_DESCRIPTION) } : x))}
                                 placeholder="Briefly describe what you did…"
                                 style={{ ...inputStyle, height: 72, padding: "8px 12px", resize: "vertical" as const }} />
-                              <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 1 }}>{exp.description.length}/300</div>
+                              <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 1 }}>{exp.description.length}/{MAX_EXP_DESCRIPTION}</div>
                             </div>
                           </div>
                         ))}

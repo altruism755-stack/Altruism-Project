@@ -3,6 +3,17 @@ import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DatePicker } from "../components/DatePicker";
 import { Logo } from "../components/Logo";
+import {
+  GOVERNORATES, NATIONALITIES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
+  PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
+  DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
+  MAX_SKILLS, MAX_CAUSES,
+  validateFullName, validateEmail, validatePassword,
+  validateNationalIdOrPassport, validateDob, validatePhone, validateCity,
+  type ExperienceEntry,
+  type VolunteerEditableState,
+  buildVolunteerRegisterPayload,
+} from "../data/volunteerFormSchema";
 
 const GREEN = "#16A34A";
 const GREEN_HOVER = "#15803D";
@@ -11,110 +22,8 @@ const BLUE = "#2563EB";
 
 type Role = "Volunteer" | "Organization";
 
-const GOVERNORATES = [
-  "Cairo", "Alexandria", "Giza", "Qalyubia", "Sharqia", "Dakahlia", "Beheira",
-  "Minya", "Asyut", "Sohag", "Qena", "Luxor", "Aswan", "Fayoum", "Beni Suef",
-  "Ismailia", "Port Said", "Suez", "Damietta", "Kafr El Sheikh", "Gharbia",
-  "Monufia", "Red Sea", "New Valley", "Matrouh", "North Sinai", "South Sinai",
-];
-
-const NATIONALITIES = [
-  // ── Egypt (default) ──
-  "Egyptian",
-  // ── Africa ──
-  "Algerian", "Angolan", "Beninese", "Botswanan", "Burkinabe", "Burundian",
-  "Cameroonian", "Cape Verdean", "Central African", "Chadian", "Comorian",
-  "Congolese", "Djiboutian", "Equatorial Guinean", "Eritrean", "Ethiopian",
-  "Gabonese", "Gambian", "Ghanaian", "Guinean", "Guinea-Bissauan", "Ivorian",
-  "Kenyan", "Lesothan", "Liberian", "Libyan", "Malagasy", "Malawian", "Malian",
-  "Mauritanian", "Mauritian", "Moroccan", "Mozambican", "Namibian", "Nigerien",
-  "Nigerian", "Rwandan", "Senegalese", "Sierra Leonean", "Somali",
-  "South African", "South Sudanese", "Sudanese", "Swazi", "Tanzanian",
-  "Togolese", "Tunisian", "Ugandan", "Zambian", "Zimbabwean",
-  // ── Middle East ──
-  "Bahraini", "Emirati", "Iranian", "Iraqi", "Israeli", "Jordanian",
-  "Kuwaiti", "Lebanese", "Omani", "Palestinian", "Qatari", "Saudi", "Syrian",
-  "Yemeni",
-  // ── Asia ──
-  "Afghan", "Armenian", "Azerbaijani", "Bangladeshi", "Bhutanese", "Bruneian",
-  "Cambodian", "Chinese", "Filipino", "Georgian", "Indian", "Indonesian",
-  "Japanese", "Kazakh", "North Korean", "South Korean", "Kyrgyz", "Lao",
-  "Malaysian", "Maldivian", "Mongolian", "Myanmarese", "Nepali", "Pakistani",
-  "Singaporean", "Sri Lankan", "Tajik", "Thai", "Timorese", "Turkmen",
-  "Uzbek", "Vietnamese",
-  // ── Europe ──
-  "Albanian", "Andorran", "Austrian", "Belarusian", "Belgian", "Bosnian",
-  "British", "Bulgarian", "Croatian", "Cypriot", "Czech", "Danish", "Dutch",
-  "Estonian", "Finnish", "French", "German", "Greek", "Hungarian", "Icelandic",
-  "Irish", "Italian", "Kosovar", "Latvian", "Lithuanian", "Luxembourgish",
-  "Macedonian", "Maltese", "Moldovan", "Montenegrin", "Norwegian", "Polish",
-  "Portuguese", "Romanian", "Russian", "Serbian", "Slovak", "Slovenian",
-  "Spanish", "Swedish", "Swiss", "Turkish", "Ukrainian",
-  // ── Americas ──
-  "American", "Argentinian", "Bahamian", "Barbadian", "Belizean", "Bolivian",
-  "Brazilian", "Canadian", "Chilean", "Colombian", "Costa Rican", "Cuban",
-  "Dominican", "Ecuadorian", "Grenadian", "Guatemalan", "Guyanese", "Haitian",
-  "Honduran", "Jamaican", "Mexican", "Nicaraguan", "Panamanian", "Paraguayan",
-  "Peruvian", "Salvadoran", "Surinamese", "Trinidadian", "Uruguayan",
-  "Venezuelan",
-  // ── Oceania ──
-  "Australian", "Fijian", "New Zealander", "Papua New Guinean", "Samoan",
-  "Tongan",
-  // ── Other ──
-  "Other",
-];
-
-const SKILLS_LIST = [
-  "Teaching / Tutoring", "Medical / First Aid", "Photography & Videography",
-  "Event Planning", "Social Media Management", "Translation",
-  "Software Development", "Graphic Design", "Fundraising",
-  "Administrative Support", "Environmental Work", "Community Outreach", "Other",
-];
-
-const AVAILABILITY_SPECIFIC = ["Weekday mornings", "Weekday afternoons", "Weekday evenings", "Weekends"];
-
-const MAX_CAUSES = 5;
-
-const CAUSE_GROUPS: { label: string; causes: string[] }[] = [
-  { label: "Social & Humanitarian",  causes: ["Poverty Alleviation", "Food & Clothing Distribution", "Refugee & Migrant Support", "Disability Support", "Elderly Care", "Child Protection & Orphan Care", "Women Empowerment"] },
-  { label: "Children & Youth",       causes: ["Youth Development", "Street Children Outreach", "Child Education Support", "After-School Programs"] },
-  { label: "Education & Skills",     causes: ["Education & Tutoring", "Literacy Programs", "Career Mentorship", "Youth Entrepreneurship", "Awareness Campaigns"] },
-  { label: "Health & Emergency",     causes: ["Healthcare Access", "Blood Donation", "Emergency & Disaster Relief", "Mental Health Support", "First Aid & Safety"] },
-  { label: "Environment",            causes: ["Environmental Cleanup", "Climate Action", "Animal Welfare", "Sustainability"] },
-  { label: "Community & Events",     causes: ["Community Engagement", "Event Planning & Coordination", "Fundraising", "Arts & Culture", "Sports & Recreation", "Ramadan & Seasonal Programs"] },
-  { label: "Professional & General", causes: ["Administrative Support", "Media & Content Creation", "Translation & Interpretation", "General Volunteering"] },
-];
-
-const ALL_PREDEFINED_CAUSES = new Set(CAUSE_GROUPS.flatMap((g) => g.causes));
-
-const EDUCATION_LEVELS = [
-  "High School Student",
-  "High School Graduate",
-  "University Student",
-  "University Graduate",
-  "Postgraduate (Diploma / Master / PhD)",
-  "Other",
-];
-
-const STUDY_YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year+"];
-
-type ExperienceEntry = {
-  orgName: string; department: string;
-  role: string; duration: string; description: string;
-};
-
-const PROFICIENCY_LEVELS = ["Basic", "Conversational", "Fluent", "Native"];
-
-const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
-  { label: "Communications & Outreach", options: ["PR", "Media", "Content Creation"] },
-  { label: "Operations", options: ["HR", "Event Management", "Logistics", "Fundraising", "Partnerships"] },
-  { label: "Other", options: ["Emergencies", "General"] },
-];
-
 const STEP1_FIELDS = ["fullName", "email", "password", "confirmPassword"];
 const STEP2_FIELDS = ["nationalId", "dateOfBirth", "governorate", "phone", "city", "gender"];
-
-const MAX_SKILLS = 5;
 
 // ── SVG Icons ────────────────────────────────────────────────────────
 
@@ -144,84 +53,6 @@ function CheckIcon() {
       <path d="M2.5 7L5.5 10L11.5 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-}
-
-// ── Validation helpers ────────────────────────────────────────────────
-
-function validateFullName(v: string): string {
-  if (!v.trim()) return "Full name is required.";
-  if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(v))
-    return "Full name must contain letters only — no numbers or special characters.";
-  if (v.trim().split(/\s+/).length < 3)
-    return "Full name must include at least 3 words.";
-  return "";
-}
-
-function validateEmail(v: string): string {
-  if (!v.trim()) return "Email address is required.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
-    return "Please enter a valid email.";
-  return "";
-}
-
-function validatePassword(v: string): string {
-  if (!v) return "Password is required.";
-  if (v.length < 8) return "Password must be at least 8 characters long.";
-  if (v.length > 64) return "Password must be no more than 64 characters.";
-  if (!/[A-Z]/.test(v)) return "Add at least one uppercase letter (A–Z).";
-  if (!/[a-z]/.test(v)) return "Add at least one lowercase letter (a–z).";
-  if (!/[0-9]/.test(v)) return "Add at least one number (0–9).";
-  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(v))
-    return "Add at least one special character (e.g., @, #, $, !).";
-  return "";
-}
-
-function validateNationalId(v: string): string {
-  if (!v) return "National ID is required.";
-  if (!/^\d+$/.test(v)) return "National ID must contain numbers only — no letters or symbols.";
-  if (v.length !== 14) return "National ID must be exactly 14 digits.";
-  if (!["2", "3"].includes(v[0])) return "Please enter a valid national ID.";
-  return "";
-}
-
-function validatePassportNumber(v: string): string {
-  const trimmed = v.trim();
-  if (!trimmed) return "Passport number is required.";
-  if (trimmed.length < 5) return "Passport number must be at least 5 characters.";
-  if (trimmed.length > 20) return "Passport number must be no more than 20 characters.";
-  if (!/^[A-Z0-9][A-Z0-9-]{3,18}[A-Z0-9]$/.test(trimmed))
-    return "Passport number may contain uppercase letters, digits, and hyphens only.";
-  if (/--/.test(trimmed)) return "Passport number cannot contain consecutive hyphens.";
-  return "";
-}
-
-function validateDob(v: string): string {
-  if (!v) return "Date of birth is required.";
-  const dob = new Date(v);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (dob > today) return "Date of birth cannot be a future date.";
-  const y = today.getFullYear() - dob.getFullYear();
-  const m = today.getMonth() - dob.getMonth();
-  const age = m < 0 || (m === 0 && today.getDate() < dob.getDate()) ? y - 1 : y;
-  if (age < 15) return "You must be at least 15 years old to register.";
-  return "";
-}
-
-function validatePhone(v: string): string {
-  if (!v) return "Phone number is required.";
-  if (!/^\d+$/.test(v)) return "Phone number must contain numbers only.";
-  if (!["010", "011", "012", "015"].some((p) => v.startsWith(p)))
-    return "Please enter a valid phone number.";
-  if (v.length !== 11) return "Phone number must be exactly 11 digits.";
-  return "";
-}
-
-function validateCity(v: string): string {
-  if (!v.trim()) return "City is required.";
-  if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(v.trim()))
-    return "City name must contain letters only — no numbers or special characters.";
-  return "";
 }
 
 // ── Component ─────────────────────────────────────────────────────────
@@ -279,9 +110,7 @@ export function RegisterPage() {
       : volForm.confirmPassword !== volForm.password
         ? "Passwords do not match."
         : "",
-    nationalId:      volForm.nationality === "Egyptian"
-      ? validateNationalId(volForm.nationalId)
-      : validatePassportNumber(volForm.nationalId),
+    nationalId:      validateNationalIdOrPassport(volForm.nationalId, volForm.nationality),
     dateOfBirth:     validateDob(volForm.dateOfBirth),
     governorate:     volForm.governorate ? "" : "Please select a governorate.",
     phone:           validatePhone(volForm.phone),
@@ -493,11 +322,25 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
     setSubmitError(null);
     setIsSubmitting(true);
 
-    const allSkills = volSkills.includes("Other")
-      ? [...volSkills.filter((s) => s !== "Other"), volCustomSkill.trim()]
-      : volSkills;
-
-    const allCauses = [...rankedCauses];
+    const volunteerState: VolunteerEditableState = {
+      fullName: volForm.fullName, email: volForm.email,
+      nationality: volForm.nationality, nationalId: volForm.nationalId,
+      dateOfBirth: volForm.dateOfBirth, governorate: volForm.governorate,
+      phone: volForm.phone, city: volForm.city, gender: volForm.gender,
+      healthNotes: volForm.healthNotes,
+      educationLevel: volForm.educationLevel,
+      educationOther: volForm.educationOther,
+      universityName: volForm.universityName,
+      faculty: volForm.faculty,
+      studyYear: volForm.studyYear,
+      fieldOfStudy: volForm.fieldOfStudy,
+      department: volForm.department,
+      hoursPerWeek: volForm.hoursPerWeek,
+      skills: volSkills, customSkill: volCustomSkill,
+      availability, languages,
+      priorHasExperience, experiences,
+      causeAreas: rankedCauses,
+    };
 
     const data =
       role === "Organization"
@@ -512,37 +355,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
             logoUrl: orgForm.logoDataUri, documentsUrl: orgForm.documentsUrl,
             submitterName: orgForm.submitterName, submitterRole: orgForm.submitterRole,
           }
-        : {
-            role: "volunteer",
-            email: volForm.email, password: volForm.password,
-            name: volForm.fullName, phone: volForm.phone,
-            city: volForm.city, skills: allSkills,
-            dateOfBirth: volForm.dateOfBirth, governorate: volForm.governorate,
-            nationality: volForm.nationality,
-            nationalId: volForm.nationalId,
-            gender: volForm.gender,
-            department: volForm.department,
-            healthNotes: volForm.healthNotes,
-            availability, ...(volForm.hoursPerWeek !== null ? { hoursPerWeek: volForm.hoursPerWeek } : {}),
-            languages,
-            educationLevel: volForm.educationLevel === "Other" ? volForm.educationOther.trim() : volForm.educationLevel,
-            universityName: volForm.universityName,
-            faculty: volForm.faculty,
-            studyYear: volForm.studyYear,
-            fieldOfStudy: volForm.fieldOfStudy,
-            priorExperience: priorHasExperience === true,
-            priorOrg: priorHasExperience === true
-              ? experiences.map((e) => e.orgName.trim()).filter(Boolean).join(", ")
-              : "",
-            experiences: priorHasExperience === true ? experiences.map((e) => ({
-              orgName: e.orgName.trim(),
-              department: e.department,
-              role: e.role.trim(),
-              duration: e.duration.trim(),
-              description: e.description.trim(),
-            })) : [],
-            causeAreas: allCauses,
-          };
+        : buildVolunteerRegisterPayload(volunteerState, volForm.password);
 
     console.log("[Register] payload:", JSON.stringify(data, null, 2));
     const result = await register(data);
