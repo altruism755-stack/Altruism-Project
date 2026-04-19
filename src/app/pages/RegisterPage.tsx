@@ -99,7 +99,7 @@ const EDUCATION_LEVELS = [
 const STUDY_YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year+"];
 
 type ExperienceEntry = {
-  orgName: string; department: string; departmentOther: string;
+  orgName: string; department: string;
   role: string; duration: string; description: string;
 };
 
@@ -316,8 +316,7 @@ export function RegisterPage() {
       ? experiences.length === 0
         ? "Please add at least one experience or select 'No'."
         : experiences.some(
-            (e) => !e.orgName.trim() || !e.department ||
-              (e.department === "Other" && e.departmentOther.trim().length < 2)
+            (e) => !e.orgName.trim() || !e.department
           )
           ? "Please complete all required fields in each experience entry."
           : ""
@@ -428,7 +427,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
   };
 
   const addExperience = () => {
-    setExperiences((prev) => [...prev, { orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }]);
+    setExperiences((prev) => [...prev, { orgName: "", department: "", role: "", duration: "", description: "" }]);
     touch("priorExperiences");
   };
 
@@ -457,8 +456,6 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
     if (!e) return "";
     if (field === "orgName" && !e.orgName.trim()) return "Organization name is required.";
     if (field === "department" && !e.department) return "Please select a department.";
-    if (field === "deptOther" && e.department === "Other" && e.departmentOther.trim().length < 2)
-      return "Please specify a department name (min 2 characters).";
     return "";
   };
 
@@ -539,7 +536,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
               : "",
             experiences: priorHasExperience === true ? experiences.map((e) => ({
               orgName: e.orgName.trim(),
-              department: e.department === "Other" ? e.departmentOther.trim() : e.department,
+              department: e.department,
               role: e.role.trim(),
               duration: e.duration.trim(),
               description: e.description.trim(),
@@ -1296,7 +1293,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                               setPriorHasExperience(val);
                               if (!val) { setExperiences([]); setExpTouched({}); }
                               else if (experiences.length === 0) {
-                                setExperiences([{ orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }]);
+                                setExperiences([{ orgName: "", department: "", role: "", duration: "", description: "" }]);
                               }
                               touch("priorExperiences");
                             }}
@@ -1326,7 +1323,6 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                             {experiences.map((exp, idx) => {
                               const orgErr  = getExpError(idx, "orgName");
                               const deptErr = getExpError(idx, "department");
-                              const deptOtherErr = getExpError(idx, "deptOther");
                               return (
                                 <div key={idx} style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "16px 16px 14px", backgroundColor: "#FAFAFA" }}>
                                   {/* Card header */}
@@ -1366,7 +1362,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                                     </label>
                                     <select id={`exp-dept-${idx}`}
                                       value={exp.department}
-                                      onChange={(e) => { updateExperience(idx, "department", e.target.value); if (e.target.value !== "Other") updateExperience(idx, "departmentOther", ""); }}
+                                      onChange={(e) => updateExperience(idx, "department", e.target.value)}
                                       onFocus={() => setFocused(`exp_${idx}_department`)}
                                       onBlur={() => { setFocused(null); touchExp(idx, "department"); }}
                                       style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${expBorder(idx, "department", !!deptErr)}`, borderRadius: 8, padding: "0 8px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
@@ -1379,20 +1375,6 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                                       ))}
                                     </select>
                                     {deptErr && <div style={{ display: "flex", gap: 4, marginTop: 4 }}><span style={{ color: RED, fontSize: 12 }}>⚠</span><span style={{ fontSize: 12, color: RED }}>{deptErr}</span></div>}
-                                    {exp.department === "Other" && (
-                                      <div style={{ marginTop: 8 }}>
-                                        <input
-                                          value={exp.departmentOther}
-                                          onChange={(e) => updateExperience(idx, "departmentOther", e.target.value.slice(0, 50))}
-                                          onFocus={() => setFocused(`exp_${idx}_deptOther`)}
-                                          onBlur={() => { setFocused(null); touchExp(idx, "deptOther"); }}
-                                          placeholder="Specify department…"
-                                          maxLength={50}
-                                          style={{ width: "100%", height: 38, outline: "none", boxSizing: "border-box", border: `1.5px solid ${expBorder(idx, "deptOther", !!deptOtherErr)}`, borderRadius: 8, padding: "0 12px", fontSize: 13, backgroundColor: "#FFFFFF", transition: "border-color 150ms" }}
-                                        />
-                                        {deptOtherErr && <div style={{ display: "flex", gap: 4, marginTop: 4 }}><span style={{ color: RED, fontSize: 12 }}>⚠</span><span style={{ fontSize: 12, color: RED }}>{deptOtherErr}</span></div>}
-                                      </div>
-                                    )}
                                   </div>
 
                                   {/* Role — optional */}
@@ -1651,7 +1633,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       style={{ flex: 1 }}
                       onClick={() => {
                         if (!step3Valid) {
-                          setTouched((t) => ({ ...t, skills: true, availability: true, languages: true, priorExperiences: true, departmentOther: true }));
+                          setTouched((t) => ({ ...t, skills: true, availability: true, languages: true, priorExperiences: true }));
                           if (experiences.length > 0) {
                             setExpTouched((t) => {
                               const next = { ...t };

@@ -40,6 +40,7 @@ const SKILLS_LIST = [
   "Administrative Support",
   "Environmental Work",
   "Community Outreach",
+  "Other",
 ];
 
 const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
@@ -257,7 +258,7 @@ export function ProfilePage() {
   const [form, setForm] = useState({
     fullName: "", phone: "", city: "", department: "",
     dateOfBirth: "", governorate: "", email: "",
-    gender: "", healthNotes: "", educationLevel: "",
+    gender: "", healthNotes: "", educationLevel: "", educationOther: "",
     universityName: "", faculty: "", studyYear: "", fieldOfStudy: "",
     priorExperience: false, priorOrg: "", hoursPerWeek: null as number | null,
   });
@@ -266,7 +267,7 @@ export function ProfilePage() {
   const [formAvailability, setFormAvailability] = useState<string[]>([]);
   const [formLanguages, setFormLanguages] = useState<{ language: string; proficiency: string }[]>([]);
   const [formCauseAreas, setFormCauseAreas] = useState<string[]>([]);
-  const [formExperiences, setFormExperiences] = useState<{ orgName: string; department: string; departmentOther: string; role: string; duration: string; description: string }[]>([]);
+  const [formExperiences, setFormExperiences] = useState<{ orgName: string; department: string; role: string; duration: string; description: string }[]>([]);
   const [customCauseInput, setCustomCauseInput] = useState("");
   const [formNewLang, setFormNewLang] = useState("");
   const [formNewLangProf, setFormNewLangProf] = useState("Conversational");
@@ -320,7 +321,13 @@ export function ProfilePage() {
       const causes: string[] = (() => { try { return JSON.parse(volRes.cause_areas || "[]"); } catch { return []; } })();
       setFormCauseAreas(causes);
       const exps: { orgName: string; department: string; role: string; duration: string; description: string }[] = (() => { try { return JSON.parse(volRes.experiences || "[]"); } catch { return []; } })();
-      setFormExperiences(exps.map((e) => ({ ...e, departmentOther: "" })));
+      setFormExperiences(exps);
+
+      const KNOWN_EDU_LEVELS = ["High School Student", "High School Graduate", "University Student", "University Graduate", "Postgraduate (Diploma / Master / PhD)", "Other"];
+      const rawEduLevel = volRes.education_level || "";
+      const isKnownLevel = rawEduLevel === "" || KNOWN_EDU_LEVELS.includes(rawEduLevel);
+      const resolvedEduLevel = isKnownLevel ? rawEduLevel : "Other";
+      const resolvedEduOther = isKnownLevel ? "" : rawEduLevel;
 
       setForm({
         fullName: volRes.name || "",
@@ -332,7 +339,8 @@ export function ProfilePage() {
         email: volRes.email || "",
         gender: volRes.gender || "",
         healthNotes: volRes.health_notes || "",
-        educationLevel: volRes.education_level || "",
+        educationLevel: resolvedEduLevel,
+        educationOther: resolvedEduOther,
         universityName: volRes.university_name || "",
         faculty: volRes.faculty || "",
         studyYear: volRes.study_year || "",
@@ -358,7 +366,7 @@ export function ProfilePage() {
         : formSkills;
       const resolvedExperiences = formExperiences.map((e) => ({
         orgName: e.orgName,
-        department: e.department === "Other" ? e.departmentOther : e.department,
+        department: e.department,
         role: e.role,
         duration: e.duration,
         description: e.description,
@@ -373,7 +381,7 @@ export function ProfilePage() {
         email: form.email,
         gender: form.gender,
         health_notes: form.healthNotes,
-        education_level: form.educationLevel,
+        education_level: form.educationLevel === "Other" ? form.educationOther.trim() : form.educationLevel,
         university_name: form.universityName,
         faculty: form.faculty,
         study_year: form.studyYear,
@@ -742,7 +750,7 @@ export function ProfilePage() {
                 {/* Education Level */}
                 <div style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Education Level</label>
-                  <select value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={inputStyle}>
+                  <select value={form.educationLevel} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, educationOther: "", universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={inputStyle}>
                     <option value="">Select education level...</option>
                     {["High School Student", "High School Graduate", "University Student", "University Graduate", "Postgraduate (Diploma / Master / PhD)", "Other"].map((l) => (
                       <option key={l} value={l}>{l}</option>
@@ -773,6 +781,12 @@ export function ProfilePage() {
                       <input value={form.fieldOfStudy} onChange={(e) => setForm((f) => ({ ...f, fieldOfStudy: e.target.value }))} style={inputStyle} placeholder="e.g. Engineering, Medicine..." />
                     </div>
                   )}
+                  {form.educationLevel === "Other" && (
+                    <div style={{ marginTop: 10 }}>
+                      <label style={labelStyle}>Please describe your education background</label>
+                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value }))} style={inputStyle} placeholder="e.g. Self-taught, Vocational Training..." />
+                    </div>
+                  )}
                 </div>
                 {/* Step 3 — Preferred Department */}
                 <div style={{ marginTop: 12 }}>
@@ -800,15 +814,6 @@ export function ProfilePage() {
                         {skill}
                       </label>
                     ))}
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#1E293B", padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formSkills.includes("Other") ? GREEN : "#E2E8F0"}`, backgroundColor: formSkills.includes("Other") ? "#F0FDF4" : "#FAFAFA", transition: "all 150ms", userSelect: "none" as const }}>
-                      <input
-                        type="checkbox"
-                        checked={formSkills.includes("Other")}
-                        onChange={() => setFormSkills((prev) => prev.includes("Other") ? prev.filter((s) => s !== "Other") : [...prev, "Other"])}
-                        style={{ accentColor: GREEN, width: 14, height: 14, flexShrink: 0 }}
-                      />
-                      Other
-                    </label>
                   </div>
                   {formSkills.includes("Other") && (
                     <input
@@ -928,7 +933,7 @@ export function ProfilePage() {
                         onClick={() => {
                           setForm((f) => ({ ...f, priorExperience: val }));
                           if (!val) setFormExperiences([]);
-                          else if (formExperiences.length === 0) setFormExperiences([{ orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }]);
+                          else if (formExperiences.length === 0) setFormExperiences([{ orgName: "", department: "", role: "", duration: "", description: "" }]);
                         }}
                         style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.priorExperience === val ? GREEN : "#E2E8F0"}`, backgroundColor: form.priorExperience === val ? "#F0FDF4" : "#FAFAFA", color: form.priorExperience === val ? GREEN : "#64748B", fontWeight: form.priorExperience === val ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
                         {val ? "Yes" : "No"}
@@ -956,7 +961,7 @@ export function ProfilePage() {
                             <div style={{ marginBottom: 10 }}>
                               <label style={{ ...labelStyle, fontSize: 12 }}>Department <span style={{ color: "#DC2626" }}>*</span></label>
                               <select value={exp.department}
-                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, department: e.target.value, departmentOther: e.target.value !== "Other" ? "" : x.departmentOther } : x))}
+                                onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, department: e.target.value } : x))}
                                 style={inputStyle}>
                                 <option value="">Select department…</option>
                                 {DEPARTMENT_GROUPS.map((group) => (
@@ -964,14 +969,7 @@ export function ProfilePage() {
                                     {group.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                                   </optgroup>
                                 ))}
-                                <option value="Other">Other</option>
                               </select>
-                              {exp.department === "Other" && (
-                                <input value={exp.departmentOther}
-                                  onChange={(e) => setFormExperiences((prev) => prev.map((x, i) => i === idx ? { ...x, departmentOther: e.target.value.slice(0, 50) } : x))}
-                                  placeholder="Specify department…"
-                                  style={{ ...inputStyle, marginTop: 8 }} />
-                              )}
                             </div>
                             <div style={{ marginBottom: 10 }}>
                               <label style={{ ...labelStyle, fontSize: 12 }}>Role / Position <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
@@ -999,7 +997,7 @@ export function ProfilePage() {
                         ))}
                       </div>
                       <button type="button"
-                        onClick={() => setFormExperiences((prev) => [...prev, { orgName: "", department: "", departmentOther: "", role: "", duration: "", description: "" }])}
+                        onClick={() => setFormExperiences((prev) => [...prev, { orgName: "", department: "", role: "", duration: "", description: "" }])}
                         style={{ marginTop: 12, height: 38, padding: "0 16px", borderRadius: 8, border: `1.5px solid ${GREEN}`, backgroundColor: "#F0FDF4", color: GREEN, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         + Add Experience
                       </button>
