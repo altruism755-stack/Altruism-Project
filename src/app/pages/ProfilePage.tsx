@@ -10,10 +10,13 @@ import {
   DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
   MAX_SKILLS, MAX_CAUSES, MAX_HEALTH_NOTES, MAX_EXP_DESCRIPTION,
   MIN_HOURS, MAX_HOURS,
-  type ExperienceEntry, type VolunteerEditableState,
+  type ExperienceEntry, type VolunteerEditableState, type VolunteerErrors,
   buildVolunteerPayload, buildVolunteerRegisterPayload,
   computeVolunteerErrors, getExperienceFieldError,
+  isProfileFormValid, getFirstProfileError, getFirstProfileErrorField,
+  createEmptyTouched, createAllTouched, shouldShowError,
 } from "../data/volunteerFormSchema";
+
 
 const GREEN = "#16A34A";
 const RED = "#DC2626";
@@ -229,8 +232,12 @@ export function ProfilePage() {
     universityName: "", faculty: "", studyYear: "", fieldOfStudy: "",
     priorExperience: null as boolean | null, priorOrg: "", hoursPerWeek: null as number | null,
   });
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  
+  // ── Fixed Validation State ──
+  const [touched, setTouched] = useState<Record<string, boolean>>(createEmptyTouched);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const markTouched = (k: string) => setTouched((t) => ({ ...t, [k]: true }));
+  
   const [formSkills, setFormSkills] = useState<string[]>([]);
   const [formCustomSkill, setFormCustomSkill] = useState("");
   const [formAvailability, setFormAvailability] = useState<string[]>([]);
@@ -356,24 +363,34 @@ export function ProfilePage() {
     causeAreas: formCauseAreas,
   }), [form, formSkills, formCustomSkill, formAvailability, formLanguages, formExperiences, formCauseAreas]);
 
-  const errors = useMemo(() => computeVolunteerErrors(volunteerState), [volunteerState]);
-  const showErr = (k: string) => touched[k] && errors[k] ? errors[k] : "";
+  // ── Fixed Error Logic ──
+  const errors: VolunteerErrors = useMemo(() => computeVolunteerErrors(volunteerState), [volunteerState]);
+  
+  const showErr = (k: string) => shouldShowError(errors, touched, k, submitAttempted);
+  
   const Err = ({ field }: { field: string }) => {
     const m = showErr(field);
     return m ? <div style={{ fontSize: 12, color: RED, marginTop: 4 }}>{m}</div> : null;
   };
 
+  // Helper to apply red borders on validation error
+  const getBorderStyle = (field: string) => `1.5px solid ${showErr(field) ? RED : "#E2E8F0"}`;
+
   const handleSave = async () => {
-    // Touch every field so missing-required errors surface on submit
-    // Identity fields are read-only in Profile — skip them in blocking validation
-    const readOnlyKeys = new Set(["fullName", "email", "nationality", "nationalId", "dateOfBirth"]);
-    const allKeys = Object.keys(errors).filter((k) => !readOnlyKeys.has(k));
-    setTouched(Object.fromEntries(allKeys.map((k) => [k, true])));
-    const firstErr = allKeys.find((k) => errors[k]);
-    if (firstErr) {
-      console.warn("[Profile] validation blocked save:", firstErr, errors[firstErr]);
+    // Touch every field and trigger submit state so missing-required errors surface
+    setSubmitAttempted(true);
+    setTouched(createAllTouched());
+
+    if (!isProfileFormValid(errors)) {
+      const msg = getFirstProfileError(errors);
+      const field = getFirstProfileErrorField(errors);
+      if (field) {
+        document.querySelector(`[data-field="${field}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      window.alert(msg || "Please fix the highlighted errors.");
       return;
     }
+    
     setSaving(true);
     try {
       const savePayload = buildVolunteerPayload(volunteerState);
@@ -383,6 +400,8 @@ export function ProfilePage() {
       const saveResult = await api.updateVolunteer(volRecordId, savePayload);
       console.log("[Profile] save response:", saveResult);
       setEditing(false);
+      setSubmitAttempted(false);
+      setTouched(createEmptyTouched());
       fetchProfile();
     } catch (e) { console.error("Failed to save profile:", e); }
     finally { setSaving(false); }
@@ -664,9 +683,10 @@ export function ProfilePage() {
               <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
                 <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
                   <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: 0 }}>Edit Profile</h3>
-                  <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#94A3B8", cursor: "pointer" }}>&times;</button>
+                  <button onClick={() => { setEditing(false); setSubmitAttempted(false); setTouched(createEmptyTouched()); }} style={{ background: "none", border: "none", fontSize: 20, color: "#94A3B8", cursor: "pointer" }}>&times;</button>
                 </div>
-                {/* Read-only fields — set at registration, cannot be changed */}
+                
+                {/* Read-only fields */}
                 <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "12px 16px", marginBottom: 4 }}>
                   <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>These details can only be changed by contacting the administration.</p>
                   <div className="grid grid-cols-2 gap-4">
@@ -692,46 +712,54 @@ export function ProfilePage() {
                     </div>
                   </div>
                 </div>
+
                 {/* Step 2 — Personal details */}
-                <div style={{ marginTop: 12 }}>
+                <div data-field="phone" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Phone Number</label>
-                  <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={inputStyle} />
+                  <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} onBlur={() => markTouched("phone")} style={{ ...inputStyle, border: getBorderStyle("phone") }} />
+                  <Err field="phone" />
                 </div>
-                <div style={{ marginTop: 12 }}>
+                <div data-field="governorate" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Governorate</label>
-                  <select value={form.governorate} onChange={(e) => setForm((f) => ({ ...f, governorate: e.target.value }))} style={inputStyle}>
+                  <select value={form.governorate} onChange={(e) => setForm((f) => ({ ...f, governorate: e.target.value }))} onBlur={() => markTouched("governorate")} style={{ ...inputStyle, border: getBorderStyle("governorate") }}>
                     <option value="">Select Governorate</option>
                     {GOVERNORATES.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
+                  <Err field="governorate" />
                 </div>
-                <div style={{ marginTop: 12 }}>
+                <div data-field="city" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>City</label>
-                  <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} style={inputStyle} />
+                  <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} onBlur={() => markTouched("city")} style={{ ...inputStyle, border: getBorderStyle("city") }} />
+                  <Err field="city" />
                 </div>
+                
                 {/* Gender */}
-                <div style={{ marginTop: 12 }}>
+                <div data-field="gender" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Gender</label>
                   <div style={{ display: "flex", gap: 10 }}>
                     {["Male", "Female"].map((g) => (
-                      <button key={g} type="button" onClick={() => setForm((f) => ({ ...f, gender: g }))}
-                        style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.gender === g ? GREEN : "#E2E8F0"}`, backgroundColor: form.gender === g ? "#F0FDF4" : "#FAFAFA", color: form.gender === g ? GREEN : "#64748B", fontWeight: form.gender === g ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
+                      <button key={g} type="button" onClick={() => { setForm((f) => ({ ...f, gender: g })); markTouched("gender"); }}
+                        style={{ flex: 1, height: 42, borderRadius: 8, border: `1.5px solid ${form.gender === g ? GREEN : showErr("gender") ? RED : "#E2E8F0"}`, backgroundColor: form.gender === g ? "#F0FDF4" : "#FAFAFA", color: form.gender === g ? GREEN : "#64748B", fontWeight: form.gender === g ? 600 : 400, fontSize: 14, cursor: "pointer" }}>
                         {g}
                       </button>
                     ))}
                   </div>
+                  <Err field="gender" />
                 </div>
+
                 {/* Health Notes */}
-                <div style={{ marginTop: 12 }}>
+                <div data-field="healthNotes" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Health / Mobility Notes <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                   <textarea value={form.healthNotes} onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value.slice(0, MAX_HEALTH_NOTES) }))}
                     placeholder="Any physical limitations organizations should know about..."
-                    style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const }} />
+                    style={{ ...inputStyle, height: 80, padding: "10px 12px", resize: "vertical" as const, border: getBorderStyle("healthNotes") }} />
                   <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.healthNotes.length}/{MAX_HEALTH_NOTES}</div>
                 </div>
+
                 {/* Education Level */}
-                <div style={{ marginTop: 12 }}>
+                <div data-field="educationLevel" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Education Level</label>
-                  <select value={form.educationLevel} onBlur={() => markTouched("educationLevel")} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, educationOther: "", universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={inputStyle}>
+                  <select value={form.educationLevel} onBlur={() => markTouched("educationLevel")} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, educationOther: "", universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={{ ...inputStyle, border: getBorderStyle("educationLevel") }}>
                     <option value="">Select education level...</option>
                     {EDUCATION_LEVELS.map((l) => (
                       <option key={l} value={l}>{l}</option>
@@ -740,40 +768,46 @@ export function ProfilePage() {
                   <Err field="educationLevel" />
                   {form.educationLevel === "University Student" && (
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div>
+                      <div data-field="universityName">
                         <label style={labelStyle}>University Name</label>
-                        <input value={form.universityName} onChange={(e) => setForm((f) => ({ ...f, universityName: e.target.value }))} style={inputStyle} placeholder="e.g. Cairo University" />
+                        <input value={form.universityName} onChange={(e) => setForm((f) => ({ ...f, universityName: e.target.value }))} onBlur={() => markTouched("universityName")} style={{ ...inputStyle, border: getBorderStyle("universityName") }} placeholder="e.g. Cairo University" />
+                        <Err field="universityName" />
                       </div>
-                      <div>
+                      <div data-field="faculty">
                         <label style={labelStyle}>Faculty / Major</label>
-                        <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} style={inputStyle} placeholder="e.g. Computer Science" />
+                        <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} onBlur={() => markTouched("faculty")} style={{ ...inputStyle, border: getBorderStyle("faculty") }} placeholder="e.g. Computer Science" />
+                        <Err field="faculty" />
                       </div>
-                      <div>
+                      <div data-field="studyYear">
                         <label style={labelStyle}>Academic Year</label>
-                        <select value={form.studyYear} onChange={(e) => setForm((f) => ({ ...f, studyYear: e.target.value }))} style={inputStyle}>
+                        <select value={form.studyYear} onChange={(e) => setForm((f) => ({ ...f, studyYear: e.target.value }))} onBlur={() => markTouched("studyYear")} style={{ ...inputStyle, border: getBorderStyle("studyYear") }}>
                           <option value="">Select year...</option>
                           {STUDY_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                         </select>
+                        <Err field="studyYear" />
                       </div>
                     </div>
                   )}
                   {(form.educationLevel === "University Graduate" || form.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
-                    <div style={{ marginTop: 10 }}>
+                    <div data-field="fieldOfStudy" style={{ marginTop: 10 }}>
                       <label style={labelStyle}>Field of Study</label>
-                      <input value={form.fieldOfStudy} onChange={(e) => setForm((f) => ({ ...f, fieldOfStudy: e.target.value }))} style={inputStyle} placeholder="e.g. Engineering, Medicine..." />
+                      <input value={form.fieldOfStudy} onChange={(e) => setForm((f) => ({ ...f, fieldOfStudy: e.target.value }))} onBlur={() => markTouched("fieldOfStudy")} style={{ ...inputStyle, border: getBorderStyle("fieldOfStudy") }} placeholder="e.g. Engineering, Medicine..." />
+                      <Err field="fieldOfStudy" />
                     </div>
                   )}
                   {form.educationLevel === "Other" && (
-                    <div style={{ marginTop: 10 }}>
+                    <div data-field="educationOther" style={{ marginTop: 10 }}>
                       <label style={labelStyle}>Please describe your education background</label>
-                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value }))} style={inputStyle} placeholder="e.g. Self-taught, Vocational Training..." />
+                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value }))} onBlur={() => markTouched("educationOther")} style={{ ...inputStyle, border: getBorderStyle("educationOther") }} placeholder="e.g. Self-taught, Vocational Training..." />
+                      <Err field="educationOther" />
                     </div>
                   )}
                 </div>
+
                 {/* Step 3 — Preferred Department */}
-                <div style={{ marginTop: 12 }}>
+                <div data-field="department" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Preferred Department <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
-                  <select value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} style={inputStyle}>
+                  <select value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} style={{ ...inputStyle, border: getBorderStyle("department") }}>
                     <option value="">Select a department…</option>
                     {DEPARTMENT_GROUPS.map((group) => (
                       <optgroup key={group.label} label={group.label}>
@@ -782,7 +816,9 @@ export function ProfilePage() {
                     ))}
                   </select>
                 </div>
-                <div style={{ marginTop: 12 }}>
+
+                {/* Skills */}
+                <div data-field="skills" style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Skills</label>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px", marginTop: 4 }}>
                     {SKILLS_LIST.map((skill) => (
@@ -801,11 +837,14 @@ export function ProfilePage() {
                     <input
                       value={formCustomSkill}
                       onChange={(e) => setFormCustomSkill(e.target.value)}
+                      onBlur={() => markTouched("skills")}
                       placeholder="Describe your skill(s), comma-separated..."
-                      style={{ ...inputStyle, marginTop: 8 }}
+                      style={{ ...inputStyle, marginTop: 8, border: getBorderStyle("skills") }}
                     />
                   )}
+                  <Err field="skills" />
                 </div>
+
                 {/* Availability */}
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Availability <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
@@ -874,7 +913,7 @@ export function ProfilePage() {
                 </div>
 
                 {/* Languages */}
-                <div style={{ marginTop: 16 }}>
+                <div data-field="languages" style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Languages Spoken</label>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
                     {formLanguages.map((lang, idx) => (
@@ -903,10 +942,11 @@ export function ProfilePage() {
                       + Add
                     </button>
                   </div>
+                  <Err field="languages" />
                 </div>
 
-                {/* Prior Volunteer Experience — Step 3 */}
-                <div style={{ marginTop: 16 }}>
+                {/* Prior Volunteer Experience */}
+                <div data-field="priorExperiences" style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Prior Volunteer Experience <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>Have you volunteered with any organization before?</p>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -993,9 +1033,10 @@ export function ProfilePage() {
                       </button>
                     </div>
                   )}
+                  <Err field="priorExperiences" />
                 </div>
 
-                {/* Cause Areas — Step 3 */}
+                {/* Cause Areas */}
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Cause Areas / Interests <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 14px 0" }}>Rank the causes based on your interest (most preferred first) — up to {MAX_CAUSES}</p>
@@ -1103,7 +1144,7 @@ export function ProfilePage() {
                   <button onClick={handleSave} disabled={saving} style={{ flex: 1, height: 42, backgroundColor: saving ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
-                  <button onClick={() => setEditing(false)} style={{ height: 42, padding: "0 24px", backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => { setEditing(false); setSubmitAttempted(false); setTouched(createEmptyTouched()); }} style={{ height: 42, padding: "0 24px", backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
                 </div>
               </div>
             )}

@@ -5,6 +5,8 @@
 // Contains:
 //   - Constant value lists (governorates, nationalities, skills, …)
 //   - Validation helpers (one function per field)
+//   - Step validators for registration multi-step flow
+//   - Full-form validator for profile editing
 //   - The canonical Volunteer payload shape and helper to build it
 //
 // Rule: any change to a volunteer field's value-set, validation rule,
@@ -133,6 +135,30 @@ export const REQUIRED_FIELDS: VolunteerFieldKey[] = [
   "nationality", "nationalId", "dateOfBirth", "governorate", "phone",
   "city", "gender", "educationLevel",
 ];
+
+// ── Step field lists (Registration multi-step flow) ──────────────────
+
+/** Step 1: Account credentials + personal identity */
+export const STEP1_FIELDS = [
+  "fullName", "email", "password", "confirmPassword",
+  "nationality", "nationalId", "dateOfBirth",
+  "governorate", "phone", "city", "gender",
+] as const;
+
+/** Step 2: Education details (base field + conditionals) */
+export const STEP2_FIELDS = [
+  "educationLevel",
+] as const;
+
+/** Extra education fields that must be checked depending on educationLevel */
+export const STEP2_CONDITIONAL_FIELDS = [
+  "universityName", "faculty", "studyYear", "fieldOfStudy", "educationOther",
+] as const;
+
+/** Step 3: Skills, languages, experience, causes (validated together) */
+export const STEP3_FIELDS = [
+  "skills", "languages", "priorExperiences",
+] as const;
 
 // ── Validators (each returns "" when valid, else an error message) ───
 
@@ -305,10 +331,6 @@ export function getExperienceFieldError(
 }
 
 // ── Canonical volunteer payload shape (frontend → backend) ───────────
-//
-// `name`, `email`, `phone`, `skills`, etc. are the keys the backend
-// PUT /volunteers/{id} endpoint expects. Build this once and use it
-// from both Registration and Profile so the data structure is identical.
 
 export type VolunteerEditableState = {
   fullName: string;
@@ -435,12 +457,29 @@ export function buildVolunteerRegisterPayload(
   };
 }
 
-// Compute the full set of validation errors for the editable state.
-// Both Registration and Profile pages use this to drive their UI.
+// ── Error computation ────────────────────────────────────────────────
+
+/**
+ * Error map type: field key → error string ("" means valid).
+ */
+export type VolunteerErrors = Record<string, string>;
+
+/**
+ * Compute the full set of validation errors for the editable state.
+ *
+ * `opts.password` is used to decide whether password fields are validated.
+ * - During **registration**: pass `{ password, confirmPassword }` — both
+ *   password fields are validated.
+ * - During **profile editing**: call with no opts (or omit password) —
+ *   password fields are skipped, which is correct because the profile
+ *   page does not ask for the password.
+ *
+ * Both Registration and Profile pages use this single function.
+ */
 export function computeVolunteerErrors(
   s: VolunteerEditableState,
   opts: { confirmPassword?: string; password?: string } = {},
-): Record<string, string> {
+): VolunteerErrors {
   return {
     fullName:        validateFullName(s.fullName),
     email:           validateEmail(s.email),
@@ -466,4 +505,148 @@ export function computeVolunteerErrors(
     priorExperiences: validatePriorExperiences(s.priorHasExperience, s.experiences),
     availability:    "",
   };
+}
+
+// ── Step validators (Registration multi-step flow) ───────────────────
+
+/**
+ * Step 1 is valid when every field in STEP1_FIELDS has no error.
+ */
+export function isStep1Valid(errors: VolunteerErrors): boolean {
+  return (STEP1_FIELDS as readonly string[]).every((f) => !errors[f]);
+}
+
+/**
+ * Step 2 is valid when the base educationLevel field AND whichever
+ * conditional fields are active for the selected level have no error.
+ */
+export function isStep2Valid(errors: VolunteerErrors): boolean {
+  if (errors.educationLevel) return false;
+  // Check all conditional education fields — if any has a non-empty error
+  // it means the condition was active and the field failed validation.
+  return (STEP2_CONDITIONAL_FIELDS as readonly string[]).every((f) => !errors[f]);
+}
+
+/**
+ * Step 3 is valid when skills, languages, and priorExperiences have
+ * no error AND the terms checkbox has been accepted.
+ */
+export function isStep3Valid(errors: VolunteerErrors, termsAccepted: boolean): boolean {
+  if (!termsAccepted) return false;
+  return (STEP3_FIELDS as readonly string[]).every((f) => !errors[f]);
+}
+
+// ── Profile-edit validators ──────────────────────────────────────────
+
+/**
+ * Fields that are **not** relevant during profile editing.
+ * Password is never collected on the profile page.
+ */
+const PROFILE_EXCLUDED_FIELDS = new Set(["password", "confirmPassword"]);
+
+/**
+ * Returns `true` when the entire editable form is valid for profile saving.
+ * Skips password fields since they are not part of the profile edit flow.
+ */
+export function isProfileFormValid(errors: VolunteerErrors): boolean {
+  return (Object.keys(errors) as string[]).every(
+    (k) => PROFILE_EXCLUDED_FIELDS.has(k) || !errors[k],
+  );
+}
+
+/**
+ * Returns the first non-empty error message that is relevant to the
+ * profile edit flow (skips password fields). Useful for toast messages.
+ * Returns `""` when there is no error.
+ */
+export function getFirstProfileError(errors: VolunteerErrors): string {
+  for (const key of Object.keys(errors)) {
+    if (PROFILE_EXCLUDED_FIELDS.has(key)) continue;
+    if (errors[key]) return errors[key];
+  }
+  return "";
+}
+
+/**
+ * Returns the **key** of the first field that has a profile-relevant error.
+ * Useful for scrolling to the first invalid field.
+ * Returns `null` when there is no error.
+ */
+export function getFirstProfileErrorField(errors: VolunteerErrors): string | null {
+  for (const key of Object.keys(errors)) {
+    if (PROFILE_EXCLUDED_FIELDS.has(key)) continue;
+    if (errors[key]) return key;
+  }
+  return null;
+}
+
+// ── Touched-state helpers ────────────────────────────────────────────
+
+/**
+ * All field keys that participate in profile validation
+ * (password fields excluded because they don't exist on the profile form).
+ */
+export const PROFILE_TOUCHABLE_FIELDS = [
+  "fullName", "email", "nationality", "nationalId", "dateOfBirth",
+  "governorate", "phone", "city", "gender", "healthNotes",
+  "educationLevel", "educationOther", "universityName", "faculty",
+  "studyYear", "fieldOfStudy", "department", "hoursPerWeek",
+  "skills", "languages", "priorExperiences",
+] as const;
+
+/**
+ * Creates an initial touched-state record where every profile-touchable
+ * field is `false`. Spread into `useState`:
+ *
+ * ```ts
+ * const [touched, setTouched] = useState<Record<string, boolean>>(
+ *   () => createEmptyTouched(),
+ * );
+ * ```
+ */
+export function createEmptyTouched(): Record<string, boolean> {
+  const obj: Record<string, boolean> = {};
+  for (const f of PROFILE_TOUCHABLE_FIELDS) {
+    obj[f] = false;
+  }
+  return obj;
+}
+
+/**
+ * Returns a touched record where **every** profile-touchable field is
+ * `true`. Call this right before validating on submit so that *all*
+ * errors become visible.
+ */
+export function createAllTouched(): Record<string, boolean> {
+  const obj: Record<string, boolean> = {};
+  for (const f of PROFILE_TOUCHABLE_FIELDS) {
+    obj[f] = true;
+  }
+  return obj;
+}
+
+/**
+ * Resolves whether an error message should be displayed for a given field.
+ *
+ * The error is shown when:
+ * - The field has been touched (blur / change), **OR**
+ * - A submit attempt has been made (`submitAttempted === true`)
+ *
+ * and the error string for that field is non-empty.
+ *
+ * Usage:
+ * ```tsx
+ * const msg = shouldShowError(errors, touched, "phone", true);
+ * return msg ? <span className="err">{msg}</span> : null;
+ * ```
+ */
+export function shouldShowError(
+  errors: VolunteerErrors,
+  touched: Record<string, boolean>,
+  field: string,
+  submitAttempted: boolean,
+): string {
+  if (!errors[field]) return "";
+  if (touched[field] || submitAttempted) return errors[field];
+  return "";
 }
