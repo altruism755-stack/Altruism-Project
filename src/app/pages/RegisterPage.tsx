@@ -9,7 +9,8 @@ import {
   DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
   MAX_SKILLS, MAX_CAUSES,
   validateFullName, validateEmail, validatePassword,
-  validateNationalIdOrPassport, validateDob, validatePhone, validateOrgPhone, validateCity, validateSubmitterName,
+  validateNationalIdOrPassport, validateDob, validatePhone, validateOrgPhone, validateCity,
+  validateSubmitterName, validateSubmitterRole, validateOrgCity,
   type ExperienceEntry,
   type VolunteerEditableState,
   buildVolunteerRegisterPayload,
@@ -178,18 +179,20 @@ export function RegisterPage() {
       ? "Please describe your organization."
       : orgForm.description.trim().length < 20
         ? "Description must be at least 20 characters."
-        : "",
+        : orgForm.description.length > 500
+          ? "Description must be no more than 500 characters."
+          : "",
     officialEmail:  orgForm.officialEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orgForm.officialEmail)
       ? "Please enter a valid email address."
       : "",
     phone:          validateOrgPhone(orgForm.phone),
     orgSize:        !orgForm.orgSize ? "Please select an organization size." : "",
     hqGovernorate:  !orgForm.hqGovernorate ? "Please select a governorate." : "",
-    hqCity:         !orgForm.hqCity.trim() ? "Please enter a city or district." : "",
+    hqCity:         validateOrgCity(orgForm.hqCity),
     website:        !orgForm.website.trim() ? "Website is required." : !/^https?:\/\/.+/.test(orgForm.website.trim()) ? "Please enter a valid URL starting with http:// or https://." : "",
     documents:      !orgDocumentFile ? "Please upload a supporting document." : "",
     submitterName:  validateSubmitterName(orgForm.submitterName),
-    submitterRole:  !orgForm.submitterRole.trim() ? "Your role is required." : "",
+    submitterRole:  validateSubmitterRole(orgForm.submitterRole),
   }), [orgForm, orgCategories, orgDocumentFile]);
 
   const orgFormValid =
@@ -1880,9 +1883,17 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                 </div>
 
                 <div>
-                  <label htmlFor="orgDescription" style={labelStyle}>Description <span style={{ color: RED }}>*</span></label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                    <label htmlFor="orgDescription" style={{ ...labelStyle, margin: 0 }}>Description <span style={{ color: RED }}>*</span></label>
+                    <span style={{
+                      fontSize: 11, fontWeight: 500,
+                      color: orgForm.description.length > 500 ? RED : orgForm.description.length > 420 ? "#F59E0B" : "#94A3B8",
+                    }}>
+                      {orgForm.description.length}/500
+                    </span>
+                  </div>
                   <textarea id="orgDescription" value={orgForm.description}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, description: e.target.value }))}
+                    onChange={(e) => { if (e.target.value.length <= 500) setOrgForm((f) => ({ ...f, description: e.target.value })); }}
                     onFocus={() => onOrgFocus("description")} onBlur={() => onOrgBlur("description")}
                     placeholder="Tell us about your organization, its mission, and impact…"
                     style={{ ...orgFieldStyle("description", 100), padding: "10px 12px" }} />

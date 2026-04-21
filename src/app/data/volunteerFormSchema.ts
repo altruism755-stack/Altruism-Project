@@ -180,6 +180,24 @@ export function validateSubmitterName(v: string): string {
   return "";
 }
 
+export function validateSubmitterRole(v: string): string {
+  if (!v.trim()) return "Your role is required.";
+  if (v.trim().length < 2) return "Role must be at least 2 characters.";
+  if (v.trim().length > 60) return "Role must be no more than 60 characters.";
+  if (!/^[\u0600-\u06FFa-zA-Z\s\-\/\.]+$/.test(v.trim()))
+    return "Role must contain letters only — no numbers or special characters.";
+  return "";
+}
+
+export function validateOrgCity(v: string): string {
+  if (!v.trim()) return "City or district is required.";
+  if (v.trim().length < 2) return "City must be at least 2 characters.";
+  if (v.trim().length > 60) return "City must be no more than 60 characters.";
+  if (!/^[\u0600-\u06FFa-zA-Z\s\-\.]+$/.test(v.trim()))
+    return "City must contain letters only — no numbers or special characters.";
+  return "";
+}
+
 export function validateEmail(v: string): string {
   if (!v.trim()) return "Email address is required.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
