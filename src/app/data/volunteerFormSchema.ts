@@ -171,6 +171,15 @@ export function validateFullName(v: string): string {
   return "";
 }
 
+export function validateSubmitterName(v: string): string {
+  if (!v.trim()) return "Submitter name is required.";
+  if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(v.trim()))
+    return "Name must contain letters only — no numbers or special characters.";
+  if (v.trim().split(/\s+/).length < 2)
+    return "Please enter your first and last name.";
+  return "";
+}
+
 export function validateEmail(v: string): string {
   if (!v.trim()) return "Email address is required.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
@@ -239,6 +248,16 @@ export function validatePhone(v: string): string {
     return "Please enter a valid phone number.";
   if (v.length !== 11) return "Phone number must be exactly 11 digits.";
   return "";
+}
+
+export function validateOrgPhone(v: string): string {
+  if (!v) return "Phone number is required.";
+  if (!/^\d+$/.test(v)) return "Phone number must contain numbers only.";
+  const isMobile   = ["010", "011", "012", "015"].some((p) => v.startsWith(p));
+  const isLandline = /^0[2-9]/.test(v) && !isMobile;
+  if (isMobile)   return v.length === 11 ? "" : "Mobile numbers must be exactly 11 digits (e.g. 01XXXXXXXXX).";
+  if (isLandline) return v.length === 10 ? "" : "Landline numbers must be exactly 10 digits (e.g. 0XXXXXXXXX).";
+  return "Enter a valid mobile (01XXXXXXXXX) or landline (0XXXXXXXXX) number.";
 }
 
 export function validateCity(v: string): string {
