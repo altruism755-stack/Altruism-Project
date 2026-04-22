@@ -5,13 +5,15 @@ import { Logo } from "./Logo";
 interface NavbarProps {
   role?: "org" | "supervisor" | "volunteer" | "guest";
   userName?: string;
+  hideNavLinks?: boolean;
+  hideUserMenu?: boolean;
 }
 
 const NAV = "#0F172A";
 const GREEN = "#16A34A";
 const GREEN_HOVER = "#15803D";
 
-export function Navbar({ role = "guest", userName }: NavbarProps) {
+export function Navbar({ role = "guest", userName, hideNavLinks = false, hideUserMenu = false }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -53,7 +55,7 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
         </Link>
 
         <div className="hidden md:flex items-center gap-6">
-          {navLinks.map((link) => (
+          {!hideNavLinks && navLinks.map((link) => (
             <Link
               key={link.to + link.label}
               to={link.to}
@@ -74,7 +76,7 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        {role === "guest" ? (
+        {!hideUserMenu && (role === "guest" ? (
           <>
             <button
               onClick={() => navigate("/login")}
@@ -150,7 +152,7 @@ export function Navbar({ role = "guest", userName }: NavbarProps) {
               Logout
             </button>
           </>
-        )}
+        ))}
       </div>
     </nav>
   );

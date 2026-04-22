@@ -12,10 +12,11 @@ interface AuthContextType {
   token: string | null;
   profile: any;
   orgStatus: "pending" | "approved" | "rejected" | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ ok: boolean; role?: string; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean }>;
   register: (data: any) => Promise<{ ok: boolean; message?: string; orgStatus?: string }>;
   logout: () => void;
   isLoading: boolean;
+  refreshOrgStatus: () => Promise<"pending" | "approved" | "rejected" | null>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -23,10 +24,12 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 // Fallback demo credentials when backend is unavailable
-const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string; is_platform_admin?: boolean }> = {
-  "admin@resala.org":      { password: "admin",      role: "org_admin",  name: "Resala" },
-  "admin@redcrescent.org": { password: "admin",      role: "org_admin",  name: "Egyptian Red Crescent" },
-  "admin@enactus.org":     { password: "admin",      role: "org_admin",  name: "Enactus Egypt" },
+const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string; is_platform_admin?: boolean; orgStatus?: "pending" | "approved" | "rejected" }> = {
+  "admin@resala.org":      { password: "admin",      role: "org_admin",  name: "Resala",                  orgStatus: "approved" },
+  "admin@redcrescent.org": { password: "admin",      role: "org_admin",  name: "Egyptian Red Crescent",   orgStatus: "approved" },
+  "admin@enactus.org":     { password: "admin",      role: "org_admin",  name: "Enactus Egypt",           orgStatus: "approved" },
+  "pending@org.com":       { password: "pending",    role: "org_admin",  name: "Demo Pending Org",        orgStatus: "pending"  },
+  "rejected@org.com":      { password: "rejected",   role: "org_admin",  name: "Demo Rejected Org",       orgStatus: "rejected" },
   "amira@resala.org":      { password: "supervisor", role: "supervisor", name: "Dr. Amira Khalil" },
   "volunteer@example.com": { password: "volunteer",  role: "volunteer",  name: "Yara Hassan" },
   "platform@altruism.org": { password: "platform",  role: "volunteer",  name: "Platform Admin", is_platform_admin: true },
@@ -68,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else sessionStorage.removeItem("altruism_profile");
   }, [profile]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ ok: boolean; role?: User["role"]; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean }> => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
@@ -81,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         setToken(data.token);
         setProfile(data.profile);
-        setOrgStatus(data.org_status || null);
+        const status = data.org_status || null;
+        setOrgStatus(status);
         setIsLoading(false);
-        return true;
+        return { ok: true, role: data.user?.role, orgStatus: status, isPlatformAdmin: data.user?.is_platform_admin };
       }
     } catch {
       // Backend unavailable — use demo fallback
@@ -96,12 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       setToken("demo-token");
       setProfile({ name: demo.name });
+      const status = demo.orgStatus || null;
+      setOrgStatus(status);
       setIsLoading(false);
-      return true;
+      return { ok: true, role: demo.role, orgStatus: status, isPlatformAdmin: demo.is_platform_admin };
     }
 
     setIsLoading(false);
-    return false;
+    return { ok: false };
   };
 
   const register = async (data: any): Promise<{ ok: boolean; message?: string; orgStatus?: string }> => {
@@ -158,6 +164,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshOrgStatus = async (): Promise<"pending" | "approved" | "rejected" | null> => {
+    const currentToken = sessionStorage.getItem("altruism_token");
+    if (!currentToken || currentToken === "demo-token") return orgStatus;
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const status: "pending" | "approved" | "rejected" | null = data.org_status || null;
+        setOrgStatus(status);
+        if (data.profile) setProfile(data.profile);
+        return status;
+      }
+    } catch { /* backend unavailable */ }
+    return orgStatus;
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -170,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, profile, orgStatus, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, profile, orgStatus, login, register, logout, isLoading, refreshOrgStatus }}>
       {children}
     </AuthContext.Provider>
   );

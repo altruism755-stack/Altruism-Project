@@ -490,7 +490,11 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
       setSubmitError(result.message ?? "Registration failed. Please check your details and try again.");
       return;
     }
-    navigate(role === "Organization" ? "/org/pending" : "/dashboard/profile");
+    if (role === "Organization") {
+      navigate(result.orgStatus === "approved" ? "/org" : "/org/pending");
+    } else {
+      navigate("/dashboard/profile");
+    }
   };
 
   // ── Sub-components scoped to this render ──

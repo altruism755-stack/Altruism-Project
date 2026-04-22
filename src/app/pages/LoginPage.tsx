@@ -39,17 +39,14 @@ export function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(false);
-    const success = await login(email, password);
-    if (success) {
-      // Determine redirect based on role stored after login
-      const stored = sessionStorage.getItem("altruism_user");
-      const u = stored ? JSON.parse(stored) : null;
-      const orgStatus = sessionStorage.getItem("altruism_org_status");
-      if (u?.is_platform_admin) navigate("/platform-admin");
-      else if (u?.role === "org_admin") {
-        navigate(orgStatus && orgStatus !== "approved" ? "/org/pending" : "/org");
+    const result = await login(email, password);
+    if (result.ok) {
+      if (result.isPlatformAdmin) navigate("/platform-admin");
+      else if (result.role === "org_admin") {
+        const status = result.orgStatus;
+        navigate(status === "pending" || status === "rejected" ? "/org/pending" : "/org");
       }
-      else if (u?.role === "supervisor") navigate("/supervisor");
+      else if (result.role === "supervisor") navigate("/supervisor");
       else navigate("/dashboard/profile");
     } else {
       setError(true);
@@ -133,10 +130,11 @@ export function LoginPage() {
 
             <div style={{ marginTop: 4, backgroundColor: "#F8FAFC", borderRadius: 8, padding: "12px 14px", fontSize: 12, color: "#64748B", lineHeight: 1.8 }}>
               <strong style={{ color: "#1E293B" }}>Demo accounts:</strong><br />
-              volunteer@example.com / <strong>volunteer</strong> — Yara Hassan<br />
-              admin@resala.org / <strong>admin</strong> — Resala Admin<br />
-              admin@redcrescent.org / <strong>admin</strong> — Red Crescent Admin<br />
-              amira@resala.org / <strong>supervisor</strong> — Resala Supervisor<br />
+              volunteer@example.com / <strong>volunteer</strong> — Volunteer<br />
+              admin@resala.org / <strong>admin</strong> — Org Admin (approved)<br />
+              pending@org.com / <strong>pending</strong> — Org Admin (pending)<br />
+              rejected@org.com / <strong>rejected</strong> — Org Admin (rejected)<br />
+              amira@resala.org / <strong>supervisor</strong> — Supervisor<br />
               platform@altruism.org / <strong>platform</strong> — Platform Admin
             </div>
           </form>

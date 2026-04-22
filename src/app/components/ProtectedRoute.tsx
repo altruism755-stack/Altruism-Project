@@ -32,8 +32,9 @@ export function ProtectedRoute({ children, allowedRoles, requirePlatformAdmin, r
     return <Navigate to={redirectMap[user.role] || "/"} replace />;
   }
 
-  // Gate org_admin features on organization approval status
-  if (requireApprovedOrg && user.role === "org_admin" && orgStatus && orgStatus !== "approved") {
+  // Gate org_admin features on organization approval status.
+  // Explicitly block "pending" and "rejected"; null passes through (demo / no-status backend).
+  if (requireApprovedOrg && user.role === "org_admin" && (orgStatus === "pending" || orgStatus === "rejected")) {
     return <Navigate to="/org/pending" replace />;
   }
 
