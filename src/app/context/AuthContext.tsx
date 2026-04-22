@@ -1,11 +1,9 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import type { User } from "../types";
 
-interface User {
-  id: number;
-  email: string;
-  role: "volunteer" | "supervisor" | "org_admin";
-  is_platform_admin?: boolean;
-}
+// Demo fallback is enabled only in dev builds. In production, an unreachable
+// backend must surface as a real error rather than silently logging the user in.
+const DEMO_FALLBACK_ENABLED = import.meta.env.DEV;
 
 interface AuthContextType {
   user: User | null;
@@ -93,13 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Backend unavailable — use demo fallback
     }
 
-    // Demo fallback
-    const demo = DEMO_USERS[email];
+    // Demo fallback (dev only)
+    const demo = DEMO_FALLBACK_ENABLED ? DEMO_USERS[email] : undefined;
     if (demo && demo.password === password) {
       const u: User = { id: 1, email, role: demo.role, is_platform_admin: demo.is_platform_admin };
       setUser(u);
-      setToken("demo-token");
-      setProfile({ name: demo.name });
+      setToken(`demo-${Date.now()}`);
+      setProfile({ name: demo.name, _demo: true });
       const status = demo.orgStatus || null;
       setOrgStatus(status);
       setIsLoading(false);
@@ -166,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshOrgStatus = async (): Promise<"pending" | "approved" | "rejected" | null> => {
     const currentToken = sessionStorage.getItem("altruism_token");
-    if (!currentToken || currentToken === "demo-token") return orgStatus;
+    if (!currentToken || currentToken.startsWith("demo-")) return orgStatus;
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
         headers: { Authorization: `Bearer ${currentToken}` },

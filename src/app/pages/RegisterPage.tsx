@@ -3,6 +3,9 @@ import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DatePicker } from "../components/DatePicker";
 import { Logo } from "../components/Logo";
+import { EyeIcon, EyeOffIcon, CheckIcon } from "../components/icons/PasswordIcons";
+import { StepIndicator } from "./register/StepIndicator";
+import { LegalModal, SectionHeader } from "./register/LegalModal";
 import {
   GOVERNORATES, NATIONALITIES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
   PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
@@ -25,36 +28,6 @@ type Role = "Volunteer" | "Organization";
 
 const STEP1_FIELDS = ["fullName", "email", "password", "confirmPassword"];
 const STEP2_FIELDS = ["nationalId", "dateOfBirth", "governorate", "phone", "city", "gender"];
-
-// ── SVG Icons ────────────────────────────────────────────────────────
-
-function EyeIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function EyeOffIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M2.5 7L5.5 10L11.5 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 // ── Component ─────────────────────────────────────────────────────────
 
@@ -2079,122 +2052,3 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
   );
 }
 
-// ── Step indicator ────────────────────────────────────────────────────
-
-function StepIndicator({ step, step1Valid, step2Valid }: { step: 1 | 2 | 3; step1Valid: boolean; step2Valid: boolean }) {
-  const steps = [
-    { n: 1 as const, label: "Account" },
-    { n: 2 as const, label: "Profile" },
-    { n: 3 as const, label: "Preferences & Skills" },
-  ];
-
-  const seg1Complete = step > 1 && step1Valid;
-  const seg2Complete = step > 2 && step2Valid;
-
-  return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: "flex", position: "relative", alignItems: "flex-start" }}>
-        {/* Connecting line — segment 1 (between steps 1 and 2) */}
-        <div style={{ position: "absolute", top: 17, left: "16.667%", width: "33.333%", height: 2, backgroundColor: "#E5E7EB", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: seg1Complete ? "100%" : "0%", backgroundColor: "#16A34A", borderRadius: 2, transition: "width 0.4s ease" }} />
-        </div>
-        {/* Connecting line — segment 2 (between steps 2 and 3) */}
-        <div style={{ position: "absolute", top: 17, left: "50%", width: "33.333%", height: 2, backgroundColor: "#E5E7EB", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: seg2Complete ? "100%" : "0%", backgroundColor: "#16A34A", borderRadius: 2, transition: "width 0.4s ease" }} />
-        </div>
-
-        {steps.map((s) => {
-          const done = step > s.n;
-          const active = step === s.n;
-
-          return (
-            <div key={s.n} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, position: "relative", zIndex: 1 }}>
-              {/* Circle */}
-              <div style={{
-                width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                backgroundColor: done ? "#16A34A" : "#FFFFFF",
-                color: done ? "#FFFFFF" : active ? "#16A34A" : "#9CA3AF",
-                border: done
-                  ? "2px solid #16A34A"
-                  : active
-                    ? "2px solid #16A34A"
-                    : "1.5px solid #D1D5DB",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 13, fontWeight: 700,
-                transition: "all 300ms ease",
-                boxShadow: active ? "0 0 0 4px rgba(22,163,74,0.12)" : "none",
-                boxSizing: "border-box",
-              }}>
-                {done ? <CheckIcon /> : s.n}
-              </div>
-              {/* Label */}
-              <span style={{
-                fontSize: 12, whiteSpace: "nowrap", textAlign: "center", fontWeight: 500,
-                color: active ? "#16A34A" : done ? "#374151" : "#9CA3AF",
-                transition: "color 300ms ease",
-              }}>
-                {s.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Legal Modal ───────────────────────────────────────────────────────
-
-function LegalModal({ type, onClose }: { type: "terms" | "privacy"; onClose: () => void }) {
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={type === "terms" ? "Terms of Service" : "Privacy Policy"}
-    >
-      <div
-        style={{ backgroundColor: "#FFFFFF", borderRadius: 14, padding: "32px 36px", maxWidth: 520, width: "100%", maxHeight: "80vh", overflowY: "auto", position: "relative", boxShadow: "0 24px 60px rgba(0,0,0,0.2)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button onClick={onClose} aria-label="Close"
-          style={{ position: "absolute", top: 16, right: 18, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94A3B8", lineHeight: 1 }}>
-          ×
-        </button>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1E293B", margin: "0 0 20px 0" }}>
-          {type === "terms" ? "Terms of Service" : "Privacy Policy"}
-        </h2>
-        {type === "terms" ? (
-          <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.8 }}>
-            <p style={{ marginBottom: 14 }}>By registering on Altruism, you agree to use the platform responsibly and in accordance with its purpose of facilitating community volunteerism.</p>
-            <p style={{ marginBottom: 14 }}>You agree not to misrepresent your identity, qualifications, or availability. You commit to fulfilling volunteer obligations made through the platform to the best of your ability.</p>
-            <p style={{ marginBottom: 14 }}>Altruism reserves the right to suspend or remove accounts that violate community guidelines, engage in fraudulent activity, or harm other users or organizations.</p>
-            <p>These terms may be updated periodically. Continued use of the platform constitutes acceptance of the current terms.</p>
-          </div>
-        ) : (
-          <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.8 }}>
-            <p style={{ marginBottom: 14 }}>Altruism collects personal information you provide during registration — including your name, contact details, skills, and preferences — to match you with volunteering opportunities.</p>
-            <p style={{ marginBottom: 14 }}>Your data is stored securely and is never sold to third parties. Organizations you apply to will be able to view relevant profile information to assess your suitability for their activities.</p>
-            <p style={{ marginBottom: 14 }}>Sensitive fields such as your National ID are stored encrypted and are only accessible to authorized platform administrators for identity verification purposes.</p>
-            <p>You may request the deletion of your account and all associated personal data at any time by contacting our support team.</p>
-          </div>
-        )}
-        <button onClick={onClose}
-          style={{ marginTop: 24, width: "100%", height: 42, backgroundColor: "#16A34A", color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-          I understand
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Section header ────────────────────────────────────────────────────
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 8, borderBottom: "1px solid #F1F5F9", paddingBottom: 6 }}>
-      {children}
-    </div>
-  );
-}

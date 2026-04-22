@@ -41,3 +41,7 @@ Thumbs.db
 
 # Vite
 *.local
+
+# Local SQLite database & uploaded files (per-developer)
+backend-python/data/
+backend-python/uploads/

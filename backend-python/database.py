@@ -2,7 +2,10 @@ import sqlite3
 import os
 from contextlib import contextmanager
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "models", "altruism.db")
+DB_PATH = os.getenv(
+    "ALTRUISM_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "data", "altruism.db"),
+)
 
 
 def _ensure_dir():

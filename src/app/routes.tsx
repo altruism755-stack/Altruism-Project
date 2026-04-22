@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -27,34 +27,44 @@ function ErrorPage() {
   );
 }
 
+function RootLayout() {
+  return <Outlet />;
+}
+
 export const router = createBrowserRouter([
-  { path: "/", element: <LandingPage />, errorElement: <ErrorPage /> },
-  { path: "/login", element: <LoginPage />, errorElement: <ErrorPage /> },
-  { path: "/register", element: <RegisterPage />, errorElement: <ErrorPage /> },
+  {
+    element: <RootLayout />,
+    errorElement: <ErrorPage />,
+    children: [
+      { path: "/", element: <LandingPage /> },
+      { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
 
-  // Platform admin
-  { path: "/platform-admin", element: <ProtectedRoute requirePlatformAdmin><PlatformAdminDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
+      // Platform admin
+      { path: "/platform-admin", element: <ProtectedRoute requirePlatformAdmin><PlatformAdminDashboard /></ProtectedRoute> },
 
-  // Organization admin routes — all gated on organization approval
-  { path: "/org", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><OrgDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/org/pending", element: <ProtectedRoute allowedRoles={["org_admin"]}><OrgPendingPage /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/org/volunteers", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><VolunteerManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/org/supervisors", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><SupervisorManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/org/activities", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><EventManagement /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/org/events", element: <Navigate to="/org/activities" replace /> },
-  { path: "/org/reports", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><ReportsPage /></ProtectedRoute>, errorElement: <ErrorPage /> },
+      // Organization admin routes — all gated on organization approval
+      { path: "/org", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><OrgDashboard /></ProtectedRoute> },
+      { path: "/org/pending", element: <ProtectedRoute allowedRoles={["org_admin"]}><OrgPendingPage /></ProtectedRoute> },
+      { path: "/org/volunteers", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><VolunteerManagement /></ProtectedRoute> },
+      { path: "/org/supervisors", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><SupervisorManagement /></ProtectedRoute> },
+      { path: "/org/activities", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><EventManagement /></ProtectedRoute> },
+      { path: "/org/events", element: <Navigate to="/org/activities" replace /> },
+      { path: "/org/reports", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><ReportsPage /></ProtectedRoute> },
 
-  // Supervisor routes
-  { path: "/supervisor", element: <ProtectedRoute allowedRoles={["supervisor"]}><SupervisorDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/supervisor/volunteer/:id", element: <ProtectedRoute allowedRoles={["supervisor"]}><VolunteerDetail /></ProtectedRoute>, errorElement: <ErrorPage /> },
+      // Supervisor routes
+      { path: "/supervisor", element: <ProtectedRoute allowedRoles={["supervisor"]}><SupervisorDashboard /></ProtectedRoute> },
+      { path: "/supervisor/volunteer/:id", element: <ProtectedRoute allowedRoles={["supervisor"]}><VolunteerDetail /></ProtectedRoute> },
 
-  // Volunteer routes
-  { path: "/dashboard", element: <Navigate to="/dashboard/profile" replace /> },
-  { path: "/dashboard/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><ProfilePage /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/dashboard/orgs", element: <ProtectedRoute allowedRoles={["volunteer"]}><BrowseOrganizations /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/dashboard/org/:orgId", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgDashboard /></ProtectedRoute>, errorElement: <ErrorPage /> },
-  { path: "/dashboard/feed", element: <ProtectedRoute allowedRoles={["volunteer"]}><NewsFeed /></ProtectedRoute>, errorElement: <ErrorPage /> },
+      // Volunteer routes
+      { path: "/dashboard", element: <Navigate to="/dashboard/profile" replace /> },
+      { path: "/dashboard/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><ProfilePage /></ProtectedRoute> },
+      { path: "/dashboard/orgs", element: <ProtectedRoute allowedRoles={["volunteer"]}><BrowseOrganizations /></ProtectedRoute> },
+      { path: "/dashboard/org/:orgId", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgDashboard /></ProtectedRoute> },
+      { path: "/dashboard/feed", element: <ProtectedRoute allowedRoles={["volunteer"]}><NewsFeed /></ProtectedRoute> },
 
-  // Catch-all
-  { path: "*", element: <Navigate to="/" replace /> },
+      // Catch-all
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
+  },
 ]);

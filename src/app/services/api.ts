@@ -1,3 +1,5 @@
+import { ApiError } from "../types";
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
 function getToken(): string | null {
@@ -10,7 +12,8 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token && token !== "demo-token") {
+  // Demo tokens (dev-only fallback) are not real JWTs — skip Authorization.
+  if (token && !token.startsWith("demo-")) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
@@ -18,7 +21,8 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed: ${res.status}`);
+    const message = body.error || body.message || `Request failed: ${res.status}`;
+    throw new ApiError(message, res.status, body);
   }
 
   if (res.headers.get("content-type")?.includes("text/csv")) {

@@ -22,11 +22,15 @@ from routes.admin import router as admin_router
 
 app = FastAPI(title="Altruism API", redirect_slashes=False)
 
-# CORS
-cors_origin = os.getenv("CORS_ORIGIN", "http://localhost:5173")
+# CORS — comma-separated list of allowed origins
+cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[cors_origin],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,27 +87,40 @@ def startup():
 
 
 def _seed_platform_admin():
-    """Ensure the default platform admin account exists at startup."""
+    """Ensure the default platform admin account exists at startup.
+
+    DEV-ONLY SEED: password is read from PLATFORM_ADMIN_PASSWORD env var.
+    If unset, seeding is skipped — never ship a hardcoded default to production.
+    """
     from database import get_connection
     from auth import hash_password
+
+    admin_email = os.getenv("PLATFORM_ADMIN_EMAIL", "platform@altruism.org")
+    admin_password = os.getenv("PLATFORM_ADMIN_PASSWORD")
+    if not admin_password:
+        print(
+            "[seed] PLATFORM_ADMIN_PASSWORD not set — skipping platform admin seed.",
+            file=sys.stderr,
+        )
+        return
 
     conn = get_connection()
     try:
         existing = conn.execute(
-            "SELECT id FROM users WHERE email = ?", ("platform@altruism.org",)
+            "SELECT id FROM users WHERE email = ?", (admin_email,)
         ).fetchone()
         if not existing:
-            hashed = hash_password("platform")
+            hashed = hash_password(admin_password)
             cur = conn.execute(
                 "INSERT INTO users (email, password, role) VALUES (?, ?, 'volunteer')",
-                ("platform@altruism.org", hashed),
+                (admin_email, hashed),
             )
             user_id = cur.lastrowid
             conn.execute(
                 "INSERT OR IGNORE INTO platform_admins (user_id) VALUES (?)", (user_id,)
             )
             conn.commit()
-            print("[seed] Created platform admin: platform@altruism.org / platform")
+            print(f"[seed] Created platform admin: {admin_email}")
         else:
             # Ensure the user is in platform_admins even if seeded before
             conn.execute(
