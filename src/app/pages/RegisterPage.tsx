@@ -6,7 +6,7 @@ import { Logo } from "../components/Logo";
 import {
   GOVERNORATES, NATIONALITIES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
   PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
-  DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
+  DEPARTMENT_GROUPS, CAUSE_GROUPS,
   MAX_SKILLS, MAX_CAUSES,
   validateFullName, validateEmail, validatePassword,
   validateNationalIdOrPassport, validateDob, validatePhone, validateOrgPhone, validateCity,
@@ -81,7 +81,6 @@ export function RegisterPage() {
   const [volCustomSkill, setVolCustomSkill] = useState("");
   const [availability, setAvailability] = useState<string[]>([]);
   const [rankedCauses, setRankedCauses] = useState<string[]>([]);
-  const [customCauseInput, setCustomCauseInput] = useState("");
   const [languages, setLanguages] = useState<{ language: string; proficiency: string }[]>([]);
   const [priorHasExperience, setPriorHasExperience] = useState<boolean | null>(null);
   const [experiences, setExperiences] = useState<ExperienceEntry[]>([]);
@@ -90,8 +89,6 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  const dragCauseIdx = useRef<number | null>(null);
 
   // ── Organization form ──
   const [orgForm, setOrgForm] = useState({
@@ -266,31 +263,14 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
     touch("availability");
   };
 
-  const addCause = (cause: string) => {
-    if (rankedCauses.includes(cause) || rankedCauses.length >= MAX_CAUSES) return;
-    setRankedCauses((prev) => [...prev, cause]);
-  };
-
-  const removeCause = (idx: number) => {
-    setRankedCauses((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const addCustomCause = () => {
-    const text = customCauseInput.trim();
-    if (!text || text.length < 2 || rankedCauses.length >= MAX_CAUSES) return;
-    if (rankedCauses.some((c) => c.toLowerCase() === text.toLowerCase())) return;
-    setRankedCauses((prev) => [...prev, text]);
-    setCustomCauseInput("");
-  };
-
-  const moveCause = (from: number, to: number) => {
-    if (to < 0 || to >= rankedCauses.length) return;
-    setRankedCauses((prev) => {
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
+  const toggleCause = (cause: string) => {
+    const idx = rankedCauses.indexOf(cause);
+    if (idx !== -1) {
+      setRankedCauses((prev) => prev.filter((_, i) => i !== idx));
+    } else {
+      if (rankedCauses.length >= MAX_CAUSES) return;
+      setRankedCauses((prev) => [...prev, cause]);
+    }
   };
 
   const addLanguage = () => {
@@ -1385,138 +1365,73 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       )}
                     </div>
 
-                    {/* Cause Areas — ranked preference */}
+                    {/* Cause Areas — Tap-to-Rank */}
                     <div>
                       <label style={labelStyle}>
                         Cause Areas / Interests{" "}
                         <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span>
                       </label>
-                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 14px 0" }}>
-                        Rank the causes based on your interest (most preferred first) — up to {MAX_CAUSES}
+                      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 2px 0" }}>
+                        Tap causes in order of preference — your top choice first (up to 5)
+                      </p>
+                      <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>
+                        You can update your interests later from your profile
+                      </p>
+                      <p style={{ fontSize: 12, margin: "0 0 10px 0", color: rankedCauses.length >= MAX_CAUSES ? "#F59E0B" : "#94A3B8" }}>
+                        {rankedCauses.length} of {MAX_CAUSES} selected{rankedCauses.length >= MAX_CAUSES ? " — you can select up to 5" : ""}
                       </p>
 
-                      {/* ── Ranked priority list ── */}
-                      {rankedCauses.length > 0 && (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                            Your Priorities ({rankedCauses.length}/{MAX_CAUSES}) — drag to reorder
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {rankedCauses.map((cause, idx) => {
-                              const isCustom = !ALL_PREDEFINED_CAUSES.has(cause);
-                              const accent = isCustom ? BLUE : GREEN;
-                              const bg = isCustom ? "#EFF6FF" : "#F0FDF4";
-                              const handleColor = isCustom ? "#93C5FD" : "#86EFAC";
-                              const textColor = isCustom ? "#1D4ED8" : "#15803D";
-                              const btnBorder = isCustom ? "#BFDBFE" : "#BBF7D0";
-                              return (
-                              <div
-                                key={cause}
-                                draggable
-                                onDragStart={() => { dragCauseIdx.current = idx; }}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  if (dragCauseIdx.current !== null && dragCauseIdx.current !== idx) {
-                                    moveCause(dragCauseIdx.current, idx);
-                                  }
-                                  dragCauseIdx.current = null;
-                                }}
-                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${accent}`, backgroundColor: bg, cursor: "grab", userSelect: "none" }}
-                              >
-                                {/* Rank badge */}
-                                <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: accent, color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                  {idx + 1}
-                                </div>
-                                {/* Drag handle */}
-                                <span style={{ color: handleColor, fontSize: 15, lineHeight: 1, flexShrink: 0 }} aria-hidden>⠿</span>
-                                {/* Cause name */}
-                                <span style={{ flex: 1, fontSize: 13, color: textColor, fontWeight: 500, fontStyle: isCustom ? "italic" : "normal" }}>{cause}{isCustom && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: BLUE, fontStyle: "normal", opacity: 0.7 }}>custom</span>}</span>
-                                {/* Up / Down */}
-                                <button type="button" onClick={() => moveCause(idx, idx - 1)} disabled={idx === 0}
-                                  aria-label={`Move ${cause} up`}
-                                  style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === 0 ? "#D1FAE5" : "#16A34A", cursor: idx === 0 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms" }}>
-                                  ↑
-                                </button>
-                                <button type="button" onClick={() => moveCause(idx, idx + 1)} disabled={idx === rankedCauses.length - 1}
-                                  aria-label={`Move ${cause} down`}
-                                  style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === rankedCauses.length - 1 ? "#D1FAE5" : "#16A34A", cursor: idx === rankedCauses.length - 1 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms" }}>
-                                  ↓
-                                </button>
-                                {/* Remove */}
-                                <button type="button" onClick={() => removeCause(idx)}
-                                  aria-label={`Remove ${cause}`}
-                                  style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms" }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = RED; e.currentTarget.style.color = RED; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#BBF7D0"; e.currentTarget.style.color = "#94A3B8"; }}>
-                                  ×
-                                </button>
-                              </div>
-                            );
-                            })}
-                          </div>
-
-                        </div>
-                      )}
-
-                      {/* ── Available cause pool ── */}
-                      {rankedCauses.length < MAX_CAUSES ? (
-                        <div style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", backgroundColor: "#FAFAFA" }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-                            {rankedCauses.length === 0 ? "Select causes to rank" : "Add more"}
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            {CAUSE_GROUPS.map((group) => {
-                              const available = group.causes.filter((c) => !rankedCauses.includes(c));
-                              if (available.length === 0) return null;
-                              return (
-                                <div key={group.label}>
-                                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, marginBottom: 6 }}>{group.label}</div>
-                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                    {available.map((cause) => (
-                                      <button key={cause} type="button" onClick={() => addCause(cause)}
-                                        style={{ height: 30, padding: "0 12px", borderRadius: 20, border: "1.5px solid #E2E8F0", backgroundColor: "#fff", color: "#374151", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 150ms", display: "flex", alignItems: "center", gap: 4 }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = GREEN; e.currentTarget.style.color = GREEN; e.currentTarget.style.backgroundColor = "#F0FDF4"; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#374151"; e.currentTarget.style.backgroundColor = "#fff"; }}>
-                                        <span style={{ fontSize: 11, opacity: 0.6 }}>+</span> {cause}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Custom interest input */}
-                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                              Add Custom Interest
-                            </div>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <input
-                                value={customCauseInput}
-                                onChange={(e) => setCustomCauseInput(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomCause(); } }}
-                                placeholder="e.g. Street Arts, Sports for Youth…"
-                                maxLength={60}
-                                style={{ flex: 1, height: 36, padding: "0 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#1E293B", outline: "none", backgroundColor: "#fff" }}
-                              />
-                              <button
-                                type="button"
-                                onClick={addCustomCause}
-                                disabled={customCauseInput.trim().length < 2}
-                                style={{ height: 36, padding: "0 14px", borderRadius: 8, border: `1.5px solid ${customCauseInput.trim().length >= 2 ? GREEN : "#E2E8F0"}`, backgroundColor: customCauseInput.trim().length >= 2 ? "#F0FDF4" : "#F8FAFC", color: customCauseInput.trim().length >= 2 ? GREEN : "#CBD5E1", fontSize: 13, fontWeight: 600, cursor: customCauseInput.trim().length >= 2 ? "pointer" : "default", transition: "all 150ms", flexShrink: 0 }}
-                              >
-                                + Add
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ padding: "10px 14px", borderRadius: 9, backgroundColor: "#F0FDF4", border: "1.5px solid #BBF7D0", fontSize: 12, color: "#15803D", textAlign: "center" }}>
-                          Maximum {MAX_CAUSES} causes selected — remove one to add another
-                        </div>
-                      )}
+                      {/* 7 selectable cause pills */}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {CAUSE_GROUPS.map(({ label }) => {
+                          const rank = rankedCauses.indexOf(label);
+                          const isSelected = rank !== -1;
+                          const isDisabled = !isSelected && rankedCauses.length >= MAX_CAUSES;
+                          return (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => toggleCause(label)}
+                              style={{
+                                height: 34,
+                                padding: "0 14px",
+                                borderRadius: 20,
+                                border: `1.5px solid ${isSelected ? GREEN : "#D1D5DB"}`,
+                                backgroundColor: isSelected ? "#DCFCE7" : "#FFFFFF",
+                                color: isSelected ? "#15803D" : "#4B5563",
+                                fontSize: 13,
+                                fontWeight: isSelected ? 600 : 400,
+                                cursor: isDisabled ? "not-allowed" : "pointer",
+                                transition: "all 150ms",
+                                opacity: isDisabled ? 0.45 : 1,
+                                userSelect: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              {isSelected && (
+                                <span style={{
+                                  width: 18, height: 18, borderRadius: "50%",
+                                  backgroundColor: GREEN,
+                                  color: "#fff",
+                                  fontSize: 10, fontWeight: 700,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  flexShrink: 0,
+                                }}>
+                                  {rank + 1}
+                                </span>
+                              )}
+                              {isSelected && (
+                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                                  <path d="M2 6L5 9L10 3" stroke="#15803D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Terms & Privacy consent */}

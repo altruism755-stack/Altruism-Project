@@ -20,7 +20,7 @@ import {
 
 const GREEN = "#16A34A";
 const RED = "#DC2626";
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
 function EyeIcon() {
   return (
