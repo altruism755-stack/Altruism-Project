@@ -14,6 +14,9 @@ import {
   validateFullName, validateEmail, validatePassword,
   validateNationalIdOrPassport, validateDob, validatePhone, validateOrgPhone, validateCity,
   validateSubmitterName, validateSubmitterRole, validateOrgCity,
+  validateEducationLevel, validateUniversityName, validateFaculty,
+  validateStudyYear, validateFieldOfStudy, validateEducationOther,
+  MAX_EDUCATION_OTHER,
   type ExperienceEntry,
   type VolunteerEditableState,
   buildVolunteerRegisterPayload,
@@ -103,17 +106,12 @@ export function RegisterPage() {
         ? "Custom skill must be at least 2 characters."
         : "",
     availability:    "",
-    educationLevel:  volForm.educationLevel ? "" : "Please select your education level.",
-    universityName:  volForm.educationLevel === "University Student" && !volForm.universityName.trim()
-      ? "Please enter your university name." : "",
-    faculty:         volForm.educationLevel === "University Student" && !volForm.faculty.trim()
-      ? "Please enter your faculty or major." : "",
-    studyYear:       volForm.educationLevel === "University Student" && !volForm.studyYear
-      ? "Please select your academic year." : "",
-    fieldOfStudy:    (volForm.educationLevel === "University Graduate" || volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)") && !volForm.fieldOfStudy.trim()
-      ? "Please enter your field of study." : "",
-    educationOther:  volForm.educationLevel === "Other" && !volForm.educationOther.trim()
-      ? "Please describe your education background." : "",
+    educationLevel:  validateEducationLevel(volForm.educationLevel),
+    universityName:  validateUniversityName(volForm.universityName, volForm.educationLevel),
+    faculty:         validateFaculty(volForm.faculty, volForm.educationLevel),
+    studyYear:       validateStudyYear(volForm.studyYear, volForm.educationLevel),
+    fieldOfStudy:    validateFieldOfStudy(volForm.fieldOfStudy, volForm.educationLevel),
+    educationOther:  validateEducationOther(volForm.educationOther, volForm.educationLevel),
     languages:       languages.length === 0 ? "" :
       languages.some((l) => !l.language.trim())
         ? "All language fields must be filled in."
@@ -376,7 +374,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
       else setTouched((t) => ({ ...t, fullName: true, email: true, password: true, confirmPassword: true }));
     } else if (step === 2) {
       if (step2Valid) { setStep(3); scrollTop(); }
-      else setTouched((t) => ({ ...t, nationalId: true, dateOfBirth: true, governorate: true, phone: true, city: true, gender: true, educationLevel: true, universityName: true, faculty: true, studyYear: true, fieldOfStudy: true, educationOther: true }));
+      else setTouched((t) => ({ ...t, nationalId: true, dateOfBirth: true, governorate: true, phone: true, city: true, gender: true, educationLevel: true, universityName: true, educationOther: true }));
     }
   };
 
@@ -837,7 +835,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                           </div>
                           <div>
                             <label htmlFor="faculty" style={{ ...labelStyle, fontSize: 12 }}>
-                              Faculty / Major <span style={{ color: RED }}>*</span>
+                              Faculty / Field <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
                             </label>
                             <input id="faculty"
                               value={volForm.faculty}
@@ -847,11 +845,10 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                               placeholder="e.g. Computer Science, Medicine, Law…"
                               style={fieldStyle("faculty", 40)}
                             />
-                            <Err field="faculty" />
                           </div>
                           <div>
                             <label htmlFor="studyYear" style={{ ...labelStyle, fontSize: 12 }}>
-                              Academic Year <span style={{ color: RED }}>*</span>
+                              Academic Year <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
                             </label>
                             <select id="studyYear"
                               value={volForm.studyYear}
@@ -863,26 +860,28 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                               <option value="">Select academic year…</option>
                               {STUDY_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                             </select>
-                            <Err field="studyYear" />
                           </div>
                         </div>
                       )}
 
-                      {/* University Graduate / Postgraduate — Field of Study */}
+                      {/* University Graduate / Postgraduate — Field of Study (unified faculty field) */}
                       {(volForm.educationLevel === "University Graduate" || volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
                         <div style={{ marginTop: 12, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1.5px solid #E2E8F0" }}>
-                          <label htmlFor="fieldOfStudy" style={{ ...labelStyle, fontSize: 12 }}>
-                            Field of Study <span style={{ color: RED }}>*</span>
+                          <label htmlFor="faculty" style={{ ...labelStyle, fontSize: 12 }}>
+                            Field of Study <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
                           </label>
-                          <input id="fieldOfStudy"
-                            value={volForm.fieldOfStudy}
-                            onChange={(e) => setVolForm((f) => ({ ...f, fieldOfStudy: e.target.value }))}
-                            onFocus={() => onFocus("fieldOfStudy")}
-                            onBlur={() => onBlur("fieldOfStudy")}
-                            placeholder="e.g. Engineering, Pharmacy, Business…"
-                            style={fieldStyle("fieldOfStudy", 40)}
+                          <input id="faculty"
+                            value={volForm.faculty}
+                            onChange={(e) => setVolForm((f) => ({ ...f, faculty: e.target.value }))}
+                            onFocus={() => onFocus("faculty")}
+                            onBlur={() => onBlur("faculty")}
+                            placeholder={
+                              volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)"
+                                ? "e.g. Biomedical Engineering (MSc), Public Health (Diploma)…"
+                                : "e.g. Engineering, Pharmacy, Business…"
+                            }
+                            style={fieldStyle("faculty", 40)}
                           />
-                          <Err field="fieldOfStudy" />
                         </div>
                       )}
 
@@ -890,11 +889,14 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       {volForm.educationLevel === "Other" && (
                         <div style={{ marginTop: 12, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1.5px solid #E2E8F0" }}>
                           <label htmlFor="educationOther" style={{ ...labelStyle, fontSize: 12 }}>
-                            Please specify <span style={{ color: RED }}>*</span>
+                            Describe your education background <span style={{ color: RED }}>*</span>
                           </label>
+                          <p style={{ fontSize: 11, color: "#64748B", margin: "0 0 5px 0" }}>
+                            e.g., Technical Institute, Vocational Training, Military Academy…
+                          </p>
                           <input id="educationOther"
                             value={volForm.educationOther}
-                            onChange={(e) => setVolForm((f) => ({ ...f, educationOther: e.target.value.slice(0, 100) }))}
+                            onChange={(e) => setVolForm((f) => ({ ...f, educationOther: e.target.value.slice(0, MAX_EDUCATION_OTHER) }))}
                             onFocus={() => onFocus("educationOther")}
                             onBlur={() => onBlur("educationOther")}
                             placeholder="Describe your education background…"
@@ -902,7 +904,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                           />
                           <Err field="educationOther" />
                           <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>
-                            {volForm.educationOther.length}/100
+                            {volForm.educationOther.length}/{MAX_EDUCATION_OTHER}
                           </div>
                         </div>
                       )}

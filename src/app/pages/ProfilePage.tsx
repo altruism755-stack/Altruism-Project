@@ -7,7 +7,7 @@ import { OrgLogo } from "../components/OrgLogos";
 import { EyeIcon, EyeOffIcon } from "../components/icons/PasswordIcons";
 import { CalendarWidget } from "./profile/CalendarWidget";
 import {
-  GOVERNORATES, NATIONALITIES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
+  GOVERNORATES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
   PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
   DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
   MAX_SKILLS, MAX_CAUSES, MAX_HEALTH_NOTES, MAX_EXP_DESCRIPTION,
@@ -155,9 +155,9 @@ export function ProfilePage() {
         educationLevel: resolvedEduLevel,
         educationOther: resolvedEduOther,
         universityName: volRes.university_name || "",
-        faculty: volRes.faculty || "",
+        faculty: volRes.faculty || volRes.field_of_study || "",
         studyYear: volRes.study_year || "",
-        fieldOfStudy: volRes.field_of_study || "",
+        fieldOfStudy: "",
         priorExperience: volRes.prior_experience === 1 ? true : volRes.prior_experience === 0 ? false : null,
         priorOrg: volRes.prior_org || "",
         hoursPerWeek: volRes.hours_per_week ?? null,
@@ -610,31 +610,30 @@ export function ProfilePage() {
                         <Err field="universityName" />
                       </div>
                       <div data-field="faculty">
-                        <label style={labelStyle}>Faculty / Major</label>
-                        <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} onBlur={() => markTouched("faculty")} style={{ ...inputStyle, border: getBorderStyle("faculty") }} placeholder="e.g. Computer Science" />
-                        <Err field="faculty" />
+                        <label style={labelStyle}>Faculty / Field <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                        <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} onBlur={() => markTouched("faculty")} style={{ ...inputStyle, border: getBorderStyle("faculty") }} placeholder="e.g. Computer Science, Medicine, Law…" />
                       </div>
                       <div data-field="studyYear">
-                        <label style={labelStyle}>Academic Year</label>
+                        <label style={labelStyle}>Academic Year <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                         <select value={form.studyYear} onChange={(e) => setForm((f) => ({ ...f, studyYear: e.target.value }))} onBlur={() => markTouched("studyYear")} style={{ ...inputStyle, border: getBorderStyle("studyYear") }}>
                           <option value="">Select year...</option>
                           {STUDY_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                         </select>
-                        <Err field="studyYear" />
                       </div>
                     </div>
                   )}
                   {(form.educationLevel === "University Graduate" || form.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
-                    <div data-field="fieldOfStudy" style={{ marginTop: 10 }}>
-                      <label style={labelStyle}>Field of Study</label>
-                      <input value={form.fieldOfStudy} onChange={(e) => setForm((f) => ({ ...f, fieldOfStudy: e.target.value }))} onBlur={() => markTouched("fieldOfStudy")} style={{ ...inputStyle, border: getBorderStyle("fieldOfStudy") }} placeholder="e.g. Engineering, Medicine..." />
-                      <Err field="fieldOfStudy" />
+                    <div data-field="faculty" style={{ marginTop: 10 }}>
+                      <label style={labelStyle}>Field of Study <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                      <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} onBlur={() => markTouched("faculty")} style={{ ...inputStyle, border: getBorderStyle("faculty") }}
+                        placeholder={form.educationLevel === "Postgraduate (Diploma / Master / PhD)" ? "e.g. Biomedical Engineering (MSc), Public Health (Diploma)…" : "e.g. Engineering, Pharmacy, Business…"} />
                     </div>
                   )}
                   {form.educationLevel === "Other" && (
                     <div data-field="educationOther" style={{ marginTop: 10 }}>
-                      <label style={labelStyle}>Please describe your education background</label>
-                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value }))} onBlur={() => markTouched("educationOther")} style={{ ...inputStyle, border: getBorderStyle("educationOther") }} placeholder="e.g. Self-taught, Vocational Training..." />
+                      <label style={labelStyle}>Describe your education background</label>
+                      <p style={{ fontSize: 11, color: "#64748B", margin: "0 0 4px 0" }}>e.g., Technical Institute, Vocational Training, Military Academy…</p>
+                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value }))} onBlur={() => markTouched("educationOther")} style={{ ...inputStyle, border: getBorderStyle("educationOther") }} placeholder="Describe your education background…" />
                       <Err field="educationOther" />
                     </div>
                   )}
@@ -1053,9 +1052,8 @@ export function ProfilePage() {
                     { label: "Gender",              value: volunteer?.gender || "\u2014" },
                     { label: "Education",           value: volunteer?.education_level || "\u2014" },
                     ...(volunteer?.university_name ? [{ label: "University",      value: volunteer.university_name }] : []),
-                    ...(volunteer?.faculty         ? [{ label: "Faculty / Major", value: volunteer.faculty }] : []),
+                    ...(volunteer?.faculty || volunteer?.field_of_study ? [{ label: "Faculty / Field", value: volunteer.faculty || volunteer.field_of_study }] : []),
                     ...(volunteer?.study_year      ? [{ label: "Academic Year",   value: volunteer.study_year }] : []),
-                    ...(volunteer?.field_of_study  ? [{ label: "Field of Study",  value: volunteer.field_of_study }] : []),
                     ...(volunteer?.department      ? [{ label: "Preferred Department", value: volunteer.department }] : []),
                     { label: "Hrs / Week",          value: volunteer?.hours_per_week ? `${volunteer.hours_per_week} hrs` : "\u2014" },
                   ].map((item) => (

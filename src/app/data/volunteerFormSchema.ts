@@ -82,7 +82,7 @@ export const EDUCATION_LEVELS = [
   "Other",
 ];
 
-export const STUDY_YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year+"];
+export const STUDY_YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year", "6th Year+"];
 
 export const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
   { label: "Communications & Outreach", options: ["PR", "Media", "Content Creation"] },
@@ -173,7 +173,7 @@ export function validateFullName(v: string): string {
 
 export function validateSubmitterName(v: string): string {
   if (!v.trim()) return "Submitter name is required.";
-  if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(v.trim()))
+  if (!/^[\u0600-\u06FF0-9a-zA-Z\s]+$/.test(v.trim()))
     return "Name must contain letters only — no numbers or special characters.";
   if (v.trim().split(/\s+/).length < 2)
     return "Please enter your first and last name.";
@@ -193,8 +193,8 @@ export function validateOrgCity(v: string): string {
   if (!v.trim()) return "City or district is required.";
   if (v.trim().length < 2) return "City must be at least 2 characters.";
   if (v.trim().length > 60) return "City must be no more than 60 characters.";
-  if (!/^[\u0600-\u06FFa-zA-Z\s\-\.]+$/.test(v.trim()))
-    return "City must contain letters only — no numbers or special characters.";
+  if (!/^[\u0600-\u06FF0-9a-zA-Z\s\-\.]+$/.test(v.trim()))
+    return "City or district contains invalid characters.";
   return "";
 }
 
@@ -280,8 +280,8 @@ export function validateOrgPhone(v: string): string {
 
 export function validateCity(v: string): string {
   if (!v.trim()) return "City is required.";
-  if (!/^[\u0600-\u06FFa-zA-Z\s]+$/.test(v.trim()))
-    return "City name must contain letters only — no numbers or special characters.";
+  if (!/^[\u0600-\u06FF0-9a-zA-Z\s]+$/.test(v.trim()))
+    return "City name contains invalid characters.";
   return "";
 }
 
@@ -302,19 +302,16 @@ export function validateUniversityName(v: string, level: string): string {
     ? "Please enter your university name." : "";
 }
 
-export function validateFaculty(v: string, level: string): string {
-  return level === "University Student" && !v.trim()
-    ? "Please enter your faculty or major." : "";
+export function validateFaculty(_v: string, _level: string): string {
+  return "";
 }
 
-export function validateStudyYear(v: string, level: string): string {
-  return level === "University Student" && !v
-    ? "Please select your academic year." : "";
+export function validateStudyYear(_v: string, _level: string): string {
+  return "";
 }
 
-export function validateFieldOfStudy(v: string, level: string): string {
-  return (level === "University Graduate" || level === "Postgraduate (Diploma / Master / PhD)") && !v.trim()
-    ? "Please enter your field of study." : "";
+export function validateFieldOfStudy(_v: string, _level: string): string {
+  return "";
 }
 
 export function validateEducationOther(v: string, level: string): string {
@@ -427,7 +424,7 @@ export function buildVolunteerPayload(s: VolunteerEditableState) {
     university_name: s.universityName,
     faculty: s.faculty,
     study_year: s.studyYear,
-    field_of_study: s.fieldOfStudy,
+    field_of_study: s.faculty,
     department: s.department,
     hours_per_week: s.hoursPerWeek,
     skills,
@@ -477,7 +474,7 @@ export function buildVolunteerRegisterPayload(
     universityName: s.universityName,
     faculty: s.faculty,
     studyYear: s.studyYear,
-    fieldOfStudy: s.fieldOfStudy,
+    fieldOfStudy: s.faculty,
     department: s.department,
     priorExperience: s.priorHasExperience === true,
     priorOrg: s.priorHasExperience === true
