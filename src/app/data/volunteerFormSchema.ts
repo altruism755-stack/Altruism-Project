@@ -90,17 +90,15 @@ export const DEPARTMENT_GROUPS: { label: string; options: string[] }[] = [
   { label: "Other", options: ["Emergencies", "General"] },
 ];
 
-export const CAUSE_GROUPS: { label: string; causes: string[] }[] = [
-  { label: "Social & Humanitarian",  causes: ["Poverty Alleviation", "Food & Clothing Distribution", "Refugee & Migrant Support", "Disability Support", "Elderly Care", "Child Protection & Orphan Care", "Women Empowerment"] },
-  { label: "Children & Youth",       causes: ["Youth Development", "Street Children Outreach", "Child Education Support", "After-School Programs"] },
-  { label: "Education & Skills",     causes: ["Education & Tutoring", "Literacy Programs", "Career Mentorship", "Youth Entrepreneurship", "Awareness Campaigns"] },
-  { label: "Health & Emergency",     causes: ["Healthcare Access", "Blood Donation", "Emergency & Disaster Relief", "Mental Health Support", "First Aid & Safety"] },
-  { label: "Environment",            causes: ["Environmental Cleanup", "Climate Action", "Animal Welfare", "Sustainability"] },
-  { label: "Community & Events",     causes: ["Community Engagement", "Event Planning & Coordination", "Fundraising", "Arts & Culture", "Sports & Recreation", "Ramadan & Seasonal Programs"] },
-  { label: "Professional & General", causes: ["Administrative Support", "Media & Content Creation", "Translation & Interpretation", "General Volunteering"] },
+export const CAUSE_GROUPS: string[] = [
+  "Social & Humanitarian",
+  "Children & Youth",
+  "Education & Skills",
+  "Health & Emergency",
+  "Environment",
+  "Community & Events",
+  "Professional & General",
 ];
-
-export const ALL_PREDEFINED_CAUSES = new Set(CAUSE_GROUPS.flatMap((g) => g.causes));
 
 export const MAX_SKILLS = 5;
 export const MAX_CAUSES = 5;
@@ -488,8 +486,8 @@ export function buildVolunteerRegisterPayload(
       description: e.description.trim(),
     })) : [],
     causeAreas: s.causeAreas,
-    terms_accepted: true,
-    terms_accepted_at: new Date().toISOString(),
+    termsAccepted: true,
+    termsAcceptedAt: new Date().toISOString(),
   };
 }
 

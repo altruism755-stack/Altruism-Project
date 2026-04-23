@@ -9,8 +9,9 @@ import { CalendarWidget } from "./profile/CalendarWidget";
 import {
   GOVERNORATES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
   PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
-  DEPARTMENT_GROUPS, CAUSE_GROUPS, ALL_PREDEFINED_CAUSES,
-  MAX_SKILLS, MAX_CAUSES, MAX_HEALTH_NOTES, MAX_EXP_DESCRIPTION,
+  DEPARTMENT_GROUPS, CAUSE_GROUPS,
+  MAX_SKILLS, MAX_CAUSES, MAX_HEALTH_NOTES, MAX_EDUCATION_OTHER,
+  MAX_EXP_DESCRIPTION, MAX_LANGUAGE,
   MIN_HOURS, MAX_HOURS,
   type ExperienceEntry, type VolunteerEditableState, type VolunteerErrors,
   buildVolunteerPayload, buildVolunteerRegisterPayload,
@@ -42,7 +43,6 @@ export function ProfilePage() {
   const { profile } = useAuth();
   const volName = profile?.name || "Volunteer";
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dragCauseIdx = useRef<number | null>(null);
 
   const [volunteer, setVolunteer] = useState<any>(null);
   const [myOrgs, setMyOrgs] = useState<any[]>([]);
@@ -78,7 +78,6 @@ export function ProfilePage() {
   const [formLanguages, setFormLanguages] = useState<{ language: string; proficiency: string }[]>([]);
   const [formCauseAreas, setFormCauseAreas] = useState<string[]>([]);
   const [formExperiences, setFormExperiences] = useState<{ orgName: string; department: string; role: string; duration: string; description: string }[]>([]);
-  const [customCauseInput, setCustomCauseInput] = useState("");
   const [formNewLang, setFormNewLang] = useState("");
   const [formNewLangProf, setFormNewLangProf] = useState("Conversational");
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -533,10 +532,6 @@ export function ProfilePage() {
                       <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.name}</div>
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: "#94A3B8" }}>Email</label>
-                      <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.email}</div>
-                    </div>
-                    <div>
                       <label style={{ ...labelStyle, color: "#94A3B8" }}>Nationality</label>
                       <div style={{ ...inputStyle, display: "flex", alignItems: "center", backgroundColor: "#F1F5F9", color: "#64748B", cursor: "not-allowed" }}>{volunteer?.nationality || "—"}</div>
                     </div>
@@ -551,9 +546,16 @@ export function ProfilePage() {
                   </div>
                 </div>
 
+                {/* Email — editable */}
+                <div data-field="email" style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>Email <span style={{ color: "#DC2626" }}>*</span></label>
+                  <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} onBlur={() => markTouched("email")} style={{ ...inputStyle, border: getBorderStyle("email") }} />
+                  <Err field="email" />
+                </div>
+
                 {/* Step 2 — Personal details */}
                 <div data-field="phone" style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>Phone Number</label>
+                  <label style={labelStyle}>Phone Number <span style={{ color: "#DC2626" }}>*</span></label>
                   <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} onBlur={() => markTouched("phone")} style={{ ...inputStyle, border: getBorderStyle("phone") }} />
                   <Err field="phone" />
                 </div>
@@ -596,7 +598,7 @@ export function ProfilePage() {
 
                 {/* Education Level */}
                 <div data-field="educationLevel" style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>Education Level</label>
+                  <label style={labelStyle}>Education Level <span style={{ color: "#DC2626" }}>*</span></label>
                   <select value={form.educationLevel} onBlur={() => markTouched("educationLevel")} onChange={(e) => setForm((f) => ({ ...f, educationLevel: e.target.value, educationOther: "", universityName: "", faculty: "", studyYear: "", fieldOfStudy: "" }))} style={{ ...inputStyle, border: getBorderStyle("educationLevel") }}>
                     <option value="">Select education level...</option>
                     {EDUCATION_LEVELS.map((l) => (
@@ -635,8 +637,9 @@ export function ProfilePage() {
                     <div data-field="educationOther" style={{ marginTop: 10 }}>
                       <label style={labelStyle}>Describe your education background</label>
                       <p style={{ fontSize: 11, color: "#64748B", margin: "0 0 4px 0" }}>e.g., Technical Institute, Vocational Training, Military Academy…</p>
-                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value }))} onBlur={() => markTouched("educationOther")} style={{ ...inputStyle, border: getBorderStyle("educationOther") }} placeholder="Describe your education background…" />
+                      <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value.slice(0, MAX_EDUCATION_OTHER) }))} onBlur={() => markTouched("educationOther")} style={{ ...inputStyle, border: getBorderStyle("educationOther") }} placeholder="Describe your education background…" />
                       <Err field="educationOther" />
+                      <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right", marginTop: 2 }}>{form.educationOther.length}/{MAX_EDUCATION_OTHER}</div>
                     </div>
                   )}
                 </div>
@@ -656,7 +659,13 @@ export function ProfilePage() {
 
                 {/* Skills */}
                 <div data-field="skills" style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>Skills</label>
+                  <label style={labelStyle}>Skills <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: "#64748B" }}>Select up to {MAX_SKILLS}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: formSkills.length === 0 ? "#94A3B8" : formSkills.length >= MAX_SKILLS ? GREEN : "#1E293B" }}>
+                      {formSkills.length} / {MAX_SKILLS}
+                    </span>
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px", marginTop: 4 }}>
                     {SKILLS_LIST.map((skill) => (
                       <label key={skill} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#1E293B", padding: "7px 10px", borderRadius: 7, border: `1.5px solid ${formSkills.includes(skill) ? GREEN : "#E2E8F0"}`, backgroundColor: formSkills.includes(skill) ? "#F0FDF4" : "#FAFAFA", transition: "all 150ms", userSelect: "none" as const }}>
@@ -675,7 +684,7 @@ export function ProfilePage() {
                       value={formCustomSkill}
                       onChange={(e) => setFormCustomSkill(e.target.value)}
                       onBlur={() => markTouched("skills")}
-                      placeholder="Describe your skill(s), comma-separated..."
+                      placeholder="e.g. Sign Language…"
                       style={{ ...inputStyle, marginTop: 8, border: getBorderStyle("skills") }}
                     />
                   )}
@@ -769,7 +778,8 @@ export function ProfilePage() {
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <input value={formNewLang} onChange={(e) => setFormNewLang(e.target.value)}
-                      placeholder="Add a language..." style={{ flex: 1, height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                      placeholder="Add a language..." maxLength={MAX_LANGUAGE}
+                      style={{ flex: 1, height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                     <select value={formNewLangProf} onChange={(e) => setFormNewLangProf(e.target.value)}
                       style={{ height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 8px", fontSize: 13, outline: "none", backgroundColor: "#FFFFFF" }}>
                       {PROFICIENCY_LEVELS.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -873,108 +883,67 @@ export function ProfilePage() {
                   <Err field="priorExperiences" />
                 </div>
 
-                {/* Cause Areas */}
+                {/* Cause Areas — Tap-to-Rank (matches Registration) */}
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Cause Areas / Interests <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
-                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 14px 0" }}>Rank the causes based on your interest (most preferred first) — up to {MAX_CAUSES}</p>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 2px 0" }}>
+                    Tap causes in order of preference — your top choice first (up to {MAX_CAUSES})
+                  </p>
+                  <p style={{ fontSize: 12, margin: "0 0 10px 0", color: formCauseAreas.length >= MAX_CAUSES ? "#F59E0B" : "#94A3B8" }}>
+                    {formCauseAreas.length} of {MAX_CAUSES} selected{formCauseAreas.length >= MAX_CAUSES ? " — you can select up to 5" : ""}
+                  </p>
 
-                  {/* Ranked priority list */}
-                  {formCauseAreas.length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>
-                        Your Priorities ({formCauseAreas.length}/{MAX_CAUSES}) — drag to reorder
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {formCauseAreas.map((cause, idx) => {
-                          const isCustom = !ALL_PREDEFINED_CAUSES.has(cause);
-                          const accent = isCustom ? "#2563EB" : GREEN;
-                          const bg = isCustom ? "#EFF6FF" : "#F0FDF4";
-                          return (
-                            <div key={cause} draggable
-                              onDragStart={() => { dragCauseIdx.current = idx; }}
-                              onDragOver={(e) => e.preventDefault()}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                if (dragCauseIdx.current !== null && dragCauseIdx.current !== idx) {
-                                  setFormCauseAreas((prev) => {
-                                    const next = [...prev];
-                                    const [item] = next.splice(dragCauseIdx.current!, 1);
-                                    next.splice(idx, 0, item);
-                                    return next;
-                                  });
-                                }
-                                dragCauseIdx.current = null;
-                              }}
-                              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${accent}`, backgroundColor: bg, cursor: "grab", userSelect: "none" as const }}>
-                              <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: accent, color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</div>
-                              <span style={{ color: isCustom ? "#93C5FD" : "#86EFAC", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>⠿</span>
-                              <span style={{ flex: 1, fontSize: 13, color: isCustom ? "#1D4ED8" : "#15803D", fontWeight: 500, fontStyle: isCustom ? "italic" : "normal" }}>{cause}</span>
-                              <button type="button" onClick={() => setFormCauseAreas((prev) => prev.map((c, i) => i === idx - 1 ? prev[idx] : i === idx ? prev[idx - 1] : c))}
-                                disabled={idx === 0}
-                                style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === 0 ? "#D1FAE5" : GREEN, cursor: idx === 0 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>↑</button>
-                              <button type="button" onClick={() => setFormCauseAreas((prev) => prev.map((c, i) => i === idx + 1 ? prev[idx] : i === idx ? prev[idx + 1] : c))}
-                                disabled={idx === formCauseAreas.length - 1}
-                                style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: idx === formCauseAreas.length - 1 ? "#D1FAE5" : GREEN, cursor: idx === formCauseAreas.length - 1 ? "default" : "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>↓</button>
-                              <button type="button" onClick={() => setFormCauseAreas((prev) => prev.filter((_, i) => i !== idx))}
-                                style={{ width: 26, height: 26, borderRadius: 6, border: "1.5px solid #BBF7D0", background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#DC2626"; e.currentTarget.style.color = "#DC2626"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#BBF7D0"; e.currentTarget.style.color = "#94A3B8"; }}>×</button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Available cause pool */}
-                  {formCauseAreas.length < MAX_CAUSES ? (
-                    <div style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "14px 16px", backgroundColor: "#FAFAFA" }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 12 }}>
-                        {formCauseAreas.length === 0 ? "Select causes to rank" : "Add more"}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {CAUSE_GROUPS.map((group) => {
-                          const available = group.causes.filter((c) => !formCauseAreas.includes(c));
-                          if (available.length === 0) return null;
-                          return (
-                            <div key={group.label}>
-                              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, marginBottom: 6 }}>{group.label}</div>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {available.map((cause) => (
-                                  <button key={cause} type="button"
-                                    onClick={() => setFormCauseAreas((prev) => prev.length < MAX_CAUSES ? [...prev, cause] : prev)}
-                                    style={{ height: 30, padding: "0 12px", borderRadius: 20, border: "1.5px solid #E2E8F0", backgroundColor: "#fff", color: "#374151", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 150ms", display: "flex", alignItems: "center", gap: 4 }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = GREEN; e.currentTarget.style.color = GREEN; e.currentTarget.style.backgroundColor = "#F0FDF4"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#374151"; e.currentTarget.style.backgroundColor = "#fff"; }}>
-                                    <span style={{ fontSize: 11, opacity: 0.6 }}>+</span> {cause}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>Add Custom Interest</div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <input value={customCauseInput} onChange={(e) => setCustomCauseInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const text = customCauseInput.trim(); if (text.length >= 2 && !formCauseAreas.some((c) => c.toLowerCase() === text.toLowerCase()) && formCauseAreas.length < MAX_CAUSES) { setFormCauseAreas((prev) => [...prev, text]); setCustomCauseInput(""); } } }}
-                            placeholder="e.g. Street Arts, Sports for Youth…" maxLength={60}
-                            style={{ flex: 1, height: 36, padding: "0 12px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#1E293B", outline: "none", backgroundColor: "#fff" }} />
-                          <button type="button"
-                            onClick={() => { const text = customCauseInput.trim(); if (text.length >= 2 && !formCauseAreas.some((c) => c.toLowerCase() === text.toLowerCase()) && formCauseAreas.length < MAX_CAUSES) { setFormCauseAreas((prev) => [...prev, text]); setCustomCauseInput(""); } }}
-                            disabled={customCauseInput.trim().length < 2}
-                            style={{ height: 36, padding: "0 14px", borderRadius: 8, border: `1.5px solid ${customCauseInput.trim().length >= 2 ? GREEN : "#E2E8F0"}`, backgroundColor: customCauseInput.trim().length >= 2 ? "#F0FDF4" : "#F8FAFC", color: customCauseInput.trim().length >= 2 ? GREEN : "#CBD5E1", fontSize: 13, fontWeight: 600, cursor: customCauseInput.trim().length >= 2 ? "pointer" : "default", transition: "all 150ms", flexShrink: 0 }}>
-                            + Add
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ padding: "10px 14px", borderRadius: 9, backgroundColor: "#F0FDF4", border: "1.5px solid #BBF7D0", fontSize: 12, color: "#15803D", textAlign: "center" as const }}>
-                      Maximum {MAX_CAUSES} causes selected — remove one to add another
-                    </div>
-                  )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {CAUSE_GROUPS.map((label) => {
+                      const rank = formCauseAreas.indexOf(label);
+                      const isSelected = rank !== -1;
+                      const isDisabled = !isSelected && formCauseAreas.length >= MAX_CAUSES;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setFormCauseAreas((prev) => prev.filter((c) => c !== label));
+                            } else if (formCauseAreas.length < MAX_CAUSES) {
+                              setFormCauseAreas((prev) => [...prev, label]);
+                            }
+                          }}
+                          disabled={isDisabled}
+                          style={{
+                            height: 34, padding: "0 14px", borderRadius: 20,
+                            border: `1.5px solid ${isSelected ? GREEN : "#D1D5DB"}`,
+                            backgroundColor: isSelected ? "#DCFCE7" : "#FFFFFF",
+                            color: isSelected ? "#15803D" : "#4B5563",
+                            fontSize: 13, fontWeight: isSelected ? 600 : 400,
+                            cursor: isDisabled ? "not-allowed" : "pointer",
+                            transition: "all 150ms",
+                            opacity: isDisabled ? 0.45 : 1,
+                            userSelect: "none" as const,
+                            display: "flex", alignItems: "center", gap: 6,
+                          }}
+                        >
+                          {isSelected && (
+                            <span style={{
+                              width: 18, height: 18, borderRadius: "50%",
+                              backgroundColor: GREEN, color: "#fff",
+                              fontSize: 10, fontWeight: 700,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0,
+                            }}>
+                              {rank + 1}
+                            </span>
+                          )}
+                          {isSelected && (
+                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                              <path d="M2 6L5 9L10 3" stroke="#15803D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="flex gap-3" style={{ marginTop: 20 }}>

@@ -1369,7 +1369,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
 
                       {/* 7 selectable cause pills */}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {CAUSE_GROUPS.map(({ label }) => {
+                        {CAUSE_GROUPS.map((label) => {
                           const rank = rankedCauses.indexOf(label);
                           const isSelected = rank !== -1;
                           const isDisabled = !isSelected && rankedCauses.length >= MAX_CAUSES;
