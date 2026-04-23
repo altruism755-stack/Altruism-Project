@@ -628,6 +628,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                         onChange={(e) => {
                           setVolForm((f) => ({ ...f, nationality: e.target.value, nationalId: "" }));
                           touch("nationality");
+                          setTouched((t) => ({ ...t, nationalId: false }));
                         }}
                         onFocus={() => onFocus("nationality")}
                         onBlur={() => onBlur("nationality")}
@@ -864,23 +865,23 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                         </div>
                       )}
 
-                      {/* University Graduate / Postgraduate — Field of Study (unified faculty field) */}
+                      {/* University Graduate / Postgraduate — Field of Study (separate from faculty) */}
                       {(volForm.educationLevel === "University Graduate" || volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
                         <div style={{ marginTop: 12, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1.5px solid #E2E8F0" }}>
-                          <label htmlFor="faculty" style={{ ...labelStyle, fontSize: 12 }}>
+                          <label htmlFor="fieldOfStudy" style={{ ...labelStyle, fontSize: 12 }}>
                             Field of Study <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
                           </label>
-                          <input id="faculty"
-                            value={volForm.faculty}
-                            onChange={(e) => setVolForm((f) => ({ ...f, faculty: e.target.value }))}
-                            onFocus={() => onFocus("faculty")}
-                            onBlur={() => onBlur("faculty")}
+                          <input id="fieldOfStudy"
+                            value={volForm.fieldOfStudy}
+                            onChange={(e) => setVolForm((f) => ({ ...f, fieldOfStudy: e.target.value }))}
+                            onFocus={() => onFocus("fieldOfStudy")}
+                            onBlur={() => onBlur("fieldOfStudy")}
                             placeholder={
                               volForm.educationLevel === "Postgraduate (Diploma / Master / PhD)"
                                 ? "e.g. Biomedical Engineering (MSc), Public Health (Diploma)…"
                                 : "e.g. Engineering, Pharmacy, Business…"
                             }
-                            style={fieldStyle("faculty", 40)}
+                            style={fieldStyle("fieldOfStudy", 40)}
                           />
                         </div>
                       )}
@@ -1114,47 +1115,57 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                             (l, i) => i !== idx && l.language.trim().toLowerCase() === lang.language.trim().toLowerCase() && lang.language.trim() !== ""
                           );
                           return (
-                            <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              <input
-                                value={lang.language}
-                                onChange={(e) => updateLanguage(idx, "language", e.target.value)}
-                                onFocus={() => setFocused(`lang_${idx}`)}
-                                onBlur={() => { setFocused(null); touch("languages"); }}
-                                placeholder="e.g. Arabic, English, French…"
-                                aria-label={`Language ${idx + 1}`}
-                                maxLength={50}
-                                style={{
-                                  flex: 1, height: 40, outline: "none", boxSizing: "border-box",
-                                  border: `1.5px solid ${isDuplicate ? RED : focused === `lang_${idx}` ? BLUE : "#E2E8F0"}`,
-                                  borderRadius: 8, padding: "0 12px", fontSize: 14,
-                                  backgroundColor: "#FFFFFF", transition: "border-color 150ms",
-                                }}
-                              />
-                              <select
-                                value={lang.proficiency}
-                                onChange={(e) => updateLanguage(idx, "proficiency", e.target.value)}
-                                aria-label={`Proficiency for language ${idx + 1}`}
-                                style={{
-                                  height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8,
-                                  padding: "0 8px", fontSize: 13, outline: "none",
-                                  backgroundColor: "#FFFFFF", color: "#1E293B", flexShrink: 0,
-                                }}
-                              >
-                                {PROFICIENCY_LEVELS.map((p) => <option key={p} value={p}>{p}</option>)}
-                              </select>
-                              {languages.length > 1 && (
-                                <button type="button" onClick={() => removeLanguage(idx)}
-                                  aria-label={`Remove language ${idx + 1}`}
+                            <div key={idx}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <input
+                                  value={lang.language}
+                                  onChange={(e) => updateLanguage(idx, "language", e.target.value)}
+                                  onFocus={() => setFocused(`lang_${idx}`)}
+                                  onBlur={() => { setFocused(null); touch("languages"); }}
+                                  placeholder="e.g. Arabic, English, French…"
+                                  aria-label={`Language ${idx + 1}`}
+                                  maxLength={50}
                                   style={{
-                                    width: 34, height: 34, borderRadius: 8, border: "1.5px solid #E2E8F0",
-                                    background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 17,
-                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                                    transition: "border-color 150ms, color 150ms",
+                                    flex: 1, height: 40, outline: "none", boxSizing: "border-box",
+                                    border: `1.5px solid ${isDuplicate ? RED : focused === `lang_${idx}` ? BLUE : "#E2E8F0"}`,
+                                    borderRadius: 8, padding: "0 12px", fontSize: 14,
+                                    backgroundColor: "#FFFFFF", transition: "border-color 150ms",
                                   }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = RED; e.currentTarget.style.color = RED; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#94A3B8"; }}>
-                                  ×
-                                </button>
+                                />
+                                <select
+                                  value={lang.proficiency}
+                                  onChange={(e) => updateLanguage(idx, "proficiency", e.target.value)}
+                                  aria-label={`Proficiency for language ${idx + 1}`}
+                                  style={{
+                                    height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8,
+                                    padding: "0 8px", fontSize: 13, outline: "none",
+                                    backgroundColor: "#FFFFFF", color: "#1E293B", flexShrink: 0,
+                                  }}
+                                >
+                                  {PROFICIENCY_LEVELS.map((p) => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                {languages.length > 1 && (
+                                  <button type="button" onClick={() => removeLanguage(idx)}
+                                    aria-label={`Remove language ${idx + 1}`}
+                                    style={{
+                                      width: 34, height: 34, borderRadius: 8, border: "1.5px solid #E2E8F0",
+                                      background: "#fff", color: "#94A3B8", cursor: "pointer", fontSize: 17,
+                                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                      transition: "border-color 150ms, color 150ms",
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = RED; e.currentTarget.style.color = RED; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#94A3B8"; }}>
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+                              {isDuplicate && lang.language.trim() !== "" && (
+                                <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "flex-start" }}>
+                                  <span style={{ color: RED, fontSize: 12, lineHeight: 1, marginTop: 1 }}>⚠</span>
+                                  <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>
+                                    "{lang.language.trim()}" is already in your list.
+                                  </span>
+                                </div>
                               )}
                             </div>
                           );

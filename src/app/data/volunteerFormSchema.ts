@@ -424,7 +424,7 @@ export function buildVolunteerPayload(s: VolunteerEditableState) {
     university_name: s.universityName,
     faculty: s.faculty,
     study_year: s.studyYear,
-    field_of_study: s.faculty,
+    field_of_study: s.fieldOfStudy,
     department: s.department,
     hours_per_week: s.hoursPerWeek,
     skills,
@@ -474,7 +474,7 @@ export function buildVolunteerRegisterPayload(
     universityName: s.universityName,
     faculty: s.faculty,
     studyYear: s.studyYear,
-    fieldOfStudy: s.faculty,
+    fieldOfStudy: s.fieldOfStudy,
     department: s.department,
     priorExperience: s.priorHasExperience === true,
     priorOrg: s.priorHasExperience === true
@@ -488,6 +488,8 @@ export function buildVolunteerRegisterPayload(
       description: e.description.trim(),
     })) : [],
     causeAreas: s.causeAreas,
+    terms_accepted: true,
+    terms_accepted_at: new Date().toISOString(),
   };
 }
 

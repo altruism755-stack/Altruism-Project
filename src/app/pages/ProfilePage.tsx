@@ -17,6 +17,7 @@ import {
   computeVolunteerErrors, getExperienceFieldError,
   isProfileFormValid, getFirstProfileError, getFirstProfileErrorField,
   createEmptyTouched, createAllTouched, shouldShowError,
+  validatePassword,
 } from "../data/volunteerFormSchema";
 
 
@@ -155,9 +156,9 @@ export function ProfilePage() {
         educationLevel: resolvedEduLevel,
         educationOther: resolvedEduOther,
         universityName: volRes.university_name || "",
-        faculty: volRes.faculty || volRes.field_of_study || "",
+        faculty: volRes.faculty || "",
         studyYear: volRes.study_year || "",
-        fieldOfStudy: "",
+        fieldOfStudy: volRes.field_of_study || volRes.faculty || "",
         priorExperience: volRes.prior_experience === 1 ? true : volRes.prior_experience === 0 ? false : null,
         priorOrg: volRes.prior_org || "",
         hoursPerWeek: volRes.hours_per_week ?? null,
@@ -247,11 +248,12 @@ export function ProfilePage() {
     setPasswordError("");
     setPasswordSuccess("");
     if (passwordForm.newPass !== passwordForm.confirm) {
-      setPasswordError("Passwords do not match");
+      setPasswordError("Passwords do not match.");
       return;
     }
-    if (passwordForm.newPass.length < 6) {
-      setPasswordError("Password must be at least 6 characters");
+    const pwError = validatePassword(passwordForm.newPass);
+    if (pwError) {
+      setPasswordError(pwError);
       return;
     }
     try {
@@ -623,9 +625,9 @@ export function ProfilePage() {
                     </div>
                   )}
                   {(form.educationLevel === "University Graduate" || form.educationLevel === "Postgraduate (Diploma / Master / PhD)") && (
-                    <div data-field="faculty" style={{ marginTop: 10 }}>
+                    <div data-field="fieldOfStudy" style={{ marginTop: 10 }}>
                       <label style={labelStyle}>Field of Study <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
-                      <input value={form.faculty} onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))} onBlur={() => markTouched("faculty")} style={{ ...inputStyle, border: getBorderStyle("faculty") }}
+                      <input value={form.fieldOfStudy} onChange={(e) => setForm((f) => ({ ...f, fieldOfStudy: e.target.value }))} onBlur={() => markTouched("fieldOfStudy")} style={{ ...inputStyle, border: getBorderStyle("fieldOfStudy") }}
                         placeholder={form.educationLevel === "Postgraduate (Diploma / Master / PhD)" ? "e.g. Biomedical Engineering (MSc), Public Health (Diploma)…" : "e.g. Engineering, Pharmacy, Business…"} />
                     </div>
                   )}
