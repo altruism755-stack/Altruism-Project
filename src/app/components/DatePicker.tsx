@@ -117,6 +117,19 @@ export function DatePicker({
     setTentative(`${viewYear}-${mm}-${dd}`);
   };
 
+  // When user changes the year/month dropdown, mirror it into `tentative` so
+  // confirming without re-clicking a day still commits the new year/month.
+  // Day is preserved, clamped to the new month's length (e.g. Mar 31 → Feb 28).
+  const syncTentative = (year: number, monthZeroBased: number) => {
+    const currentDay = tentative
+      ? parseInt(tentative.split("-")[2], 10)
+      : Math.min(today.getDate(), getDaysInMonth(year, monthZeroBased));
+    const clampedDay = Math.min(currentDay, getDaysInMonth(year, monthZeroBased));
+    const mm = String(monthZeroBased + 1).padStart(2, "0");
+    const dd = String(clampedDay).padStart(2, "0");
+    setTentative(`${year}-${mm}-${dd}`);
+  };
+
   // Build day grid
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay    = new Date(viewYear, viewMonth, 1).getDay();
@@ -204,14 +217,22 @@ export function DatePicker({
             <div style={{ flex: 1, display: "flex", gap: 6 }}>
               <select
                 value={viewMonth}
-                onChange={(e) => setViewMonth(Number(e.target.value))}
+                onChange={(e) => {
+                  const m = Number(e.target.value);
+                  setViewMonth(m);
+                  syncTentative(viewYear, m);
+                }}
                 style={{ flex: 1, height: 30, border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, padding: "0 6px", cursor: "pointer", outline: "none", backgroundColor: "#F8FAFC", color: "#1E293B", fontWeight: 500 }}
               >
                 {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
               </select>
               <select
                 value={viewYear}
-                onChange={(e) => setViewYear(Number(e.target.value))}
+                onChange={(e) => {
+                  const y = Number(e.target.value);
+                  setViewYear(y);
+                  syncTentative(y, viewMonth);
+                }}
                 style={{ width: 68, height: 30, border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, padding: "0 4px", cursor: "pointer", outline: "none", backgroundColor: "#F8FAFC", color: "#1E293B", fontWeight: 500 }}
               >
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
