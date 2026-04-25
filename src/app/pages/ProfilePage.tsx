@@ -616,7 +616,7 @@ export function ProfilePage() {
                   <Err field="phone" />
                 </div>
                 <div data-field="governorate" style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>Governorate</label>
+                  <label style={labelStyle}>Governorate <span style={{ color: "#DC2626" }}>*</span></label>
                   <select value={form.governorate} onChange={(e) => setForm((f) => ({ ...f, governorate: e.target.value }))} onBlur={() => markTouched("governorate")} style={{ ...inputStyle, border: getBorderStyle("governorate") }}>
                     <option value="">Select Governorate</option>
                     {GOVERNORATES.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -624,14 +624,14 @@ export function ProfilePage() {
                   <Err field="governorate" />
                 </div>
                 <div data-field="city" style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>City</label>
+                  <label style={labelStyle}>City <span style={{ color: "#DC2626" }}>*</span></label>
                   <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} onBlur={() => markTouched("city")} style={{ ...inputStyle, border: getBorderStyle("city") }} />
                   <Err field="city" />
                 </div>
                 
                 {/* Gender */}
                 <div data-field="gender" style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>Gender</label>
+                  <label style={labelStyle}>Gender <span style={{ color: "#DC2626" }}>*</span></label>
                   <div style={{ display: "flex", gap: 10 }}>
                     {["Male", "Female"].map((g) => (
                       <button key={g} type="button" onClick={() => { setForm((f) => ({ ...f, gender: g })); markTouched("gender"); }}
@@ -665,7 +665,7 @@ export function ProfilePage() {
                   {form.educationLevel === "University Student" && (
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                       <div data-field="universityName">
-                        <label style={labelStyle}>University Name</label>
+                        <label style={labelStyle}>University Name <span style={{ color: "#DC2626" }}>*</span></label>
                         <input value={form.universityName} onChange={(e) => setForm((f) => ({ ...f, universityName: e.target.value }))} onBlur={() => markTouched("universityName")} style={{ ...inputStyle, border: getBorderStyle("universityName") }} placeholder="e.g. Cairo University" />
                         <Err field="universityName" />
                       </div>
@@ -691,7 +691,7 @@ export function ProfilePage() {
                   )}
                   {form.educationLevel === "Other" && (
                     <div data-field="educationOther" style={{ marginTop: 10 }}>
-                      <label style={labelStyle}>Describe your education background</label>
+                      <label style={labelStyle}>Describe your education background <span style={{ color: "#DC2626" }}>*</span></label>
                       <p style={{ fontSize: 11, color: "#64748B", margin: "0 0 4px 0" }}>e.g., Technical Institute, Vocational Training, Military Academy…</p>
                       <input value={form.educationOther} onChange={(e) => setForm((f) => ({ ...f, educationOther: e.target.value.slice(0, MAX_EDUCATION_OTHER) }))} onBlur={() => markTouched("educationOther")} style={{ ...inputStyle, border: getBorderStyle("educationOther") }} placeholder="Describe your education background…" />
                       <Err field="educationOther" />
@@ -816,7 +816,7 @@ export function ProfilePage() {
 
                 {/* Languages */}
                 <div data-field="languages" style={{ marginTop: 16 }}>
-                  <label style={labelStyle}>Languages Spoken</label>
+                  <label style={labelStyle}>Languages Spoken <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
                     {formLanguages.map((lang, idx) => (
                       <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
