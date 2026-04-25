@@ -497,13 +497,22 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
             ))}
           </div>
 
-          <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "10px 14px", marginBottom: 20 }}>
-            <p style={{ fontSize: 12, color: "#15803D", margin: 0, lineHeight: 1.5 }}>
-              {role === "Volunteer"
-                ? "Sign up and apply to available organizations. You can join multiple organizations and manage all activities from one profile."
-                : "Register your organization for platform review. Our admins will verify your details and approve access within 1–2 business days."}
-            </p>
-          </div>
+          {role === "Volunteer" ? (
+            <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#15803D", margin: 0, lineHeight: 1.4 }}>
+                Takes less than 2 minutes
+              </p>
+              <p style={{ fontSize: 12, color: "#15803D", margin: "2px 0 0 0", lineHeight: 1.5 }}>
+                Fill this once and apply to any organization without re-entering your details.
+              </p>
+            </div>
+          ) : (
+            <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "10px 14px", marginBottom: 20 }}>
+              <p style={{ fontSize: 12, color: "#15803D", margin: 0, lineHeight: 1.5 }}>
+                Register your organization for platform review. Our admins will verify your details and approve access within 1–2 business days.
+              </p>
+            </div>
+          )}
 
           {submitError && (
             <div style={{ backgroundColor: "#FEE2E2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#B91C1C", fontSize: 13 }}>
