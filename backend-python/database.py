@@ -1,11 +1,46 @@
 import sqlite3
 import os
+import sys
+import inspect
 from contextlib import contextmanager
 
-DB_PATH = os.getenv(
-    "ALTRUISM_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "data", "altruism.db"),
-)
+# Single source of truth: backend-python/data/altruism.db
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+_THIS_FILE = os.path.abspath(__file__)
+_DEFAULT_DB_PATH = os.path.join(_BACKEND_DIR, "data", "altruism.db")
+DB_PATH = os.path.abspath(os.getenv("ALTRUISM_DB_PATH", _DEFAULT_DB_PATH))
+
+# Guard: refuse to use a path outside backend-python/data — prevents stray
+# SQLite files (e.g. backend-python/models/altruism.db) from being recreated
+# if the working directory shifts or a relative path sneaks in.
+_ALLOWED_DIR = os.path.join(_BACKEND_DIR, "data")
+if not DB_PATH.startswith(_ALLOWED_DIR + os.sep) and DB_PATH != os.path.join(_ALLOWED_DIR, "altruism.db"):
+    raise RuntimeError(
+        f"Refusing to use database path outside backend-python/data/: {DB_PATH}. "
+        f"Set ALTRUISM_DB_PATH only to a file inside {_ALLOWED_DIR}."
+    )
+
+print(f"[db] Using database at: {DB_PATH}", file=sys.stderr)
+
+
+# ── Runtime safeguard: block direct sqlite3.connect from anywhere but database.py
+# Any other module must use get_db() / get_connection() so the path guard above
+# always applies and no stray .db files can be created.
+_real_sqlite_connect = sqlite3.connect
+
+
+def _guarded_sqlite_connect(*args, **kwargs):
+    caller = inspect.stack()[1].filename
+    if os.path.abspath(caller) != _THIS_FILE:
+        raise RuntimeError(
+            "Direct sqlite3.connect() is not allowed outside database.py. "
+            "Use database.get_db() or database.get_connection() instead. "
+            f"(called from {caller})"
+        )
+    return _real_sqlite_connect(*args, **kwargs)
+
+
+sqlite3.connect = _guarded_sqlite_connect
 
 
 def _ensure_dir():

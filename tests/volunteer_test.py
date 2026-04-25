@@ -19,17 +19,16 @@ Then in a separate terminal:
 import sys
 import os
 import json
-import sqlite3
 import urllib.request
 import urllib.error
 from datetime import datetime
 
+# Import the canonical database utilities — never use sqlite3 directly.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend-python"))
+from database import DB_PATH, get_connection  # noqa: E402
+
 # ── Config ────────────────────────────────────────────────────────────────────
 BASE_URL = "http://127.0.0.1:8000"
-DB_PATH  = os.getenv(
-    "ALTRUISM_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "..", "backend-python", "data", "altruism.db"),
-)
 
 PASS = "\033[92m[PASS]\033[0m"
 FAIL = "\033[91m[FAIL]\033[0m"
@@ -148,7 +147,7 @@ def step0_cleanup():
         print(f"  {WARN} DB not found at {DB_PATH} — skipping cleanup")
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     conn.execute("PRAGMA foreign_keys = ON")
 
     # Count before
@@ -380,7 +379,7 @@ def step7_scope_guard():
         print(f"  {WARN} DB not found — skipping scope guard")
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     before_orgs = conn.execute("SELECT COUNT(*) FROM organizations").fetchone()[0]
     before_org_users = conn.execute(
         "SELECT COUNT(*) FROM users WHERE role = 'org_admin'"

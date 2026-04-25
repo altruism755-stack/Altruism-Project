@@ -48,3 +48,6 @@ backend-python/uploads/
 *.db
 *.db-shm
 *.db-wal
+
+# Stray DBs outside the canonical data/ dir — should never exist, but ignore defensively
+backend-python/models/*.db
