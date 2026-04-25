@@ -540,6 +540,7 @@ type MainTab = "volunteers" | "supervisors" | "activities" | "admins";
 export function OrgDashboard() {
   const { profile, user } = useAuth();
   const orgName = profile?.name || "Organization";
+  console.log("PROFILE DEBUG:", profile);
   const orgId: number = profile?.id || 0;
 
   const [stats, setStats]       = useState<any>(null);
@@ -554,7 +555,7 @@ export function OrgDashboard() {
   const [importing, setImporting] = useState(false);
 
   const loadAll = useCallback(async () => {
-    if (!orgId) return;
+    if (!orgId) { setLoading(false); return; }
     try {
       const [sumRes, memRes, supRes, evtRes] = await Promise.all([
         api.getReportSummary(),
