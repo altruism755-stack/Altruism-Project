@@ -45,3 +45,6 @@ Thumbs.db
 # Local SQLite database & uploaded files (per-developer)
 backend-python/data/
 backend-python/uploads/
+*.db
+*.db-shm
+*.db-wal

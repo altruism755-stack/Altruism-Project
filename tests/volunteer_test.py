@@ -26,7 +26,10 @@ from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
 BASE_URL = "http://127.0.0.1:8000"
-DB_PATH  = os.path.join(os.path.dirname(__file__), "..", "backend-python", "models", "altruism.db")
+DB_PATH  = os.getenv(
+    "ALTRUISM_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "backend-python", "data", "altruism.db"),
+)
 
 PASS = "\033[92m[PASS]\033[0m"
 FAIL = "\033[91m[FAIL]\033[0m"
