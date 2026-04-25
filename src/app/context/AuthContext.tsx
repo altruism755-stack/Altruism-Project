@@ -22,12 +22,12 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
 // Fallback demo credentials when backend is unavailable
-const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string; is_platform_admin?: boolean; orgStatus?: "pending" | "approved" | "rejected" }> = {
-  "admin@resala.org":      { password: "admin",      role: "org_admin",  name: "Resala",                  orgStatus: "approved" },
-  "admin@redcrescent.org": { password: "admin",      role: "org_admin",  name: "Egyptian Red Crescent",   orgStatus: "approved" },
-  "admin@enactus.org":     { password: "admin",      role: "org_admin",  name: "Enactus Egypt",           orgStatus: "approved" },
-  "pending@org.com":       { password: "pending",    role: "org_admin",  name: "Demo Pending Org",        orgStatus: "pending"  },
-  "rejected@org.com":      { password: "rejected",   role: "org_admin",  name: "Demo Rejected Org",       orgStatus: "rejected" },
+const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string; is_platform_admin?: boolean; orgStatus?: "pending" | "approved" | "rejected"; id?: number }> = {
+  "admin@resala.org":      { password: "admin",      role: "org_admin",  name: "Resala",                  orgStatus: "approved", id: 1 },
+  "admin@redcrescent.org": { password: "admin",      role: "org_admin",  name: "Egyptian Red Crescent",   orgStatus: "approved", id: 2 },
+  "admin@enactus.org":     { password: "admin",      role: "org_admin",  name: "Enactus Egypt",           orgStatus: "approved", id: 3 },
+  "pending@org.com":       { password: "pending",    role: "org_admin",  name: "Demo Pending Org",        orgStatus: "pending",  id: 4 },
+  "rejected@org.com":      { password: "rejected",   role: "org_admin",  name: "Demo Rejected Org",       orgStatus: "rejected", id: 5 },
   "amira@resala.org":      { password: "supervisor", role: "supervisor", name: "Dr. Amira Khalil" },
   "volunteer@example.com": { password: "volunteer",  role: "volunteer",  name: "Yara Hassan" },
   "platform@altruism.org": { password: "platform",  role: "volunteer",  name: "Platform Admin", is_platform_admin: true },
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u: User = { id: 1, email, role: demo.role, is_platform_admin: demo.is_platform_admin };
       setUser(u);
       setToken(`demo-${Date.now()}`);
-      setProfile({ name: demo.name, _demo: true });
+      setProfile({ id: demo.id, name: demo.name, _demo: true });
       const status = demo.orgStatus || null;
       setOrgStatus(status);
       setIsLoading(false);

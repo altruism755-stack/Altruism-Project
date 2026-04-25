@@ -540,7 +540,6 @@ type MainTab = "volunteers" | "supervisors" | "activities" | "admins";
 export function OrgDashboard() {
   const { profile, user } = useAuth();
   const orgName = profile?.name || "Organization";
-  console.log("PROFILE DEBUG:", profile);
   const orgId: number = profile?.id || 0;
 
   const [stats, setStats]       = useState<any>(null);

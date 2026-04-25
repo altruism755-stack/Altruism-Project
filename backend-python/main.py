@@ -2,10 +2,12 @@ import os
 import sys
 from datetime import datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from database import init_schema
 from routes.auth_routes import router as auth_router
@@ -45,9 +47,12 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-# Global error handler
+# Global error handler — only catches non-HTTP exceptions so FastAPI/Starlette
+# HTTPExceptions still return their intended status codes (401, 400, etc).
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, (HTTPException, StarletteHTTPException)):
+        return await http_exception_handler(request, exc)
     import traceback
     traceback.print_exc()
     print(f"Server error: {exc}", file=sys.stderr)
