@@ -16,6 +16,7 @@ import {
   validateSubmitterName, validateSubmitterRole, validateOrgCity,
   validateEducationLevel, validateUniversityName, validateFaculty,
   validateStudyYear, validateFieldOfStudy, validateEducationOther,
+  validateCauseAreas,
   MAX_EDUCATION_OTHER,
   type ExperienceEntry,
   type VolunteerEditableState,
@@ -129,6 +130,7 @@ export function RegisterPage() {
           ? "Please complete all required fields in each experience entry."
           : ""
       : "",
+    causeAreas: validateCauseAreas(rankedCauses),
   }), [volForm, volSkills, volCustomSkill, availability, languages, priorHasExperience, experiences, rankedCauses]);
 
   const orgErrors = useMemo(() => ({
@@ -176,7 +178,7 @@ export function RegisterPage() {
     && !errors.educationLevel && !errors.universityName && !errors.faculty
     && !errors.studyYear && !errors.fieldOfStudy && !errors.educationOther;
   const step3Valid = !errors.skills && !errors.languages && !errors.priorExperiences
-    && termsAccepted;
+    && !errors.causeAreas && termsAccepted;
 
   // ── Helpers ──
   const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1363,8 +1365,8 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>
                         You can update your interests later from your profile
                       </p>
-                      <p style={{ fontSize: 12, margin: "0 0 10px 0", color: rankedCauses.length >= MAX_CAUSES ? "#F59E0B" : "#94A3B8" }}>
-                        {rankedCauses.length} of {MAX_CAUSES} selected{rankedCauses.length >= MAX_CAUSES ? " — you can select up to 5" : ""}
+                      <p style={{ fontSize: 12, margin: "0 0 10px 0", color: rankedCauses.length === MAX_CAUSES ? GREEN : "#94A3B8" }}>
+                        {rankedCauses.length} of {MAX_CAUSES} selected
                       </p>
 
                       {/* 7 selectable cause pills */}
@@ -1418,6 +1420,12 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                           );
                         })}
                       </div>
+                      {rankedCauses.length > 0 && rankedCauses.length < MAX_CAUSES && (
+                        <p style={{ fontSize: 12, color: "#F59E0B", margin: "8px 0 0 0" }}>
+                          Keep going or skip this step
+                        </p>
+                      )}
+                      <Err field="causeAreas" />
                     </div>
 
                     {/* Terms & Privacy consent */}
@@ -1475,7 +1483,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       style={{ flex: 1 }}
                       onClick={() => {
                         if (!step3Valid) {
-                          setTouched((t) => ({ ...t, skills: true, availability: true, languages: true, priorExperiences: true }));
+                          setTouched((t) => ({ ...t, skills: true, availability: true, languages: true, priorExperiences: true, causeAreas: true }));
                           if (experiences.length > 0) {
                             setExpTouched((t) => {
                               const next = { ...t };

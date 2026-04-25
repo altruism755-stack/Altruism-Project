@@ -75,6 +75,11 @@ def register(body: RegisterBody):
         hashed = hash_password(body.password)
 
         if body.role == "volunteer":
+            if body.causeAreas is not None:
+                n = len(body.causeAreas)
+                if 1 <= n <= 4:
+                    raise HTTPException(422, "Please select exactly 5 interests, or leave it empty.")
+
             cur = db.execute(
                 "INSERT INTO users (email, password, role) VALUES (?, ?, 'volunteer')",
                 (body.email, hashed),

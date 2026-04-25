@@ -155,7 +155,7 @@ export const STEP2_CONDITIONAL_FIELDS = [
 
 /** Step 3: Skills, languages, experience, causes (validated together) */
 export const STEP3_FIELDS = [
-  "skills", "languages", "priorExperiences",
+  "skills", "languages", "priorExperiences", "causeAreas",
 ] as const;
 
 // ── Validators (each returns "" when valid, else an error message) ───
@@ -362,6 +362,11 @@ export function getExperienceFieldError(
   return "";
 }
 
+export function validateCauseAreas(areas: string[]): string {
+  if (areas.length === 0 || areas.length === 5) return "";
+  return "You can select 5 interests to help us match you better, or leave it for later";
+}
+
 // ── Canonical volunteer payload shape (frontend → backend) ───────────
 
 export type VolunteerEditableState = {
@@ -537,6 +542,7 @@ export function computeVolunteerErrors(
     skills:          validateSkills(s.skills, s.customSkill),
     languages:       validateLanguages(s.languages),
     priorExperiences: validatePriorExperiences(s.priorHasExperience, s.experiences),
+    causeAreas:      validateCauseAreas(s.causeAreas),
     availability:    "",
   };
 }
@@ -625,7 +631,7 @@ export const PROFILE_TOUCHABLE_FIELDS = [
   "governorate", "phone", "city", "gender", "healthNotes",
   "educationLevel", "educationOther", "universityName", "faculty",
   "studyYear", "fieldOfStudy", "department", "hoursPerWeek",
-  "skills", "languages", "priorExperiences",
+  "skills", "languages", "priorExperiences", "causeAreas",
 ] as const;
 
 /**

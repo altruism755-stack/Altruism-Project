@@ -132,6 +132,10 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         prior_org = body.get("prior_org")
         experiences = body.get("experiences")
         cause_areas = body.get("cause_areas")
+        if cause_areas is not None:
+            n = len(cause_areas)
+            if 1 <= n <= 4:
+                raise HTTPException(422, "Please select exactly 5 interests, or leave it empty.")
         university_name = body.get("university_name")
         faculty = body.get("faculty")
         study_year = body.get("study_year")

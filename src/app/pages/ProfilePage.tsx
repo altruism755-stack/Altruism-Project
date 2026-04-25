@@ -889,8 +889,11 @@ export function ProfilePage() {
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 2px 0" }}>
                     Tap causes in order of preference — your top choice first (up to {MAX_CAUSES})
                   </p>
-                  <p style={{ fontSize: 12, margin: "0 0 10px 0", color: formCauseAreas.length >= MAX_CAUSES ? "#F59E0B" : "#94A3B8" }}>
-                    {formCauseAreas.length} of {MAX_CAUSES} selected{formCauseAreas.length >= MAX_CAUSES ? " — you can select up to 5" : ""}
+                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 6px 0" }}>
+                    You can update your interests later from your profile
+                  </p>
+                  <p style={{ fontSize: 12, margin: "0 0 10px 0", color: formCauseAreas.length === MAX_CAUSES ? GREEN : "#94A3B8" }}>
+                    {formCauseAreas.length} of {MAX_CAUSES} selected
                   </p>
 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -944,6 +947,12 @@ export function ProfilePage() {
                       );
                     })}
                   </div>
+                  {formCauseAreas.length > 0 && formCauseAreas.length < MAX_CAUSES && (
+                    <p style={{ fontSize: 12, color: "#F59E0B", margin: "8px 0 0 0" }}>
+                      Keep going or skip this step
+                    </p>
+                  )}
+                  <Err field="causeAreas" />
                 </div>
 
                 <div className="flex gap-3" style={{ marginTop: 20 }}>
