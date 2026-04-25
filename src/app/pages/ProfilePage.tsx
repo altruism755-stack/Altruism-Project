@@ -16,9 +16,10 @@ import {
   type ExperienceEntry, type VolunteerEditableState, type VolunteerErrors,
   buildVolunteerPayload, buildVolunteerRegisterPayload,
   computeVolunteerErrors, getExperienceFieldError,
-  isProfileFormValid, getFirstProfileError, getFirstProfileErrorField,
+  isProfileFormValid, getFirstProfileErrorField,
   createEmptyTouched, createAllTouched, shouldShowError,
   validatePassword,
+  buildErrorSummary, PROFILE_TOUCHABLE_FIELDS,
 } from "../data/volunteerFormSchema";
 
 
@@ -52,6 +53,8 @@ export function ProfilePage() {
   const [pendingApplications, setPendingApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const errorBannerRef = useRef<HTMLDivElement | null>(null);
   const [editing, setEditing] = useState(false);
   const [uploadingPic, setUploadingPic] = useState(false);
   const [removingPic, setRemovingPic] = useState(false);
@@ -201,6 +204,12 @@ export function ProfilePage() {
 
   // ── Fixed Error Logic ──
   const errors: VolunteerErrors = useMemo(() => computeVolunteerErrors(volunteerState), [volunteerState]);
+
+  // Clear server-side save error once the user starts editing again.
+  useEffect(() => {
+    if (saveError) setSaveError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [volunteerState]);
   
   const showErr = (k: string) => shouldShowError(errors, touched, k, submitAttempted);
   
@@ -216,17 +225,21 @@ export function ProfilePage() {
     // Touch every field and trigger submit state so missing-required errors surface
     setSubmitAttempted(true);
     setTouched(createAllTouched());
+    setSaveError(null);
 
     if (!isProfileFormValid(errors)) {
-      const msg = getFirstProfileError(errors);
       const field = getFirstProfileErrorField(errors);
-      if (field) {
-        document.querySelector(`[data-field="${field}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      window.alert(msg || "Please fix the highlighted errors.");
+      // Scroll to the inline error banner first; fall back to the first field.
+      setTimeout(() => {
+        if (errorBannerRef.current) {
+          errorBannerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else if (field) {
+          document.querySelector(`[data-field="${field}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 0);
       return;
     }
-    
+
     setSaving(true);
     try {
       const savePayload = buildVolunteerPayload(volunteerState);
@@ -239,7 +252,22 @@ export function ProfilePage() {
       setSubmitAttempted(false);
       setTouched(createEmptyTouched());
       fetchProfile();
-    } catch (e) { console.error("Failed to save profile:", e); }
+    } catch (e: any) {
+      console.error("Failed to save profile:", e);
+      // Surface a friendly explanation rather than failing silently.
+      const raw = typeof e?.message === "string" ? e.message : "";
+      let friendly = "We couldn't save your changes. Please try again.";
+      if (raw) {
+        const lower = raw.toLowerCase();
+        if (lower.includes("interest") || lower.includes("cause")) friendly = raw;
+        else if (lower.includes("network") || lower.includes("fetch")) friendly = "Could not reach the server. Check your connection and try again.";
+        else friendly = raw;
+      }
+      setSaveError(friendly);
+      setTimeout(() => {
+        errorBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+    }
     finally { setSaving(false); }
   };
 
@@ -520,9 +548,37 @@ export function ProfilePage() {
               <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
                 <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
                   <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: 0 }}>Edit Profile</h3>
-                  <button onClick={() => { setEditing(false); setSubmitAttempted(false); setTouched(createEmptyTouched()); }} style={{ background: "none", border: "none", fontSize: 20, color: "#94A3B8", cursor: "pointer" }}>&times;</button>
+                  <button onClick={() => { setEditing(false); setSubmitAttempted(false); setSaveError(null); setTouched(createEmptyTouched()); }} style={{ background: "none", border: "none", fontSize: 20, color: "#94A3B8", cursor: "pointer" }}>&times;</button>
                 </div>
-                
+
+                {/* Global error summary — shown only after save attempt */}
+                <div ref={errorBannerRef}>
+                  {(submitAttempted || saveError) && (() => {
+                    const summary = buildErrorSummary(errors, PROFILE_TOUCHABLE_FIELDS as readonly string[]);
+                    if (summary.length === 0 && !saveError) return null;
+                    return (
+                      <div role="alert" style={{
+                        backgroundColor: "#FEF2F2", border: "1.5px solid #FCA5A5",
+                        borderRadius: 8, padding: "12px 14px", marginBottom: 16,
+                      }}>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: "#991B1B", margin: "0 0 6px 0" }}>
+                          Almost there — a few things need your attention
+                        </p>
+                        {summary.length > 0 && (
+                          <ul style={{ margin: 0, paddingLeft: 18, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }}>
+                            {summary.map((it) => (
+                              <li key={it.field}><strong>{it.label}:</strong> {it.message}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {saveError && (
+                          <p style={{ margin: summary.length > 0 ? "8px 0 0 0" : 0, color: "#991B1B", fontSize: 13 }}>{saveError}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* Read-only fields */}
                 <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "12px 16px", marginBottom: 4 }}>
                   <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>These details can only be changed by contacting the administration.</p>
@@ -884,7 +940,7 @@ export function ProfilePage() {
                 </div>
 
                 {/* Cause Areas — Tap-to-Rank (matches Registration) */}
-                <div style={{ marginTop: 16 }}>
+                <div data-field="causeAreas" style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Cause Areas / Interests <span style={{ color: "#94A3B8", fontWeight: 400, fontSize: 12 }}>(optional)</span></label>
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 2px 0" }}>
                     Tap causes in order of preference — your top choice first (up to {MAX_CAUSES})

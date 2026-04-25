@@ -127,11 +127,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: true, message: result.message, orgStatus: status };
       }
 
-      // Parse error body for a raw message to inspect
+      // Parse error body for a raw message to inspect.
+      // FastAPI returns { detail: "..." } for HTTPException; some endpoints
+      // use { message } / { error }. Validation errors return detail as an array.
       let rawMessage = "";
       try {
         const errData = await res.json();
-        rawMessage = errData.message || errData.error || "";
+        if (typeof errData.detail === "string") rawMessage = errData.detail;
+        else if (Array.isArray(errData.detail) && errData.detail[0]?.msg) rawMessage = errData.detail[0].msg;
+        else rawMessage = errData.message || errData.error || "";
       } catch { /* ignore */ }
 
       // Map to a user-facing message based on status code + raw message keywords

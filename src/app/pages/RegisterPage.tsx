@@ -17,6 +17,7 @@ import {
   validateEducationLevel, validateUniversityName, validateFaculty,
   validateStudyYear, validateFieldOfStudy, validateEducationOther,
   validateCauseAreas,
+  buildErrorSummary, STEP3_FIELDS,
   MAX_EDUCATION_OTHER,
   type ExperienceEntry,
   type VolunteerEditableState,
@@ -66,6 +67,8 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [step3SubmitAttempted, setStep3SubmitAttempted] = useState(false);
+  const step3BannerRef = useRef<HTMLDivElement | null>(null);
 
   // ── Organization form ──
   const [orgForm, setOrgForm] = useState({
@@ -918,6 +921,29 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                 {/* ── STEP 3: PREFERENCES & SKILLS ──────────────────── */}
                 {step === 3 && (
                   <>
+                    <div ref={step3BannerRef}>
+                      {step3SubmitAttempted && !step3Valid && (() => {
+                        const summary = buildErrorSummary(errors, STEP3_FIELDS as readonly string[]);
+                        const items: { label: string; message: string }[] = summary.map((s) => ({ label: s.label, message: s.message }));
+                        if (!termsAccepted) items.push({ label: "Terms", message: "Please accept the Terms & Privacy Policy to continue." });
+                        if (items.length === 0) return null;
+                        return (
+                          <div role="alert" style={{
+                            backgroundColor: "#FEF2F2", border: "1.5px solid #FCA5A5",
+                            borderRadius: 8, padding: "12px 14px", marginBottom: 12,
+                          }}>
+                            <p style={{ fontSize: 14, fontWeight: 600, color: "#991B1B", margin: "0 0 6px 0" }}>
+                              Almost there — a few things need your attention
+                            </p>
+                            <ul style={{ margin: 0, paddingLeft: 18, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }}>
+                              {items.map((it, i) => (
+                                <li key={i}><strong>{it.label}:</strong> {it.message}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     <SectionHeader>Preferences & Skills</SectionHeader>
 
                     {/* Preferred Department */}
@@ -1483,6 +1509,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       style={{ flex: 1 }}
                       onClick={() => {
                         if (!step3Valid) {
+                          setStep3SubmitAttempted(true);
                           setTouched((t) => ({ ...t, skills: true, availability: true, languages: true, priorExperiences: true, causeAreas: true }));
                           if (experiences.length > 0) {
                             setExpTouched((t) => {
@@ -1495,6 +1522,9 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                               return next;
                             });
                           }
+                          setTimeout(() => {
+                            step3BannerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }, 0);
                         }
                       }}
                     >

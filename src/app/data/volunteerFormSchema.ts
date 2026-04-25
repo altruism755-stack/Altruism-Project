@@ -364,7 +364,7 @@ export function getExperienceFieldError(
 
 export function validateCauseAreas(areas: string[]): string {
   if (areas.length === 0 || areas.length === 5) return "";
-  return "You can select 5 interests to help us match you better, or leave it for later";
+  return "Choose all 5 interests, or clear your selection to skip this step";
 }
 
 // ── Canonical volunteer payload shape (frontend → backend) ───────────
@@ -618,6 +618,49 @@ export function getFirstProfileErrorField(errors: VolunteerErrors): string | nul
     if (errors[key]) return key;
   }
   return null;
+}
+
+/** Human-friendly labels for use in the global error summary banner. */
+export const FIELD_LABELS: Record<string, string> = {
+  fullName: "Full name",
+  email: "Email",
+  password: "Password",
+  confirmPassword: "Password confirmation",
+  nationality: "Nationality",
+  nationalId: "National ID / Passport",
+  dateOfBirth: "Date of birth",
+  governorate: "Governorate",
+  phone: "Phone",
+  city: "City",
+  gender: "Gender",
+  educationLevel: "Education level",
+  universityName: "University name",
+  faculty: "Faculty",
+  studyYear: "Study year",
+  fieldOfStudy: "Field of study",
+  educationOther: "Education details",
+  skills: "Skills",
+  languages: "Languages",
+  priorExperiences: "Prior experiences",
+  causeAreas: "Interests",
+};
+
+/**
+ * Build a list of `{ field, label, message }` for every active error,
+ * filtered to a given set of relevant field keys. Powers the global
+ * "Almost there" banner shown on submit.
+ */
+export function buildErrorSummary(
+  errors: VolunteerErrors,
+  relevantFields: readonly string[],
+): { field: string; label: string; message: string }[] {
+  return relevantFields
+    .filter((f) => !!errors[f])
+    .map((f) => ({
+      field: f,
+      label: FIELD_LABELS[f] ?? f,
+      message: errors[f],
+    }));
 }
 
 // ── Touched-state helpers ────────────────────────────────────────────
