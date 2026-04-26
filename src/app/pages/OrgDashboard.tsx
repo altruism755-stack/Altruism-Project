@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -534,6 +534,548 @@ function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
   );
 }
 
+// ─── CSV Import Modal ─────────────────────────────────────────────────────────
+
+/** Parse a single CSV line, respecting double-quoted fields that contain commas. */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQ = !inQ; }
+    } else if (ch === "," && !inQ) {
+      result.push(cur.trim()); cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function parsedCSV(text: string): { headers: string[]; data: string[][] } {
+  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim());
+  if (!lines.length) return { headers: [], data: [] };
+  return {
+    headers: parseCSVLine(lines[0]).map((h) => h.toLowerCase().trim()),
+    data:    lines.slice(1).map(parseCSVLine),
+  };
+}
+
+const _EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const _PHONE_RE = /^01[0-9]{9}$/;
+
+interface LiveValidation {
+  rowCount: number;
+  hasRequired: boolean;
+  missingHeaders: string[];
+  errors: { row: number; message: string }[];
+}
+
+function runLiveValidation(text: string): LiveValidation {
+  if (!text.trim()) return { rowCount: 0, hasRequired: false, missingHeaders: ["name", "email"], errors: [] };
+  const { headers, data } = parsedCSV(text);
+  const missing = ["name", "email"].filter((h) => !headers.includes(h));
+  const emailIdx = headers.indexOf("email");
+  const phoneIdx = headers.indexOf("phone");
+  const errors: LiveValidation["errors"] = [];
+
+  if (!missing.length) {
+    data.forEach((row, i) => {
+      const rowNum = i + 2;
+      if (row.length < headers.length) {
+        errors.push({ row: rowNum, message: `Row ${rowNum} has missing fields` });
+        return;
+      }
+      const email = (row[emailIdx] ?? "").trim();
+      if (email && !_EMAIL_RE.test(email))
+        errors.push({ row: rowNum, message: `Invalid email on row ${rowNum}` });
+      if (phoneIdx >= 0) {
+        const phone = (row[phoneIdx] ?? "").replace(/\s/g, "");
+        if (phone && !_PHONE_RE.test(phone))
+          errors.push({ row: rowNum, message: `Invalid phone on row ${rowNum} (must be 11 digits starting with 01)` });
+      }
+    });
+  }
+  return { rowCount: data.length, hasRequired: !missing.length, missingHeaders: missing, errors };
+}
+
+type ImportStep = "input" | "preview" | "confirming" | "importing" | "result";
+
+interface PreviewRow {
+  name: string; email: string; phone: string; city: string; skills: string;
+  status: "new" | "existing" | "error"; reason?: string;
+}
+
+const DUP_HINTS: Record<string, string> = {
+  skip_duplicates: "Existing volunteers will not be changed.",
+  update_existing: "Department and source fields will be refreshed.",
+  invite_anyway:   "An invitation link will be regenerated if their account is not yet active.",
+};
+
+function ImportModal({ orgId, onClose, onSuccess }: {
+  orgId: number; onClose: () => void; onSuccess: () => void;
+}) {
+  const [step, setStep]             = useState<ImportStep>("input");
+  const [csvText, setCsvText]       = useState("");
+  const [fileName, setFileName]     = useState<string | null>(null);
+  const [dupStrategy, setDupStrategy] = useState("skip_duplicates");
+  const [liveVal, setLiveVal]       = useState<LiveValidation | null>(null);
+  const [previewData, setPreviewData] = useState<{ summary: { new: number; existing: number; errors: number }; rows: PreviewRow[] } | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Escape key — don't close while import is running
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape" && step !== "importing") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose, step]);
+
+  // Debounced live validation (500 ms)
+  useEffect(() => {
+    if (!csvText.trim()) { setLiveVal(null); return; }
+    const t = setTimeout(() => setLiveVal(runLiveValidation(csvText)), 500);
+    return () => clearTimeout(t);
+  }, [csvText]);
+
+  const handleFile = (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      alert("Please select a .csv file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = (ev.target?.result as string) ?? "";
+      setCsvText(text);
+      const { data } = parsedCSV(text);
+      setFileName(`${file.name} (${data.length} row${data.length !== 1 ? "s" : ""})`);
+    };
+    reader.readAsText(file);
+  };
+
+  const handlePreview = async () => {
+    setPreviewError(null);
+    if (!csvText.trim()) { setPreviewError("Please enter CSV data or upload a file."); return; }
+    setPreviewing(true);
+    try {
+      const res = await api.previewVolunteersCSV(orgId, csvText, dupStrategy);
+      setPreviewData(res);
+      setStep("preview");
+    } catch {
+      setPreviewError("Preview failed. Please check your CSV format and try again.");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const handleImport = async () => {
+    setPreviewError(null);
+    setStep("importing");
+    try {
+      const res = await api.importVolunteersCSV(orgId, csvText, dupStrategy);
+      setImportResult(res);
+      setStep("result");
+      onSuccess();
+    } catch {
+      setStep("preview");
+      setPreviewError("Import failed. Please try again.");
+    }
+  };
+
+  const downloadTemplate = () => {
+    const rows = [
+      "name,email,phone,city,skills,department,role,source",
+      "Ahmed Ali,ahmed@example.com,01012345678,Cairo,Teaching,Education,volunteer,manual_import",
+      'Mona Khalil,mona@example.com,01098765432,Alexandria,"Event Planning,Communication",Programs,volunteer,manual_import',
+      "Omar Hassan,omar@example.com,01155667788,Giza,Leadership|Management,Operations,volunteer,platform",
+    ];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"), { href: url, download: "volunteers_template.csv" });
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const downloadErrorReport = () => {
+    if (!importResult?.errors?.length) return;
+    const lines = ["row,reason", ...importResult.errors.map((e: any) => `"${e.row}","${e.reason}"`)];
+    const blob  = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url   = URL.createObjectURL(blob);
+    const a     = Object.assign(document.createElement("a"), { href: url, download: "import_errors.csv" });
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const resetToInput = () => {
+    setStep("input"); setCsvText(""); setFileName(null); setLiveVal(null);
+    setPreviewData(null); setPreviewError(null); setImportResult(null);
+  };
+
+  // Preview button enabled only when text present + no blocking validation errors
+  const canPreview =
+    !previewing && !!csvText.trim() &&
+    (!liveVal || (liveVal.hasRequired && liveVal.errors.length === 0));
+
+  const importableCount = (previewData?.summary.new ?? 0) + (previewData?.summary.existing ?? 0);
+
+  return (
+    <>
+      {/* Keyframe injection */}
+      <style>{`
+        @keyframes _fadeSlide { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes _shimmer   { 0%,100% { background-position:200% 0; } }
+      `}</style>
+
+      {/* Backdrop — does NOT close modal (prevents accidental data loss) */}
+      <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            backgroundColor: "#fff", borderRadius: 16, width: "100%",
+            maxWidth: step === "preview" || step === "confirming" ? 720 : 640,
+            padding: 28, maxHeight: "90vh", overflowY: "auto",
+            transition: "max-width 220ms ease",
+          }}
+        >
+
+          {/* ── INPUT ─────────────────────────────────────────────────────── */}
+          {step === "input" && (
+            <>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 6 }}>Import Volunteers from CSV</div>
+              <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6, marginBottom: 16 }}>
+                Import volunteers using a CSV file. New users will receive an invitation link to activate their account.
+                Existing users will be automatically linked to your organization.
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+              />
+
+              {/* Upload + template row */}
+              <div style={{ display: "flex", gap: 8, marginBottom: fileName ? 8 : 10 }}>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ height: 36, padding: "0 14px", backgroundColor: "#F1F5F9", color: "#1E293B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  Upload CSV file
+                </button>
+                <button
+                  onClick={downloadTemplate}
+                  style={{ height: 36, padding: "0 14px", backgroundColor: "#fff", color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  Download template
+                </button>
+              </div>
+
+              {/* Filename badge */}
+              {fileName && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 10px", backgroundColor: "#F0F9FF", borderRadius: 8, border: "1px solid #BAE6FD" }}>
+                  <span style={{ fontSize: 12, color: "#0369A1" }}>📄 {fileName}</span>
+                  <button
+                    onClick={() => { setCsvText(""); setFileName(null); setLiveVal(null); }}
+                    style={{ marginLeft: "auto", fontSize: 11, color: "#64748B", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}
+                  >
+                    Clear ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Textarea */}
+              <textarea
+                value={csvText}
+                onChange={(e) => { setCsvText(e.target.value); setFileName(null); }}
+                placeholder={"name,email,phone,city,skills\nAhmed Ali,ahmed@example.com,01012345678,Cairo,Teaching\nMona Khalil,mona@example.com,01098765432,Alexandria,\"Event Planning,Communication\""}
+                style={{
+                  width: "100%", minHeight: 150, padding: 12, fontSize: 12, fontFamily: "monospace",
+                  border: `1px solid ${liveVal && (!liveVal.hasRequired || liveVal.errors.length > 0) ? "#FECACA" : "#E2E8F0"}`,
+                  borderRadius: 8, resize: "vertical", outline: "none", boxSizing: "border-box",
+                  transition: "border-color 200ms", marginBottom: 6,
+                }}
+              />
+
+              {/* Live validation feedback */}
+              {liveVal && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 12, color: "#64748B", marginBottom: liveVal.errors.length ? 6 : 0 }}>
+                    <span>{liveVal.rowCount} row{liveVal.rowCount !== 1 ? "s" : ""} detected (excluding header)</span>
+                    {liveVal.hasRequired
+                      ? <span style={{ color: "#15803D", fontWeight: 500 }}>✓ Required headers found</span>
+                      : <span style={{ color: "#B91C1C", fontWeight: 500 }}>✗ Missing: {liveVal.missingHeaders.join(", ")}</span>
+                    }
+                  </div>
+                  {liveVal.errors.length > 0 && (
+                    <div style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "8px 10px" }}>
+                      {liveVal.errors.slice(0, 5).map((e, i) => (
+                        <div key={i} style={{ fontSize: 12, color: "#B91C1C", padding: "1px 0" }}>• {e.message}</div>
+                      ))}
+                      {liveVal.errors.length > 5 && (
+                        <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>+ {liveVal.errors.length - 5} more issues</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Duplicate strategy */}
+              <div style={{ marginBottom: 16 }}>
+                <label
+                  aria-label="Duplicate handling strategy"
+                  style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 6 }}
+                >
+                  If a volunteer is already in this organization:
+                </label>
+                <select
+                  value={dupStrategy}
+                  onChange={(e) => setDupStrategy(e.target.value)}
+                  style={{ height: 38, padding: "0 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#1E293B", outline: "none", backgroundColor: "#fff", width: "100%", marginBottom: 4 }}
+                >
+                  <option value="skip_duplicates">Skip — do not change existing members</option>
+                  <option value="update_existing">Update — refresh department / source fields</option>
+                  <option value="invite_anyway">Re-invite — resend invitation if account not yet activated</option>
+                </select>
+                <div style={{ fontSize: 12, color: "#64748B", paddingLeft: 2 }}>{DUP_HINTS[dupStrategy]}</div>
+              </div>
+
+              {previewError && (
+                <div style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 13, color: "#B91C1C" }}>
+                  {previewError}
+                </div>
+              )}
+
+              <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+                <button onClick={onClose} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+                  Close
+                </button>
+                <button
+                  onClick={handlePreview}
+                  disabled={!canPreview}
+                  style={{ height: 36, padding: "0 18px", backgroundColor: canPreview ? "#16A34A" : "#86EFAC", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: canPreview ? "pointer" : "not-allowed", opacity: canPreview ? 1 : 0.75 }}
+                >
+                  {previewing ? "Analyzing..." : "Preview"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── PREVIEW ───────────────────────────────────────────────────── */}
+          {step === "preview" && previewData && (
+            <>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 12 }}>Import Preview</div>
+
+              {/* Summary bar */}
+              <div style={{ display: "flex", gap: 16, padding: "10px 14px", backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, marginBottom: 14, fontSize: 13, flexWrap: "wrap" }}>
+                <span style={{ color: "#15803D", fontWeight: 500 }}>✅ {previewData.summary.new} will be created</span>
+                <span style={{ color: "#0369A1", fontWeight: 500 }}>🔵 {previewData.summary.existing} existing</span>
+                <span style={{ color: "#B91C1C", fontWeight: 500 }}>❌ {previewData.summary.errors} error{previewData.summary.errors !== 1 ? "s" : ""}</span>
+              </div>
+
+              {previewError && (
+                <div style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 13, color: "#B91C1C" }}>
+                  {previewError}
+                </div>
+              )}
+
+              {/* Row table */}
+              <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #E2E8F0", marginBottom: 16, animation: "_fadeSlide 200ms ease" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#F8FAFC" }}>
+                      {["Name", "Email", "Phone", "City", "Skills", "Status"].map((h) => (
+                        <th key={h} style={{ padding: "9px 12px", textAlign: "left", fontWeight: 600, color: "#64748B", fontSize: 11, borderBottom: "1px solid #E2E8F0", whiteSpace: "nowrap" }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.rows.map((r, i) => (
+                      <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                        <td style={{ padding: "8px 12px", color: "#1E293B", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name || "—"}</td>
+                        <td style={{ padding: "8px 12px", color: "#64748B", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.email || "—"}</td>
+                        <td style={{ padding: "8px 12px", color: "#64748B", whiteSpace: "nowrap" }}>{r.phone || "—"}</td>
+                        <td style={{ padding: "8px 12px", color: "#64748B", whiteSpace: "nowrap" }}>{r.city || "—"}</td>
+                        <td style={{ padding: "8px 12px", color: "#64748B", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.skills || "—"}</td>
+                        <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                          {r.status === "new"      && <span style={{ padding: "2px 8px", backgroundColor: "#DCFCE7", color: "#15803D",  borderRadius: 20, fontSize: 11, fontWeight: 600 }}>🟢 New</span>}
+                          {r.status === "existing" && <span style={{ padding: "2px 8px", backgroundColor: "#E0F2FE", color: "#0369A1",  borderRadius: 20, fontSize: 11, fontWeight: 600 }}>🔵 Existing</span>}
+                          {r.status === "error"    && (
+                            <span title={r.reason} style={{ padding: "2px 8px", backgroundColor: "#FEE2E2", color: "#B91C1C", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "help" }}>
+                              🔴 Error
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => { setStep("input"); setPreviewError(null); }}
+                  style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => setStep("confirming")}
+                  disabled={importableCount === 0}
+                  style={{ height: 36, padding: "0 18px", backgroundColor: importableCount > 0 ? "#16A34A" : "#86EFAC", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: importableCount > 0 ? "pointer" : "not-allowed" }}
+                >
+                  Import {importableCount} volunteer{importableCount !== 1 ? "s" : ""}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── CONFIRM ───────────────────────────────────────────────────── */}
+          {step === "confirming" && previewData && (
+            <div style={{ textAlign: "center", padding: "16px 0 8px" }}>
+              <div style={{ fontSize: 38, marginBottom: 12 }}>⚠️</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", marginBottom: 8 }}>Confirm Import</div>
+              <div style={{ fontSize: 14, color: "#64748B", lineHeight: 1.7, marginBottom: 28, maxWidth: 400, margin: "0 auto 28px" }}>
+                You are about to import{" "}
+                <strong>{importableCount} volunteer{importableCount !== 1 ? "s" : ""}</strong>.
+                {previewData.summary.new > 0 && <> New users will receive an invitation link.</>}
+                {" "}This action cannot be undone. Continue?
+              </div>
+              <div className="flex gap-3" style={{ justifyContent: "center" }}>
+                <button
+                  onClick={() => setStep("preview")}
+                  style={{ height: 40, padding: "0 22px", backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImport}
+                  style={{ height: 40, padding: "0 26px", backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+                >
+                  Confirm &amp; Import
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── IMPORTING ─────────────────────────────────────────────────── */}
+          {step === "importing" && (
+            <div style={{ textAlign: "center", padding: "36px 0" }}>
+              <div style={{ fontSize: 34, marginBottom: 14 }}>⏳</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", marginBottom: 6 }}>Importing volunteers…</div>
+              <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>Please wait, this may take a moment.</div>
+              <div style={{ height: 4, backgroundColor: "#E2E8F0", borderRadius: 4, overflow: "hidden", maxWidth: 300, margin: "0 auto" }}>
+                <div style={{ height: "100%", background: "linear-gradient(90deg,#16A34A 0%,#22C55E 50%,#16A34A 100%)", backgroundSize: "200% 100%", borderRadius: 4, animation: "_shimmer 1.4s linear infinite" }} />
+              </div>
+            </div>
+          )}
+
+          {/* ── RESULT ────────────────────────────────────────────────────── */}
+          {step === "result" && importResult && (() => {
+            const isFullSuccess  = importResult.errorCount === 0 && importResult.successCount > 0;
+            const isPartial      = importResult.errorCount > 0 && importResult.successCount > 0;
+            const isFullFailure  = importResult.successCount === 0;
+            return (
+              <>
+                {/* Headline */}
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>
+                    {isFullSuccess ? "✅" : isPartial ? "⚠️" : "❌"}
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: isFullSuccess ? "#15803D" : isPartial ? "#B45309" : "#B91C1C" }}>
+                    {isFullSuccess && `${importResult.successCount} volunteer${importResult.successCount !== 1 ? "s" : ""} imported successfully.`}
+                    {isPartial    && `${importResult.successCount} imported, ${importResult.skippedCount} skipped, ${importResult.errorCount} error${importResult.errorCount !== 1 ? "s" : ""}.`}
+                    {isFullFailure && "Import failed. No volunteers were added."}
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                  {[
+                    { label: "Invited (new)",     value: importResult.invitedCount,  color: "#7C3AED", bg: "#F5F3FF" },
+                    { label: "Linked (existing)", value: importResult.linkedCount,   color: "#0369A1", bg: "#F0F9FF" },
+                    { label: "Skipped",           value: importResult.skippedCount,  color: "#92400E", bg: "#FFFBEB" },
+                    { label: "Errors",            value: importResult.errorCount,    color: "#B91C1C", bg: "#FEF2F2" },
+                  ].map((c) => (
+                    <div key={c.label} style={{ backgroundColor: c.bg, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: c.color }}>{c.value}</div>
+                      <div style={{ fontSize: 10, color: "#64748B", marginTop: 1 }}>{c.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Invite links */}
+                {importResult.inviteLinks?.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1E293B", marginBottom: 8 }}>
+                      Invitation Links — share with new volunteers (expire in 48 h)
+                    </div>
+                    <div style={{ backgroundColor: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 8, padding: 10, maxHeight: 180, overflowY: "auto" }}>
+                      {importResult.inviteLinks.map((il: any, i: number) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: i < importResult.inviteLinks.length - 1 ? "1px solid #EDE9FE" : "none" }}>
+                          <span style={{ fontSize: 11, color: "#4C1D95", fontWeight: 500, minWidth: 155, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{il.email}</span>
+                          <input
+                            readOnly value={il.link}
+                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                            style={{ flex: 1, height: 26, padding: "0 8px", fontSize: 10, fontFamily: "monospace", border: "1px solid #DDD6FE", borderRadius: 5, backgroundColor: "#fff", outline: "none" }}
+                          />
+                          <button
+                            onClick={() => navigator.clipboard.writeText(il.link)}
+                            style={{ height: 26, padding: "0 8px", backgroundColor: "#7C3AED", color: "#fff", border: "none", borderRadius: 5, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error report */}
+                {importResult.errorCount > 0 && (
+                  <div style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: 12, marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#B91C1C" }}>
+                        {importResult.errorCount} error{importResult.errorCount !== 1 ? "s" : ""}
+                      </span>
+                      <button
+                        onClick={downloadErrorReport}
+                        style={{ fontSize: 12, color: "#B91C1C", background: "none", border: "1px solid #FECACA", borderRadius: 6, padding: "2px 10px", cursor: "pointer" }}
+                      >
+                        Download error report
+                      </button>
+                    </div>
+                    <div style={{ maxHeight: 100, overflowY: "auto" }}>
+                      {importResult.errors.slice(0, 10).map((e: any, i: number) => (
+                        <div key={i} style={{ fontSize: 12, color: "#991B1B", padding: "1px 0" }}>{e.row}: {e.reason}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+                  <button onClick={resetToInput} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+                    Import Another
+                  </button>
+                  <button onClick={onClose} style={{ height: 36, padding: "0 18px", backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    Done
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 type MainTab = "volunteers" | "supervisors" | "activities" | "admins";
 
@@ -549,9 +1091,6 @@ export function OrgDashboard() {
   const [loading, setLoading]   = useState(true);
   const [tab, setTab]           = useState<MainTab>("volunteers");
   const [showImport, setShowImport] = useState(false);
-  const [csvText, setCsvText]   = useState("");
-  const [importResult, setImportResult] = useState<any>(null);
-  const [importing, setImporting] = useState(false);
 
   const loadAll = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
@@ -627,7 +1166,7 @@ export function OrgDashboard() {
             </p>
           </div>
           <button
-            onClick={() => { setShowImport(true); setCsvText(""); setImportResult(null); }}
+            onClick={() => setShowImport(true)}
             style={{
               height: 38, padding: "0 16px", backgroundColor: "#fff",
               color: "#1E293B", border: "1px solid #E2E8F0", borderRadius: 8,
@@ -640,59 +1179,12 @@ export function OrgDashboard() {
 
         {/* CSV import modal */}
         {showImport && (
-          <div onClick={() => setShowImport(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 600, padding: 28 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 8 }}>Import Volunteers from CSV</div>
-              <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6, marginBottom: 14 }}>
-                Paste CSV content with headers: <code style={{ backgroundColor: "#F1F5F9", padding: "1px 5px", borderRadius: 3 }}>name,email,phone,city,skills,department</code>.
-                Each volunteer is created with default password <strong>volunteer123</strong> and added to this organization as Active.
-              </div>
-              <textarea
-                value={csvText}
-                onChange={(e) => setCsvText(e.target.value)}
-                placeholder={"name,email,phone,city,skills\nAhmed Ali,ahmed@example.com,01012345678,Cairo,Teaching\nMona Khalil,mona@example.com,01098765432,Alexandria,\"Event Planning,Communication\""}
-                style={{ width: "100%", minHeight: 180, padding: 12, fontSize: 13, fontFamily: "monospace", border: "1px solid #E2E8F0", borderRadius: 8, resize: "vertical", outline: "none", boxSizing: "border-box" }}
-              />
-
-              {importResult && (
-                <div style={{ marginTop: 12, padding: 12, backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 13, color: "#15803D" }}>
-                  Imported <strong>{importResult.created}</strong> volunteers.
-                  {importResult.skipped > 0 && <> Skipped <strong>{importResult.skipped}</strong> (already existed or missing fields).</>}
-                  {importResult.errors?.length > 0 && (
-                    <div style={{ marginTop: 6, color: "#B91C1C" }}>
-                      Errors: {importResult.errors.slice(0, 3).join("; ")}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2" style={{ marginTop: 16, justifyContent: "flex-end" }}>
-                <button onClick={() => setShowImport(false)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
-                  Close
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!csvText.trim()) return;
-                    setImporting(true);
-                    try {
-                      const res = await api.importVolunteersCSV(orgId, csvText);
-                      setImportResult(res);
-                      loadAll();
-                    } catch (e: any) {
-                      setImportResult({ created: 0, skipped: 0, errors: [e.message || "Failed"] });
-                    }
-                    setImporting(false);
-                  }}
-                  disabled={importing || !csvText.trim()}
-                  style={{ height: 36, padding: "0 18px", backgroundColor: importing || !csvText.trim() ? "#86EFAC" : "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: importing ? "wait" : "pointer" }}
-                >
-                  {importing ? "Importing..." : "Import"}
-                </button>
-              </div>
-            </div>
-          </div>
+          <ImportModal
+            orgId={orgId}
+            onClose={() => setShowImport(false)}
+            onSuccess={() => { loadAll(); setShowImport(false); }}
+          />
         )}
-
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 28 }}>
           {statCards.map((s) => (

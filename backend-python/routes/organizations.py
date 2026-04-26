@@ -1,16 +1,85 @@
 import csv
 import io
 import json
+import os
+import re
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Any, Optional
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles, require_approved_org_admin, hash_password
+from auth import get_current_user, require_roles, require_approved_org_admin
+
+# Base URL for invite links — set APP_BASE_URL in env for production.
+_APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+DUPLICATE_STRATEGIES = {"skip_duplicates", "update_existing", "invite_anyway"}
 
 
 class AddOrgAdminBody(BaseModel):
     email: str
+
+
+class ImportCSVBody(BaseModel):
+    csv: str
+    duplicate_strategy: str = "skip_duplicates"
+
+
+def _make_invite_link(token: str) -> str:
+    """Phase 1: returns a link for manual distribution.
+    Phase 2: call your email service here and keep this as the single integration point."""
+    return f"{_APP_BASE_URL}/accept-invite?token={token}"
+
+
+def _validate_csv_row(row: dict, row_num: int) -> tuple:
+    """Returns (cleaned_row, error_dict). Exactly one will be None."""
+    name  = (row.get("name")  or row.get("Name")  or "").strip()
+    email = (row.get("email") or row.get("Email") or "").strip().lower()
+    if not name:
+        return None, {"row": row_num, "reason": "Missing name"}
+    if not email:
+        return None, {"row": row_num, "reason": "Missing email"}
+    if not _EMAIL_RE.match(email):
+        return None, {"row": row_num, "reason": f"Invalid email format: {email}"}
+    return {
+        "name":       name,
+        "email":      email,
+        "phone":      (row.get("phone")      or "").strip(),
+        "city":       (row.get("city")       or row.get("governorate") or "").strip(),
+        "skills":     [s.strip() for s in (row.get("skills") or "").split(",") if s.strip()],
+        "department": (row.get("department") or "").strip(),
+        "role":       (row.get("role")       or "volunteer").strip(),
+        "source":     (row.get("source")     or "manual_import").strip(),
+    }, None
+
+
+def _parse_csv(csv_text: str) -> tuple:
+    """Parse CSV text. Returns (valid_rows, errors, duplicate_emails_in_csv)."""
+    reader      = csv.DictReader(io.StringIO(csv_text.strip()))
+    valid_rows  = []
+    errors      = []
+    seen_emails = set()
+    csv_dupes   = set()
+
+    for i, row in enumerate(reader, start=2):  # row 1 = header
+        cleaned, err = _validate_csv_row(row, i)
+        if err:
+            errors.append(err)
+            continue
+        email = cleaned["email"]
+        if email in seen_emails:
+            csv_dupes.add(email)
+            errors.append({"row": i, "reason": f"Duplicate email in CSV: {email}"})
+            continue
+        seen_emails.add(email)
+        valid_rows.append(cleaned)
+
+    return valid_rows, errors, csv_dupes
 
 
 # Fields the org admin can update directly on their own profile.
@@ -357,92 +426,228 @@ def reject_org_member(
         return {"message": "Request rejected"}
 
 
+def _assert_org_access(db, org_id: int, user_id: int):
+    org = dict_row(db.execute(
+        "SELECT id, name FROM organizations WHERE id = ? AND admin_user_id = ?",
+        (org_id, user_id),
+    ).fetchone())
+    if not org:
+        raise HTTPException(403, "Not authorized for this organization")
+    return org
+
+
+@router.post("/{org_id}/import-csv/preview")
+def preview_import_csv(
+    org_id: int,
+    body: ImportCSVBody,
+    current_user: dict = Depends(require_roles("org_admin")),
+):
+    """Dry-run: parse and validate CSV, return per-row status + summary without writing."""
+    if not body.csv.strip():
+        raise HTTPException(400, "CSV content is required")
+    if body.duplicate_strategy not in DUPLICATE_STRATEGIES:
+        raise HTTPException(400, f"duplicate_strategy must be one of: {', '.join(DUPLICATE_STRATEGIES)}")
+
+    with get_db() as db:
+        _assert_org_access(db, org_id, current_user["id"])
+
+        reader      = csv.DictReader(io.StringIO(body.csv.strip()))
+        result_rows = []
+        seen_emails = set()
+
+        for i, raw_row in enumerate(reader, start=2):
+            cleaned, err = _validate_csv_row(raw_row, i)
+
+            # Build a display row regardless of validity
+            name  = (raw_row.get("name")  or raw_row.get("Name")  or "").strip()
+            email = (raw_row.get("email") or raw_row.get("Email") or "").strip().lower()
+            phone = (raw_row.get("phone") or "").strip()
+            city  = (raw_row.get("city")  or raw_row.get("governorate") or "").strip()
+            skills_raw = (raw_row.get("skills") or "").strip()
+
+            if err:
+                result_rows.append({
+                    "name": name, "email": email, "phone": phone, "city": city,
+                    "skills": skills_raw, "status": "error", "reason": err["reason"],
+                })
+                continue
+
+            if cleaned["email"] in seen_emails:
+                result_rows.append({
+                    "name": name, "email": email, "phone": phone, "city": city,
+                    "skills": skills_raw, "status": "error",
+                    "reason": f"Duplicate email in CSV: {email}",
+                })
+                continue
+
+            seen_emails.add(cleaned["email"])
+
+            # DB lookup to determine status
+            user_row = dict_row(db.execute(
+                "SELECT id FROM users WHERE email = ?", (cleaned["email"],)
+            ).fetchone())
+
+            if not user_row:
+                row_status = "new"
+            else:
+                vol_row = dict_row(db.execute(
+                    "SELECT id FROM volunteers WHERE user_id = ?", (user_row["id"],)
+                ).fetchone())
+                vol_id = vol_row["id"] if vol_row else None
+                if vol_id:
+                    in_org = db.execute(
+                        "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                        (org_id, vol_id),
+                    ).fetchone()
+                    row_status = "existing"  # covers both already-in and will-link
+                else:
+                    row_status = "existing"
+
+            result_rows.append({
+                "name": cleaned["name"], "email": cleaned["email"],
+                "phone": cleaned["phone"], "city": cleaned["city"],
+                "skills": ", ".join(cleaned["skills"]),
+                "status": row_status,
+            })
+
+    summary = {
+        "new":      sum(1 for r in result_rows if r["status"] == "new"),
+        "existing": sum(1 for r in result_rows if r["status"] == "existing"),
+        "errors":   sum(1 for r in result_rows if r["status"] == "error"),
+    }
+    return {"summary": summary, "rows": result_rows}
+
+
 @router.post("/{org_id}/import-csv")
 def import_volunteers_csv(
     org_id: int,
-    body: dict,
+    body: ImportCSVBody,
     current_user: dict = Depends(require_roles("org_admin")),
 ):
-    """Bulk-import volunteers from CSV content.
+    """Bulk-import volunteers from CSV.
 
-    Expected CSV headers: name, email, phone (optional), city (optional), skills (optional)
-    Volunteers are created with a default password and auto-added to the org with 'Active' status.
+    Extended headers: name, email, phone, city, skills, department, role, source
+    New users are created without a password and receive a secure invite link.
+    Existing users are linked to the organization directly.
     """
-    csv_text = (body or {}).get("csv", "")
-    if not csv_text.strip():
+    if not body.csv.strip():
         raise HTTPException(400, "CSV content is required")
+    if body.duplicate_strategy not in DUPLICATE_STRATEGIES:
+        raise HTTPException(400, f"duplicate_strategy must be one of: {', '.join(DUPLICATE_STRATEGIES)}")
+
+    valid_rows, parse_errors, _csv_dupes = _parse_csv(body.csv)
+
+    invited_count  = 0
+    linked_count   = 0
+    skipped_count  = 0
+    runtime_errors = []
+    invite_links   = []
 
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE id = ? AND admin_user_id = ?",
-            (org_id, current_user["id"]),
-        ).fetchone())
-        if not org:
-            raise HTTPException(403, "Not authorized for this organization")
+        org = _assert_org_access(db, org_id, current_user["id"])
+        org_name = org["name"]
 
-        reader = csv.DictReader(io.StringIO(csv_text))
-        created, skipped, errors = 0, 0, []
-        default_pw_hash = hash_password("volunteer123")
-
-        for row in reader:
-            name = (row.get("name") or row.get("Name") or "").strip()
-            email = (row.get("email") or row.get("Email") or "").strip().lower()
-            if not name or not email:
-                skipped += 1
-                continue
+        for r in valid_rows:
+            email = r["email"]
             try:
-                existing_user = db.execute(
-                    "SELECT id FROM users WHERE email = ?", (email,)
-                ).fetchone()
+                existing_user = dict_row(db.execute(
+                    "SELECT id, role, invite_token FROM users WHERE email = ?", (email,)
+                ).fetchone())
+
                 if existing_user:
                     user_id = existing_user["id"]
-                    vol = db.execute(
+                    vol_row = dict_row(db.execute(
                         "SELECT id FROM volunteers WHERE user_id = ?", (user_id,)
+                    ).fetchone())
+                    vol_id = vol_row["id"] if vol_row else None
+
+                    if vol_id is None:
+                        cur = db.execute(
+                            "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
+                            "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+                            (user_id, r["name"], email, r["phone"] or None, r["city"] or None,
+                             json.dumps(r["skills"])),
+                        )
+                        vol_id = cur.lastrowid
+
+                    in_org = db.execute(
+                        "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                        (org_id, vol_id),
                     ).fetchone()
-                    vol_id = vol["id"] if vol else None
+
+                    if in_org:
+                        if body.duplicate_strategy == "skip_duplicates":
+                            skipped_count += 1
+                            continue
+                        elif body.duplicate_strategy == "update_existing":
+                            db.execute(
+                                "UPDATE org_volunteers SET department = ?, source = ? "
+                                "WHERE org_id = ? AND volunteer_id = ?",
+                                (r["department"] or None, r["source"], org_id, vol_id),
+                            )
+                            skipped_count += 1
+                            continue
+                        # invite_anyway: fall through to re-invite logic below only if pending invite
+                        if existing_user.get("invite_token"):
+                            token = secrets.token_urlsafe(32)
+                            expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
+                            db.execute(
+                                "UPDATE users SET invite_token = ?, invite_expires_at = ? WHERE id = ?",
+                                (token, expires, user_id),
+                            )
+                            invite_links.append({"email": email, "link": _make_invite_link(token)})
+                        skipped_count += 1
+                        continue
+
+                    # Existing user, not yet in this org — link them directly
+                    db.execute(
+                        "INSERT INTO org_volunteers (org_id, volunteer_id, status, department, source) "
+                        "VALUES (?, ?, 'Active', ?, 'existing_user')",
+                        (org_id, vol_id, r["department"] or None),
+                    )
+                    linked_count += 1
+
                 else:
+                    # Brand-new user — create without password, issue invite token
+                    token   = secrets.token_urlsafe(32)
+                    expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
                     cur = db.execute(
-                        "INSERT INTO users (email, password, role) VALUES (?, ?, 'volunteer')",
-                        (email, default_pw_hash),
+                        "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
+                        "VALUES (?, '', 'volunteer', ?, ?)",
+                        (email, token, expires),
                     )
                     user_id = cur.lastrowid
-                    vol_id = None
-
-                if vol_id is None:
                     cur = db.execute(
                         "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                        "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
-                        (
-                            user_id, name, email,
-                            (row.get("phone") or "").strip(),
-                            (row.get("city") or row.get("governorate") or "").strip(),
-                            json.dumps([s.strip() for s in (row.get("skills") or "").split(",") if s.strip()]),
-                        ),
+                        "VALUES (?, ?, ?, ?, ?, ?, 'Pending')",
+                        (user_id, r["name"], email, r["phone"] or None, r["city"] or None,
+                         json.dumps(r["skills"])),
                     )
                     vol_id = cur.lastrowid
-
-                existing_ov = db.execute(
-                    "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
-                    (org_id, vol_id),
-                ).fetchone()
-                if not existing_ov:
                     db.execute(
-                        "INSERT INTO org_volunteers (org_id, volunteer_id, status, department) "
-                        "VALUES (?, ?, 'Active', ?)",
-                        (org_id, vol_id, (row.get("department") or "").strip()),
+                        "INSERT INTO org_volunteers (org_id, volunteer_id, status, department, source) "
+                        "VALUES (?, ?, 'Pending', ?, 'invite')",
+                        (org_id, vol_id, r["department"] or None),
                     )
-                    created += 1
-                else:
-                    skipped += 1
-            except Exception as e:
-                errors.append(f"{email}: {e}")
+                    invite_links.append({"email": email, "link": _make_invite_link(token)})
+                    invited_count += 1
 
-        return {
-            "created": created,
-            "skipped": skipped,
-            "errors": errors,
-            "message": f"Imported {created} volunteers. Default password: volunteer123",
-        }
+            except Exception as e:
+                runtime_errors.append({"row": email, "reason": str(e)})
+
+    all_errors = parse_errors + runtime_errors
+    success_count = invited_count + linked_count
+
+    return {
+        "totalRows":    len(valid_rows) + len(parse_errors),
+        "successCount": success_count,
+        "invitedCount": invited_count,
+        "linkedCount":  linked_count,
+        "skippedCount": skipped_count,
+        "errorCount":   len(all_errors),
+        "errors":       all_errors,
+        "inviteLinks":  invite_links,
+    }
 
 
 @router.delete("/{org_id}/members/{vol_id}")

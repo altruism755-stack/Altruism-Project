@@ -305,5 +305,18 @@ def init_schema():
         )
     """)
 
+    # Invite token columns for CSV-imported users (Phase 1 onboarding pipeline)
+    for col, ddl in [("invite_token", "TEXT"), ("invite_expires_at", "TEXT")]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+        except Exception:
+            pass
+
+    # Source tracking on org_volunteers
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN source TEXT DEFAULT 'manual_import'")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
