@@ -281,6 +281,7 @@ export function OrgProfilePage() {
         }}>
           <OrgFormFields
             mode="profile"
+            showSubmitter={false}
             state={state}
             errors={errors}
             touched={submitAttempted

@@ -44,6 +44,10 @@ export interface OrgFormFieldsProps {
   /** "register" shows the inline section headers; "profile" omits them
    *  (callers usually wrap sections in their own card chrome). */
   mode?: "register" | "profile";
+
+  /** Whether to render the Submitter Information section. Defaults to true.
+   *  Pass false on the profile page — submitter details are registration-only. */
+  showSubmitter?: boolean;
 }
 
 const labelStyle: React.CSSProperties = {
@@ -93,7 +97,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 export function OrgFormFields(props: OrgFormFieldsProps) {
   const { state, errors, touched, focused,
     onChange, onTouch, onFocus, onBlur,
-    lockedFields, mode = "register" } = props;
+    lockedFields, mode = "register", showSubmitter = true } = props;
 
   const isLocked = (f: string) => !!lockedFields?.has(f);
 
@@ -516,45 +520,48 @@ export function OrgFormFields(props: OrgFormFieldsProps) {
         <ErrorMessage msg={showError("website")} />
       </div>
 
-      {mode === "register" && <SectionHeader>Submitter Information</SectionHeader>}
-      {mode === "profile"  && <SectionHeader>Submitter Information</SectionHeader>}
+      {showSubmitter && (
+        <>
+          <SectionHeader>Submitter Information</SectionHeader>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="orgSubmitterName" style={labelStyle}>
-            Submitter Name <span style={{ color: RED }}>*</span>
-          </label>
-          <input id="orgSubmitterName" value={state.submitterName}
-            disabled={isLocked("submitterName")}
-            onChange={(e) => onChange({ submitterName: e.target.value })}
-            onFocus={() => onFocus("submitterName")} onBlur={() => onBlur("submitterName")}
-            style={fieldStyle("submitterName")} placeholder="e.g. Ahmed Mohamed" />
-          <ErrorMessage msg={showError("submitterName")} />
-        </div>
-        <div>
-          <label htmlFor="orgSubmitterRole" style={labelStyle}>
-            Your Role <span style={{ color: RED }}>*</span>
-          </label>
-          <input id="orgSubmitterRole" value={state.submitterRole}
-            disabled={isLocked("submitterRole")}
-            onChange={(e) => onChange({ submitterRole: e.target.value })}
-            onFocus={() => onFocus("submitterRole")} onBlur={() => onBlur("submitterRole")}
-            style={fieldStyle("submitterRole")} placeholder="e.g. Founder, Director" />
-          <ErrorMessage msg={showError("submitterRole")} />
-        </div>
-      </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="orgSubmitterName" style={labelStyle}>
+                Submitter Name <span style={{ color: RED }}>*</span>
+              </label>
+              <input id="orgSubmitterName" value={state.submitterName}
+                disabled={isLocked("submitterName")}
+                onChange={(e) => onChange({ submitterName: e.target.value })}
+                onFocus={() => onFocus("submitterName")} onBlur={() => onBlur("submitterName")}
+                style={fieldStyle("submitterName")} placeholder="e.g. Ahmed Mohamed" />
+              <ErrorMessage msg={showError("submitterName")} />
+            </div>
+            <div>
+              <label htmlFor="orgSubmitterRole" style={labelStyle}>
+                Your Role <span style={{ color: RED }}>*</span>
+              </label>
+              <input id="orgSubmitterRole" value={state.submitterRole}
+                disabled={isLocked("submitterRole")}
+                onChange={(e) => onChange({ submitterRole: e.target.value })}
+                onFocus={() => onFocus("submitterRole")} onBlur={() => onBlur("submitterRole")}
+                style={fieldStyle("submitterRole")} placeholder="e.g. Founder, Director" />
+              <ErrorMessage msg={showError("submitterRole")} />
+            </div>
+          </div>
 
-      <div>
-        <label htmlFor="orgNotes" style={labelStyle}>
-          Additional Notes <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
-        </label>
-        <textarea id="orgNotes" value={state.additionalNotes}
-          disabled={isLocked("additionalNotes")}
-          onChange={(e) => onChange({ additionalNotes: e.target.value })}
-          onFocus={() => onFocus("additionalNotes")} onBlur={() => onBlur("additionalNotes")}
-          placeholder="Any additional context or information…"
-          style={{ ...fieldStyle("additionalNotes", 80), padding: "10px 12px" }} />
-      </div>
+          <div>
+            <label htmlFor="orgNotes" style={labelStyle}>
+              Additional Notes <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
+            </label>
+            <textarea id="orgNotes" value={state.additionalNotes}
+              disabled={isLocked("additionalNotes")}
+              onChange={(e) => onChange({ additionalNotes: e.target.value })}
+              onFocus={() => onFocus("additionalNotes")} onBlur={() => onBlur("additionalNotes")}
+              placeholder="Any additional context or information…"
+              style={{ ...fieldStyle("additionalNotes", 80), padding: "10px 12px" }} />
+          </div>
+        </>
+      )}
     </>
   );
 }
