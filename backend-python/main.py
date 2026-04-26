@@ -22,7 +22,8 @@ from routes.event_applications import router as event_applications_router
 from routes.announcements import router as announcements_router
 from routes.admin import router as admin_router
 
-app = FastAPI(title="Altruism API", redirect_slashes=False)
+API_VERSION = "1.0.0"
+app = FastAPI(title="Altruism API", version=API_VERSION, redirect_slashes=False)
 
 # CORS — comma-separated list of allowed origins
 cors_origins = [
@@ -78,10 +79,14 @@ os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads/profiles", StaticFiles(directory=uploads_dir), name="profile_uploads")
 
 
-# Health check
+# Health check — lightweight metadata for frontend connection probes.
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "ok",
+        "version": API_VERSION,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 # Init DB schema on startup

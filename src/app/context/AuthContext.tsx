@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { User } from "../types";
+import { API_BASE } from "../config";
 
 // Demo fallback is enabled only in dev builds. In production, an unreachable
 // backend must surface as a real error rather than silently logging the user in.
@@ -18,8 +19,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
 // Fallback demo credentials when backend is unavailable
 const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: string; is_platform_admin?: boolean; orgStatus?: "pending" | "approved" | "rejected"; id?: number }> = {

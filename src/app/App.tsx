@@ -3,6 +3,7 @@ import { RouterProvider } from "react-router";
 import { router } from "./routes";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./components/Toast";
+import { ConnectionBanner } from "./components/ConnectionBanner";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -27,6 +28,7 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <ToastProvider>
+          <ConnectionBanner />
           <RouterProvider router={router} />
         </ToastProvider>
       </AuthProvider>

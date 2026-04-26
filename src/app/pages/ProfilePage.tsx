@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
+import { ASSET_BASE } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
 import { EyeIcon, EyeOffIcon } from "../components/icons/PasswordIcons";
@@ -25,8 +26,6 @@ import {
 
 const GREEN = "#16A34A";
 const RED = "#DC2626";
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-
 const certTypeColors: Record<string, { bg: string; text: string }> = {
   Participation: { bg: "#DBEAFE", text: "#1D4ED8" },
   Achievement: { bg: "#FEF3C7", text: "#B45309" },
@@ -345,7 +344,7 @@ export function ProfilePage() {
   const totalHours = volunteer?.totalHours || 0;
   const totalActivities = (volunteer?.activities || []).length;
   const profilePicUrl = volunteer?.profile_picture
-    ? `${API_BASE}/uploads/profiles/${volunteer.profile_picture}`
+    ? `${ASSET_BASE}/uploads/profiles/${volunteer.profile_picture}`
     : null;
 
   if (loading) return (

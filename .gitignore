@@ -42,6 +42,11 @@ Thumbs.db
 # Vite
 *.local
 
+# Local environment overrides
+.env
+.env.local
+.env.*.local
+
 # Local SQLite database & uploaded files (per-developer)
 backend-python/data/
 backend-python/uploads/

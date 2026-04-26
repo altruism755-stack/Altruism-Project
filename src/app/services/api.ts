@@ -1,30 +1,104 @@
 import { ApiError } from "../types";
+import {
+  API_BASE,
+  DEFAULT_TIMEOUT_MS,
+  backoffDelay,
+  ensureReconnectLoop,
+  log,
+  setConnectionState,
+} from "../config";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+  retryable?: boolean; // force retry on non-GET methods
+}
+
+const MAX_RETRIES = 3;
 
 function getToken(): string | null {
   return sessionStorage.getItem("altruism_token");
 }
 
-async function request(path: string, options: RequestInit = {}): Promise<any> {
+function isRetryable(method: string, opts: RequestOptions): boolean {
+  if (opts.retryable) return true;
+  return method.toUpperCase() === "GET";
+}
+
+// Single fetch with its own AbortController. Each call gets a fresh one —
+// retry loops must call this again, never reuse a controller across attempts.
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const userSignal = init.signal;
+  const onUserAbort = () => controller.abort();
+  if (userSignal) {
+    if (userSignal.aborted) controller.abort();
+    else userSignal.addEventListener("abort", onUserAbort, { once: true });
+  }
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    if (userSignal) userSignal.removeEventListener("abort", onUserAbort);
+  }
+}
+
+async function request(path: string, options: RequestOptions = {}): Promise<any> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, retryable, ...fetchOpts } = options;
   const token = getToken();
+  const method = (fetchOpts.method || "GET").toUpperCase();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    ...(fetchOpts.headers as Record<string, string>),
   };
-  // Demo tokens (dev-only fallback) are not real JWTs — skip Authorization.
   if (token && !token.startsWith("demo-")) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const url = `${API_BASE}${path}`;
+  const canRetry = isRetryable(method, { retryable });
+  const maxAttempts = canRetry ? MAX_RETRIES : 1;
 
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      // Fresh init + fresh AbortController per attempt — never reuse a
+      // cancelled signal from the previous try.
+      const res = await fetchWithTimeout(url, { ...fetchOpts, headers }, timeoutMs);
+      setConnectionState("online");
+      return await parseResponse(res);
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof ApiError) throw err; // 4xx/5xx — never retry
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      const isNetwork = aborted || err instanceof TypeError;
+      if (!isNetwork) throw err;
+
+      log.warn(`${method} ${path} failed (attempt ${attempt}/${maxAttempts})${aborted ? " — timeout" : ""}`);
+      setConnectionState("reconnecting");
+
+      if (attempt === maxAttempts) break;
+      const delay = backoffDelay(attempt, 250, 2_000);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+
+  // All retries exhausted. The shared reconnect loop will flip state back to
+  // "online" the moment the backend recovers — even if the user goes idle.
+  void ensureReconnectLoop();
+  throw new ApiError("Backend unreachable", 0, { cause: String(lastErr) });
+}
+
+async function parseResponse(res: Response): Promise<any> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const message = body.error || body.message || `Request failed: ${res.status}`;
     throw new ApiError(message, res.status, body);
   }
-
   if (res.headers.get("content-type")?.includes("text/csv")) {
     return res.text();
   }
