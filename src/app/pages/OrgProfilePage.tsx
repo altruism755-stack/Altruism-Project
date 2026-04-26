@@ -2,76 +2,65 @@ import { useEffect, useMemo, useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { OrgFormFields } from "../components/OrgFormFields";
+import {
+  EMPTY_ORG_STATE,
+  computeOrgErrors,
+  isOrgFormValid,
+  buildOrgProfilePayload,
+  orgStateFromRow,
+  createOrgEmptyTouched,
+  createOrgAllTouched,
+  type OrgEditableState,
+} from "../data/orgFormSchema";
 
 const GREEN = "#16A34A";
 const GREEN_HOVER = "#15803D";
 const BORDER = "#E2E8F0";
 const TEXT = "#1E293B";
 const MUTED = "#64748B";
-const LOCK = "#94A3B8";
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", height: 42, border: `1.5px solid ${BORDER}`, borderRadius: 8,
-  padding: "0 12px", fontSize: 14, outline: "none", boxSizing: "border-box",
-  backgroundColor: "#fff", color: TEXT,
+// Sensitive fields are gated behind platform-admin review.
+// Editing these on the profile page sends a change request rather than
+// applying directly. Mirrors backend SENSITIVE_FIELDS in routes/organizations.py.
+const SENSITIVE_FRONTEND_FIELDS: ReadonlySet<keyof OrgEditableState> = new Set([
+  "orgName", "officialEmail",
+]);
+// Backend column names for the same two sensitive fields.
+const SENSITIVE_BACKEND_FIELDS = ["name", "official_email"] as const;
+const FRONTEND_TO_BACKEND: Record<string, string> = {
+  orgName: "name",
+  officialEmail: "official_email",
 };
-const lockedStyle: React.CSSProperties = {
-  ...inputStyle, backgroundColor: "#F1F5F9", color: MUTED, cursor: "not-allowed",
-};
-const labelStyle: React.CSSProperties = {
-  fontSize: 13, fontWeight: 500, color: TEXT, display: "block", marginBottom: 6,
-};
-
-const EDITABLE = ["description", "logo_url", "category", "location", "phone", "website"] as const;
-const SENSITIVE = ["name", "official_email"] as const;
-
-type FormState = {
-  name: string;
-  official_email: string;
-  description: string;
-  logo_url: string;
-  category: string;
-  location: string;
-  phone: string;
-  website: string;
-};
-
-const EMPTY: FormState = {
-  name: "", official_email: "", description: "", logo_url: "",
-  category: "", location: "", phone: "", website: "",
-};
-
-function fileToDataUri(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export function OrgProfilePage() {
   const { profile: authProfile } = useAuth();
 
   const [org, setOrg] = useState<any>(null);
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [state, setState] = useState<OrgEditableState>(EMPTY_ORG_STATE);
   const [pendingChanges, setPendingChanges] = useState<any[]>([]);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ kind: "info" | "success" | "review"; text: string } | null>(null);
-  const [sensitiveTouched, setSensitiveTouched] = useState<Record<string, boolean>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>(() => createOrgEmptyTouched());
+  const [focused, setFocused] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const orgFromData = (o: any): FormState => ({
-    name: o.name || "",
-    official_email: o.official_email || "",
-    description: o.description || "",
-    logo_url: o.logo_url || "",
-    category: o.category || "",
-    location: o.location || "",
-    phone: o.phone || "",
-    website: o.website || "",
-  });
+  const errors = useMemo(() => computeOrgErrors(state), [state]);
+  const formValid = useMemo(() => isOrgFormValid(errors), [errors]);
+
+  const lockedFields = useMemo<ReadonlySet<string>>(
+    () => editing
+      ? new Set<string>(Array.from(SENSITIVE_FRONTEND_FIELDS))
+      : new Set<string>([
+          // In view mode, every field is read-only.
+          "orgName", "officialEmail", "phone", "orgType", "foundedYear", "orgSize",
+          "categories", "hqGovernorate", "hqCity", "branches", "website",
+          "description", "logo", "submitterName", "submitterRole", "additionalNotes",
+        ]),
+    [editing],
+  );
 
   const loadProfile = async () => {
     setLoading(true);
@@ -79,19 +68,16 @@ export function OrgProfilePage() {
       const res = await api.getMyOrgProfile();
       const o = res.organization || {};
       setOrg(o);
-      setForm(orgFromData(o));
+      setState(orgStateFromRow(o));
       setPendingChanges(res.pending_changes || []);
     } catch (e) {
       console.error("Failed to load org profile", e);
-      // Fall back to the cached auth profile (populated at login) so the
-      // page is still usable without a live backend call (e.g. demo mode).
       if (authProfile && !authProfile._demo) {
         setOrg(authProfile);
-        setForm(orgFromData(authProfile));
+        setState(orgStateFromRow(authProfile));
       } else if (authProfile?._demo) {
-        // Demo profiles only carry id + name — show what we have.
         setOrg(authProfile);
-        setForm({ ...EMPTY, name: authProfile.name || "" });
+        setState({ ...EMPTY_ORG_STATE, orgName: authProfile.name || "" });
       } else {
         setNotice({ kind: "info", text: "Could not load profile. Please try again." });
       }
@@ -102,49 +88,66 @@ export function OrgProfilePage() {
 
   useEffect(() => { loadProfile(); }, []);
 
-  const orgName = authProfile?.name || org?.name || "Organization";
+  const orgName = authProfile?.name || org?.name || state.orgName || "Organization";
 
-  const sensitiveDirty = useMemo(
-    () => SENSITIVE.some((f) => (form[f] || "") !== (org?.[f] || "")),
-    [form, org],
-  );
+  const onChange = (patch: Partial<OrgEditableState>) =>
+    setState((s) => ({ ...s, ...patch }));
+  const onTouch = (f: string) => setTouched((t) => ({ ...t, [f]: true }));
+  const onFocus = (f: string) => setFocused(f);
+  const onBlur = (f: string) => { setFocused(null); setTouched((t) => ({ ...t, [f]: true })); };
 
   const onCancel = () => {
-    if (!org) return;
-    setForm({
-      name: org.name || "",
-      official_email: org.official_email || "",
-      description: org.description || "",
-      logo_url: org.logo_url || "",
-      category: org.category || "",
-      location: org.location || "",
-      phone: org.phone || "",
-      website: org.website || "",
-    });
-    setSensitiveTouched({});
+    if (org) setState(orgStateFromRow(org));
+    setTouched(createOrgEmptyTouched());
+    setSubmitAttempted(false);
     setEditing(false);
     setNotice(null);
   };
 
+  const sensitiveDirty = useMemo(() => {
+    if (!org) return false;
+    const original = orgStateFromRow(org);
+    return Array.from(SENSITIVE_FRONTEND_FIELDS).some(
+      (f) => state[f] !== original[f],
+    );
+  }, [state, org]);
+
   const onSave = async () => {
     if (!org) return;
+    setSubmitAttempted(true);
+    if (!formValid) {
+      setTouched(createOrgAllTouched());
+      setNotice({ kind: "info", text: "Please fix the highlighted fields." });
+      return;
+    }
     setSaving(true);
     setNotice(null);
     try {
+      const fullPayload = buildOrgProfilePayload(state);
+      const original = orgStateFromRow(org);
+      const originalPayload = buildOrgProfilePayload(original);
+
+      // Diff: only send fields that actually changed. Backend further
+      // routes sensitive ones through the review queue.
       const payload: Record<string, any> = {};
-      for (const f of EDITABLE) {
-        if ((form[f] || "") !== (org[f] || "")) payload[f] = form[f];
+      for (const k of Object.keys(fullPayload)) {
+        const a = fullPayload[k];
+        const b = originalPayload[k];
+        const equal = Array.isArray(a) && Array.isArray(b)
+          ? a.length === b.length && a.every((v, i) => v === b[i])
+          : a === b;
+        if (!equal) payload[k] = a;
       }
-      for (const f of SENSITIVE) {
-        if ((form[f] || "") !== (org[f] || "")) payload[f] = form[f];
-      }
+
       if (Object.keys(payload).length === 0) {
         setNotice({ kind: "info", text: "No changes to save." });
         setSaving(false);
         return;
       }
+
       const res = await api.updateMyOrgProfile(payload);
       setOrg(res.organization);
+      setState(orgStateFromRow(res.organization));
       setPendingChanges(res.pending_changes || []);
       const queued = (res.queued || []).length > 0;
       const applied = (res.applied || []).length > 0;
@@ -155,7 +158,8 @@ export function OrgProfilePage() {
       } else {
         setNotice({ kind: "success", text: "Profile updated." });
       }
-      setSensitiveTouched({});
+      setTouched(createOrgEmptyTouched());
+      setSubmitAttempted(false);
       setEditing(false);
     } catch (e: any) {
       console.error(e);
@@ -164,23 +168,6 @@ export function OrgProfilePage() {
       setSaving(false);
     }
   };
-
-  const onLogoUpload = async (file: File | null) => {
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setNotice({ kind: "info", text: "Logo must be 2 MB or less." });
-      return;
-    }
-    try {
-      const data = await fileToDataUri(file);
-      setForm((f) => ({ ...f, logo_url: data }));
-    } catch {
-      setNotice({ kind: "info", text: "Could not read image file." });
-    }
-  };
-
-  const pendingFor = (field: string) =>
-    pendingChanges.find((p) => p.field === field);
 
   if (loading) {
     return (
@@ -193,6 +180,13 @@ export function OrgProfilePage() {
     );
   }
 
+  // Pending review banner — list field labels for sensitive fields awaiting approval.
+  const pendingFieldLabels = pendingChanges.map((p) => {
+    if (p.field === "name") return "Organization Name";
+    if (p.field === "official_email") return "Official Organization Email";
+    return p.field.replace(/_/g, " ");
+  });
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Navbar role="org" userName={orgName} />
@@ -203,7 +197,7 @@ export function OrgProfilePage() {
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 600, color: TEXT, margin: 0 }}>Organization Profile</h1>
             <p style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
-              View and manage your public organization details.
+              View and manage your organization's registration details.
             </p>
           </div>
           {!editing ? (
@@ -246,7 +240,6 @@ export function OrgProfilePage() {
           )}
         </div>
 
-        {/* Notice */}
         {notice && (
           <div
             style={{
@@ -267,7 +260,6 @@ export function OrgProfilePage() {
           </div>
         )}
 
-        {/* Pending review banner */}
         {pendingChanges.length > 0 && (
           <div
             style={{
@@ -277,154 +269,35 @@ export function OrgProfilePage() {
             }}
           >
             <strong>Pending review:</strong>{" "}
-            {pendingChanges.map((p) => p.field.replace("_", " ")).join(", ")}.
+            {pendingFieldLabels.join(", ")}.
             These changes will apply once approved.
           </div>
         )}
 
         {/* Card */}
-        <div style={{ backgroundColor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 28 }}>
-          {/* Logo + name row */}
-          <div className="flex items-center gap-5" style={{ marginBottom: 28 }}>
-            <div
-              style={{
-                width: 84, height: 84, borderRadius: 16, overflow: "hidden",
-                backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center",
-                border: `1px solid ${BORDER}`, flexShrink: 0,
-              }}
-            >
-              {form.logo_url ? (
-                <img src={form.logo_url} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <span style={{ fontSize: 26, fontWeight: 700, color: GREEN }}>
-                  {orgName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 600, color: TEXT }}>{orgName}</div>
-              <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>
-                {org?.org_type || "Organization"}
-                {org?.founded_year ? ` · Founded ${org.founded_year}` : ""}
-              </div>
-              {editing && (
-                <label
-                  style={{
-                    display: "inline-block", marginTop: 10, cursor: "pointer",
-                    fontSize: 13, color: GREEN, fontWeight: 500,
-                  }}
-                >
-                  Change logo
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    onChange={(e) => onLogoUpload(e.target.files?.[0] || null)}
-                    style={{ display: "none" }}
-                  />
-                </label>
-              )}
-            </div>
-          </div>
-
-          {/* Sensitive section */}
-          <SectionTitle>Identity</SectionTitle>
-          <p style={{ fontSize: 12, color: MUTED, margin: "0 0 14px 0" }}>
-            These fields require platform-admin review before changes take effect.
-          </p>
-
-          <div className="grid grid-cols-2 gap-4" style={{ marginBottom: 24 }}>
-            <SensitiveField
-              label="Organization Name"
-              field="name"
-              value={form.name}
-              editing={editing}
-              touched={!!sensitiveTouched.name}
-              pending={pendingFor("name")}
-              onChange={(v) => {
-                setForm((f) => ({ ...f, name: v }));
-                setSensitiveTouched((t) => ({ ...t, name: true }));
-              }}
-            />
-            <SensitiveField
-              label="Public Email"
-              field="official_email"
-              value={form.official_email}
-              editing={editing}
-              touched={!!sensitiveTouched.official_email}
-              pending={pendingFor("official_email")}
-              onChange={(v) => {
-                setForm((f) => ({ ...f, official_email: v }));
-                setSensitiveTouched((t) => ({ ...t, official_email: true }));
-              }}
-            />
-          </div>
-
-          {/* Editable section */}
-          <SectionTitle>Public Details</SectionTitle>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Description</label>
-            <textarea
-              value={form.description}
-              disabled={!editing}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              rows={4}
-              style={{
-                ...inputStyle,
-                height: "auto", padding: "10px 12px", resize: "vertical",
-                backgroundColor: editing ? "#fff" : "#F8FAFC",
-              }}
-              placeholder="Tell volunteers what your organization does."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label style={labelStyle}>Categories</label>
-              <input
-                value={form.category}
-                disabled={!editing}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                style={{ ...inputStyle, backgroundColor: editing ? "#fff" : "#F8FAFC" }}
-                placeholder="e.g. Education, Health"
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Locations</label>
-              <input
-                value={form.location}
-                disabled={!editing}
-                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                style={{ ...inputStyle, backgroundColor: editing ? "#fff" : "#F8FAFC" }}
-                placeholder="e.g. Cairo, Alexandria"
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Phone Number</label>
-              <input
-                value={form.phone}
-                disabled={!editing}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                style={{ ...inputStyle, backgroundColor: editing ? "#fff" : "#F8FAFC" }}
-                placeholder="+20 ..."
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Website</label>
-              <input
-                value={form.website}
-                disabled={!editing}
-                onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                style={{ ...inputStyle, backgroundColor: editing ? "#fff" : "#F8FAFC" }}
-                placeholder="https://..."
-              />
-            </div>
-          </div>
+        <div style={{
+          backgroundColor: "#fff", border: `1px solid ${BORDER}`,
+          borderRadius: 16, padding: 28, display: "flex", flexDirection: "column", gap: 16,
+        }}>
+          <OrgFormFields
+            mode="profile"
+            state={state}
+            errors={errors}
+            touched={submitAttempted
+              ? Object.fromEntries(Object.keys(errors).map((k) => [k, true]))
+              : touched}
+            focused={focused}
+            onChange={onChange}
+            onTouch={onTouch}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            lockedFields={lockedFields}
+          />
 
           {editing && sensitiveDirty && (
             <div
               style={{
-                marginTop: 20, padding: "10px 12px", borderRadius: 8,
+                marginTop: 4, padding: "10px 12px", borderRadius: 8,
                 backgroundColor: "#FFFBEB", border: "1px solid #FDE68A",
                 fontSize: 12, color: "#92400E",
               }}
@@ -438,69 +311,5 @@ export function OrgProfilePage() {
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 style={{ fontSize: 15, fontWeight: 600, color: TEXT, margin: "0 0 6px 0" }}>{children}</h2>
-  );
-}
-
-function SensitiveField({
-  label, value, editing, touched, pending, onChange,
-}: {
-  label: string;
-  field: string;
-  value: string;
-  editing: boolean;
-  touched: boolean;
-  pending: any | undefined;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label style={labelStyle}>
-        <span>{label}</span>
-        <LockBadge />
-      </label>
-      <input
-        value={value}
-        disabled={!editing}
-        onChange={(e) => onChange(e.target.value)}
-        style={editing ? { ...inputStyle, paddingRight: 36 } : lockedStyle}
-        placeholder={label}
-      />
-      {pending && (
-        <p style={{ fontSize: 12, color: "#92400E", margin: "6px 0 0 0" }}>
-          Pending review → <strong>{pending.new_value}</strong>
-        </p>
-      )}
-      {editing && touched && (
-        <p style={{ fontSize: 12, color: "#B45309", margin: "6px 0 0 0" }}>
-          This change requires review.
-        </p>
-      )}
-      {!editing && !pending && (
-        <p style={{ fontSize: 11, color: MUTED, margin: "6px 0 0 0" }}>
-          Editing this field requires platform-admin approval.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function LockBadge() {
-  return (
-    <span
-      title="Sensitive — change requires review"
-      style={{
-        display: "inline-flex", alignItems: "center", gap: 4,
-        marginLeft: 8, fontSize: 11, fontWeight: 500, color: LOCK,
-      }}
-    >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-      </svg>
-      review required
-    </span>
-  );
-}
+// Re-exported for code-readers tracing the sensitive-field policy.
+export { SENSITIVE_BACKEND_FIELDS, FRONTEND_TO_BACKEND };

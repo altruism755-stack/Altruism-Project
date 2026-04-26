@@ -247,13 +247,19 @@ def init_schema():
         ("org_type", "TEXT"),                    # NGO, company, student_activity, etc.
         ("official_email", "TEXT"),
         ("founded_year", "TEXT"),
-        ("location", "TEXT"),                    # city / governorate
+        ("location", "TEXT"),                    # HQ governorate (legacy column name)
         ("social_links", "TEXT"),
         ("logo_url", "TEXT"),
         ("documents_url", "TEXT"),
         ("submitter_name", "TEXT"),
         ("submitter_role", "TEXT"),
         ("reviewed_at", "TEXT"),
+        # Mirror of org-registration form (single source of truth with profile)
+        ("org_size", "TEXT"),
+        ("hq_city", "TEXT"),
+        ("branches", "TEXT"),                    # JSON-encoded list of governorates
+        ("categories", "TEXT"),                  # JSON-encoded list of category names
+        ("additional_notes", "TEXT"),
     ]
     for col, ddl in org_extra_columns:
         try:

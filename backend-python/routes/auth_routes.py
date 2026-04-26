@@ -41,20 +41,25 @@ class RegisterBody(BaseModel):
     studyYear: Optional[str] = None
     fieldOfStudy: Optional[str] = None
     department: Optional[str] = None
-    # Organization fields (enhanced)
+    # Organization fields (enhanced — mirror of registration form)
     orgName: Optional[str] = None
     description: Optional[str] = None
-    category: Optional[str] = None
+    category: Optional[str] = None         # legacy comma-joined string
+    categories: Optional[list] = None      # canonical multi-select
     website: Optional[str] = None
-    orgType: Optional[str] = None        # NGO, Company, Student Activity, etc.
+    orgType: Optional[str] = None
+    orgSize: Optional[str] = None
     officialEmail: Optional[str] = None
     foundedYear: Optional[str] = None
-    location: Optional[str] = None       # city / governorate
+    location: Optional[str] = None         # HQ governorate (legacy column name)
+    hqCity: Optional[str] = None
+    branches: Optional[list] = None
     socialLinks: Optional[str] = None
     logoUrl: Optional[str] = None
     documentsUrl: Optional[str] = None
     submitterName: Optional[str] = None
     submitterRole: Optional[str] = None
+    additionalNotes: Optional[str] = None
 
 
 class LoginBody(BaseModel):
@@ -138,19 +143,33 @@ def register(body: RegisterBody):
             )
             user_id = cur.lastrowid
             initials = "".join(w[0] for w in (body.orgName or "").split() if w)[:2].upper()
+            # Resolve category vs categories: prefer the canonical multi-select
+            # list when provided; otherwise fall back to the legacy comma-string.
+            cats_list = body.categories or (
+                [c.strip() for c in (body.category or "").split(",") if c.strip()]
+                if body.category else []
+            )
+            cats_string = ", ".join(cats_list) if cats_list else (body.category or "")
             db.execute(
                 """INSERT INTO organizations (
-                    name, description, category, initials, website, phone, admin_user_id,
-                    status, org_type, official_email, founded_year, location, social_links,
-                    logo_url, documents_url, submitter_name, submitter_role
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    name, description, category, categories, initials, website, phone, admin_user_id,
+                    status, org_type, org_size, official_email, founded_year, location, hq_city,
+                    branches, social_links, logo_url, documents_url,
+                    submitter_name, submitter_role, additional_notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    body.orgName, body.description or "", body.category or "", initials,
+                    body.orgName, body.description or "",
+                    cats_string, json.dumps(cats_list),
+                    initials,
                     body.website or "", body.phone or "", user_id,
-                    body.orgType or "", body.officialEmail or body.email, body.foundedYear or "",
-                    body.location or "", body.socialLinks or "",
+                    body.orgType or "", body.orgSize or "",
+                    body.officialEmail or body.email, body.foundedYear or "",
+                    body.location or "", body.hqCity or "",
+                    json.dumps(body.branches or []),
+                    body.socialLinks or "",
                     body.logoUrl or "", body.documentsUrl or "",
                     body.submitterName or "", body.submitterRole or "",
+                    body.additionalNotes or "",
                 ),
             )
             org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user_id,)).fetchone())

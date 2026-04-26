@@ -3,7 +3,7 @@ import io
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any, Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles, require_approved_org_admin, hash_password
@@ -14,21 +14,66 @@ class AddOrgAdminBody(BaseModel):
 
 
 # Fields the org admin can update directly on their own profile.
-EDITABLE_FIELDS = {"description", "logo_url", "category", "location", "phone", "website"}
+# Mirrors the org-registration form (single source of truth) minus the
+# verification step. Sensitive fields (name, official_email) are gated
+# behind admin review and listed separately below.
+EDITABLE_FIELDS = {
+    "description", "logo_url", "phone", "website",
+    "org_type", "founded_year", "org_size",
+    "category", "categories",
+    "location",   # HQ governorate (legacy column name)
+    "hq_city", "branches",
+    "submitter_name", "submitter_role", "additional_notes",
+}
 # Fields that require platform-admin review — changes are queued, not applied.
 SENSITIVE_FIELDS = {"name", "official_email"}
 
+# Columns whose value is a JSON-encoded array — serialized on write.
+JSON_ARRAY_FIELDS = {"branches", "categories"}
+
 
 class OrgProfileUpdate(BaseModel):
+    # Editable
     description: Optional[str] = None
     logo_url: Optional[str] = None
-    category: Optional[str] = None
-    location: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
+    org_type: Optional[str] = None
+    founded_year: Optional[str] = None
+    org_size: Optional[str] = None
+    category: Optional[str] = None        # legacy comma-joined string
+    categories: Optional[list] = None
+    location: Optional[str] = None        # HQ governorate
+    hq_city: Optional[str] = None
+    branches: Optional[list] = None
+    submitter_name: Optional[str] = None
+    submitter_role: Optional[str] = None
+    additional_notes: Optional[str] = None
     # Sensitive — accepted but not applied directly.
     name: Optional[str] = None
     official_email: Optional[str] = None
+
+
+def _decode_org_json(org: dict) -> dict:
+    """Parse JSON-encoded list columns into native Python lists."""
+    if not org:
+        return org
+    for f in JSON_ARRAY_FIELDS:
+        raw = org.get(f)
+        if isinstance(raw, str) and raw.strip():
+            try:
+                org[f] = json.loads(raw)
+            except Exception:
+                org[f] = []
+        elif raw is None:
+            org[f] = []
+    return org
+
+
+def _encode_for_db(field: str, value: Any) -> Any:
+    if field in JSON_ARRAY_FIELDS:
+        return json.dumps(value or [])
+    return value
 
 
 router = APIRouter(prefix="/api/organizations", tags=["organizations"])
@@ -56,6 +101,7 @@ def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
+        org = _decode_org_json(org)
 
         pending = dict_rows(db.execute(
             "SELECT id, field, new_value, status, created_at "
@@ -85,10 +131,20 @@ def update_my_profile(
         applied: list[str] = []
         queued: list[str] = []
 
-        edits = {k: v for k, v in payload.items() if k in EDITABLE_FIELDS and v != org.get(k)}
+        # Normalize JSON-array fields on the existing row before diffing,
+        # so a client sending the same list twice doesn't trigger a write.
+        org_decoded = _decode_org_json(dict(org))
+        edits = {
+            k: v for k, v in payload.items()
+            if k in EDITABLE_FIELDS and v != org_decoded.get(k)
+        }
         if edits:
             sets = ", ".join(f"{k} = ?" for k in edits)
-            db.execute(f"UPDATE organizations SET {sets} WHERE id = ?", (*edits.values(), org["id"]))
+            values = [_encode_for_db(k, v) for k, v in edits.items()]
+            db.execute(
+                f"UPDATE organizations SET {sets} WHERE id = ?",
+                (*values, org["id"]),
+            )
             applied = list(edits.keys())
 
         for field in SENSITIVE_FIELDS:
@@ -107,9 +163,9 @@ def update_my_profile(
             )
             queued.append(field)
 
-        org_after = dict_row(db.execute(
+        org_after = _decode_org_json(dict_row(db.execute(
             "SELECT * FROM organizations WHERE id = ?", (org["id"],)
-        ).fetchone())
+        ).fetchone()))
         pending = dict_rows(db.execute(
             "SELECT id, field, new_value, status, created_at "
             "FROM org_profile_change_requests "

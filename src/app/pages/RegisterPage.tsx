@@ -12,8 +12,7 @@ import {
   DEPARTMENT_GROUPS, CAUSE_GROUPS,
   MAX_SKILLS, MAX_CAUSES,
   validateFullName, validateEmail, validatePassword,
-  validateNationalIdOrPassport, validateDob, validatePhone, validateOrgPhone, validateCity,
-  validateSubmitterName, validateSubmitterRole, validateOrgCity,
+  validateNationalIdOrPassport, validateDob, validatePhone, validateCity,
   validateEducationLevel, validateUniversityName, validateFaculty,
   validateStudyYear, validateFieldOfStudy, validateEducationOther,
   validateCauseAreas,
@@ -23,6 +22,12 @@ import {
   type VolunteerEditableState,
   buildVolunteerRegisterPayload,
 } from "../data/volunteerFormSchema";
+import {
+  EMPTY_ORG_STATE, computeOrgErrors, isOrgFormValid,
+  buildOrgRegisterPayload,
+  type OrgEditableState,
+} from "../data/orgFormSchema";
+import { OrgFormFields } from "../components/OrgFormFields";
 
 const GREEN = "#16A34A";
 const GREEN_HOVER = "#15803D";
@@ -71,16 +76,13 @@ export function RegisterPage() {
   const step3BannerRef = useRef<HTMLDivElement | null>(null);
 
   // ── Organization form ──
-  const [orgForm, setOrgForm] = useState({
-    orgName: "", email: "", password: "", confirmPassword: "", phone: "",
-    officialEmail: "", orgType: "", foundedYear: "", orgSize: "",
-    hqGovernorate: "", hqCity: "",
-    website: "",
-    description: "", logoDataUri: "",
-    submitterName: "", submitterRole: "", additionalNotes: "",
+  // Account credentials (email/password) live separately from the
+  // organization profile fields; the latter come from the shared
+  // OrgFormFields schema (single source of truth with the profile page).
+  const [orgAccount, setOrgAccount] = useState({
+    email: "", password: "", confirmPassword: "",
   });
-  const [orgCategories, setOrgCategories] = useState<string[]>([]);
-  const [orgBranches, setOrgBranches] = useState<string[]>([]);
+  const [orgState, setOrgState] = useState<OrgEditableState>(EMPTY_ORG_STATE);
   const [orgDocumentFile, setOrgDocumentFile] = useState<File | null>(null);
   const [orgTouched, setOrgTouched] = useState<Record<string, boolean>>({});
   const [orgInfoAccurate, setOrgInfoAccurate] = useState(false);
@@ -136,44 +138,32 @@ export function RegisterPage() {
     causeAreas: validateCauseAreas(rankedCauses),
   }), [volForm, volSkills, volCustomSkill, availability, languages, priorHasExperience, experiences, rankedCauses]);
 
-  const orgErrors = useMemo(() => ({
-    orgName:        !orgForm.orgName.trim() ? "Organization name is required." : "",
-    email:          validateEmail(orgForm.email),
-    password:       validatePassword(orgForm.password),
-    confirmPassword: !orgForm.confirmPassword
+  // Field-level errors come from the shared org schema. Account
+  // credentials (email/password/confirm) and the verification step
+  // (documents) are validated locally here — they don't exist in
+  // the profile-edit flow.
+  const orgFieldErrors = useMemo(() => computeOrgErrors(orgState), [orgState]);
+  const orgAccountErrors = useMemo(() => ({
+    email:    validateEmail(orgAccount.email),
+    password: validatePassword(orgAccount.password),
+    confirmPassword: !orgAccount.confirmPassword
       ? "Please confirm your password."
-      : orgForm.confirmPassword !== orgForm.password
+      : orgAccount.confirmPassword !== orgAccount.password
         ? "Passwords do not match."
         : "",
-    orgType:        !orgForm.orgType ? "Please select an organization type." : "",
-    orgCategories:  orgCategories.length === 0 ? "Please select at least one category." : "",
-    foundedYear:    !orgForm.foundedYear ? "Please select a founded year." : "",
-    description:    !orgForm.description.trim()
-      ? "Please describe your organization."
-      : orgForm.description.trim().length < 20
-        ? "Description must be at least 20 characters."
-        : orgForm.description.length > 500
-          ? "Description must be no more than 500 characters."
-          : "",
-    officialEmail:  orgForm.officialEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orgForm.officialEmail)
-      ? "Please enter a valid email address."
-      : "",
-    phone:          validateOrgPhone(orgForm.phone),
-    orgSize:        !orgForm.orgSize ? "Please select an organization size." : "",
-    hqGovernorate:  !orgForm.hqGovernorate ? "Please select a governorate." : "",
-    hqCity:         validateOrgCity(orgForm.hqCity),
-    website:        !orgForm.website.trim() ? "Website is required." : !/^https?:\/\/.+/.test(orgForm.website.trim()) ? "Please enter a valid URL starting with http:// or https://." : "",
-    documents:      !orgDocumentFile ? "Please upload a supporting document." : "",
-    submitterName:  validateSubmitterName(orgForm.submitterName),
-    submitterRole:  validateSubmitterRole(orgForm.submitterRole),
-  }), [orgForm, orgCategories, orgDocumentFile]);
+    documents: !orgDocumentFile ? "Please upload a supporting document." : "",
+  }), [orgAccount, orgDocumentFile]);
+
+  // Combined for display in the org JSX block (touched-keyed).
+  const orgErrors = useMemo(
+    () => ({ ...orgFieldErrors, ...orgAccountErrors }),
+    [orgFieldErrors, orgAccountErrors],
+  );
 
   const orgFormValid =
-    !orgErrors.orgName && !orgErrors.email && !orgErrors.password && !orgErrors.confirmPassword &&
-    !orgErrors.orgType && !orgErrors.orgCategories && !orgErrors.foundedYear && !orgErrors.description &&
-    !orgErrors.officialEmail && !orgErrors.phone && !orgErrors.orgSize &&
-    !orgErrors.hqGovernorate && !orgErrors.hqCity && !orgErrors.website && !orgErrors.documents &&
-    !orgErrors.submitterName && !orgErrors.submitterRole &&
+    isOrgFormValid(orgFieldErrors) &&
+    !orgAccountErrors.email && !orgAccountErrors.password &&
+    !orgAccountErrors.confirmPassword && !orgAccountErrors.documents &&
     orgInfoAccurate && orgTermsAccepted;
 
   const step1Valid = STEP1_FIELDS.every((f) => !errors[f as keyof typeof errors]);
@@ -319,58 +309,9 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
     fontFamily: "inherit",
   });
 
-  const ORG_CATEGORY_MAX = 5;
-
-  const toggleOrgCategory = (cat: string) => {
-    setOrgCategories((prev) => {
-      if (prev.includes(cat)) return prev.filter((c) => c !== cat);
-      if (prev.length >= ORG_CATEGORY_MAX) return prev;
-      return [...prev, cat];
-    });
-    touchOrg("orgCategories");
-  };
-
-  const ORG_CATEGORY_GROUPS: { label: string; items: string[] }[] = [
-    {
-      label: "People & Society",
-      items: ["Social Welfare", "Children & Family Services", "Youth Development",
-        "Gender Equality & Women's Empowerment", "Disability Support", "Human Rights", "Legal Aid & Justice"],
-    },
-    {
-      label: "Health & Well-being",
-      items: ["Healthcare", "Food Security & Nutrition", "Mental Health"],
-    },
-    {
-      label: "Environment & Planet",
-      items: ["Environment", "Animal Welfare", "Climate & Sustainability"],
-    },
-    {
-      label: "Knowledge & Culture",
-      items: ["Education", "Arts & Culture", "Media & Communications", "Research & Innovation"],
-    },
-    {
-      label: "Economy & Community",
-      items: ["Economic Empowerment / Livelihoods", "Community Development", "Emergency & Disaster Relief"],
-    },
-  ];
-
-  const toggleOrgBranch = (gov: string) => {
-    setOrgBranches((prev) =>
-      prev.includes(gov) ? prev.filter((g) => g !== gov) : [...prev, gov]
-    );
-  };
-
   const handleOrgDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setOrgDocumentFile(file);
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setOrgForm((f) => ({ ...f, logoDataUri: String(reader.result) }));
-    reader.readAsDataURL(file);
   };
 
   const handleNext = () => {
@@ -415,26 +356,12 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
 
     const data =
       role === "Organization"
-        ? {
-            role: "org_admin",
-            email: orgForm.email, password: orgForm.password,
-            orgName: orgForm.orgName, phone: orgForm.phone,
-            officialEmail: orgForm.officialEmail,
-            orgType: orgForm.orgType,
-            foundedYear: orgForm.foundedYear,
-            orgSize: orgForm.orgSize,
-            location: orgForm.hqGovernorate,
-            hqCity: orgForm.hqCity,
-            branches: orgBranches,
-            website: orgForm.website,
-            description: orgForm.description,
-            category: orgCategories.join(", "),
-            logoUrl: orgForm.logoDataUri,
-            documentsFile: orgDocumentFile ? orgDocumentFile.name : "",
-            submitterName: orgForm.submitterName,
-            submitterRole: orgForm.submitterRole,
-            additionalNotes: orgForm.additionalNotes,
-          }
+        ? buildOrgRegisterPayload(
+            orgState,
+            orgAccount.email,
+            orgAccount.password,
+            orgDocumentFile ? orgDocumentFile.name : "",
+          )
         : buildVolunteerRegisterPayload(volunteerState, volForm.password);
 
     console.log("[Register] payload:", JSON.stringify(data, null, 2));
@@ -1567,27 +1494,12 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                 <SectionHeader>Account Information</SectionHeader>
 
                 <div>
-                  <label htmlFor="orgName" style={labelStyle}>Organization Name <span style={{ color: RED }}>*</span></label>
-                  <input id="orgName" value={orgForm.orgName}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, orgName: e.target.value }))}
-                    onFocus={() => onOrgFocus("orgName")} onBlur={() => onOrgBlur("orgName")}
-                    style={orgFieldStyle("orgName")} placeholder="e.g. Resala Charity Organization"
-                    autoComplete="organization" />
-                  {orgTouched.orgName && orgErrors.orgName && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.orgName}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
                   <label htmlFor="orgEmail" style={labelStyle}>Account Email <span style={{ color: RED }}>*</span></label>
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>
                     This email will be used to log in and manage your organization on the platform.
                   </p>
-                  <input id="orgEmail" type="email" value={orgForm.email}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, email: e.target.value }))}
+                  <input id="orgEmail" type="email" value={orgAccount.email}
+                    onChange={(e) => setOrgAccount((a) => ({ ...a, email: e.target.value }))}
                     onFocus={() => onOrgFocus("email")} onBlur={() => onOrgBlur("email")}
                     style={orgFieldStyle("email")} placeholder="e.g. admin@organization.org"
                     autoComplete="email" />
@@ -1604,8 +1516,8 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   <div style={{ position: "relative" }}>
                     <input id="orgPassword"
                       type={showOrgPassword ? "text" : "password"}
-                      value={orgForm.password}
-                      onChange={(e) => setOrgForm((f) => ({ ...f, password: e.target.value }))}
+                      value={orgAccount.password}
+                      onChange={(e) => setOrgAccount((a) => ({ ...a, password: e.target.value }))}
                       onFocus={() => onOrgFocus("password")} onBlur={() => onOrgBlur("password")}
                       style={{ ...orgFieldStyle("password"), paddingRight: 44 }}
                       autoComplete="new-password" placeholder="Min. 8 characters, max. 64" />
@@ -1621,14 +1533,14 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                       <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.password}</span>
                     </div>
                   )}
-                  {orgForm.password.length > 0 && (
+                  {orgAccount.password.length > 0 && (
                     <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: "4px 6px" }}>
                       {[
-                        { label: "8+ chars",       ok: orgForm.password.length >= 8 },
-                        { label: "Uppercase",      ok: /[A-Z]/.test(orgForm.password) },
-                        { label: "Lowercase",      ok: /[a-z]/.test(orgForm.password) },
-                        { label: "Number",         ok: /[0-9]/.test(orgForm.password) },
-                        { label: "Special (@#!)",  ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(orgForm.password) },
+                        { label: "8+ chars",       ok: orgAccount.password.length >= 8 },
+                        { label: "Uppercase",      ok: /[A-Z]/.test(orgAccount.password) },
+                        { label: "Lowercase",      ok: /[a-z]/.test(orgAccount.password) },
+                        { label: "Number",         ok: /[0-9]/.test(orgAccount.password) },
+                        { label: "Special (@#!)",  ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(orgAccount.password) },
                       ].map(({ label, ok }) => (
                         <span key={label} style={{ fontSize: 11, padding: "2px 7px", borderRadius: 4, backgroundColor: ok ? "#DCFCE7" : "#F1F5F9", color: ok ? GREEN : "#94A3B8", fontWeight: ok ? 500 : 400 }}>
                           {ok ? "✓" : "○"} {label}
@@ -1643,8 +1555,8 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   <div style={{ position: "relative" }}>
                     <input id="orgConfirmPassword"
                       type={showOrgConfirmPassword ? "text" : "password"}
-                      value={orgForm.confirmPassword}
-                      onChange={(e) => setOrgForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      value={orgAccount.confirmPassword}
+                      onChange={(e) => setOrgAccount((a) => ({ ...a, confirmPassword: e.target.value }))}
                       onFocus={() => onOrgFocus("confirmPassword")} onBlur={() => onOrgBlur("confirmPassword")}
                       style={{ ...orgFieldStyle("confirmPassword"), paddingRight: 44 }}
                       autoComplete="new-password" placeholder="Re-enter your password" />
@@ -1662,331 +1574,18 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   )}
                 </div>
 
-                {/* ── SECTION: Organization Details ──────────────────────── */}
-                <SectionHeader>Organization Details</SectionHeader>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="orgType" style={labelStyle}>Organization Type <span style={{ color: RED }}>*</span></label>
-                    <select id="orgType" value={orgForm.orgType}
-                      onChange={(e) => setOrgForm((f) => ({ ...f, orgType: e.target.value }))}
-                      onFocus={() => onOrgFocus("orgType")} onBlur={() => onOrgBlur("orgType")}
-                      style={orgFieldStyle("orgType")}>
-                      <option value="">Select type…</option>
-                      <option value="NGO">NGO / Non-profit</option>
-                      <option value="Foundation">Foundation</option>
-                      <option value="Community Group">Community Group / Cooperative</option>
-                      <option value="Religious">Religious Organization</option>
-                      <option value="Student Activity">Student / Academic Organization</option>
-                      <option value="Government">Government / Public Body</option>
-                      <option value="Professional Association">Professional / Trade Association</option>
-                      <option value="Social Enterprise">Social Enterprise</option>
-                      <option value="International Organization">International Organization</option>
-                    </select>
-                    {orgTouched.orgType && orgErrors.orgType && (
-                      <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                        <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                        <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.orgType}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label htmlFor="orgFoundedYear" style={labelStyle}>Founded Year <span style={{ color: RED }}>*</span></label>
-                    <select id="orgFoundedYear" value={orgForm.foundedYear}
-                      onChange={(e) => setOrgForm((f) => ({ ...f, foundedYear: e.target.value }))}
-                      onFocus={() => onOrgFocus("foundedYear")} onBlur={() => onOrgBlur("foundedYear")}
-                      style={orgFieldStyle("foundedYear")}>
-                      <option value="">Select year…</option>
-                      {Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i).map((y) => (
-                        <option key={y} value={String(y)}>{y}</option>
-                      ))}
-                    </select>
-                    {orgTouched.foundedYear && orgErrors.foundedYear && (
-                      <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                        <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                        <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.foundedYear}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  {/* Label row */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <label style={{ ...labelStyle, margin: 0 }}>
-                      Category <span style={{ color: RED }}>*</span>
-                    </label>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* Progress dots */}
-                      <div style={{ display: "flex", gap: 3 }}>
-                        {Array.from({ length: ORG_CATEGORY_MAX }).map((_, i) => (
-                          <span key={i} style={{
-                            display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                            backgroundColor: i < orgCategories.length
-                              ? orgCategories.length >= ORG_CATEGORY_MAX ? "#F59E0B" : GREEN
-                              : "#E2E8F0",
-                            transition: "background-color 200ms",
-                          }} />
-                        ))}
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-                        backgroundColor: orgCategories.length >= ORG_CATEGORY_MAX ? "#FEF3C7" : orgCategories.length > 0 ? "#DCFCE7" : "#F1F5F9",
-                        color: orgCategories.length >= ORG_CATEGORY_MAX ? "#92400E" : orgCategories.length > 0 ? GREEN : "#94A3B8",
-                        transition: "all 200ms",
-                      }}>
-                        {orgCategories.length}/{ORG_CATEGORY_MAX}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Selected chips summary */}
-                  {orgCategories.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 6px", marginBottom: 10, padding: "10px 12px", backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8 }}>
-                      <span style={{ fontSize: 11, color: "#15803D", fontWeight: 600, alignSelf: "center", marginRight: 2 }}>Selected:</span>
-                      {orgCategories.map((cat) => (
-                        <button key={cat} type="button" onClick={() => toggleOrgCategory(cat)}
-                          title={`Remove ${cat}`}
-                          style={{
-                            display: "inline-flex", alignItems: "center", gap: 5,
-                            padding: "3px 8px 3px 10px", borderRadius: 20,
-                            border: "1px solid #86EFAC", backgroundColor: "#FFFFFF",
-                            color: GREEN, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                            transition: "all 150ms",
-                          }}>
-                          {cat}
-                          <span style={{ fontSize: 14, lineHeight: 1, color: "#4ADE80", fontWeight: 400 }}>×</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Max reached notice */}
-                  {orgCategories.length >= ORG_CATEGORY_MAX && (
-                    <p style={{ fontSize: 12, color: "#92400E", backgroundColor: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 6, padding: "6px 10px", margin: "0 0 10px 0" }}>
-                      Limit reached — remove a selection above to pick a different one.
-                    </p>
-                  )}
-
-                  {/* Grouped tag picker */}
-                  <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}
-                    onBlur={() => touchOrg("orgCategories")}>
-                    {ORG_CATEGORY_GROUPS.map((group, gi) => (
-                      <div key={group.label} style={{
-                        padding: "10px 14px",
-                        borderTop: gi > 0 ? "1px solid #F1F5F9" : undefined,
-                        backgroundColor: gi % 2 === 0 ? "#FFFFFF" : "#FAFAFA",
-                      }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 8px 0" }}>
-                          {group.label}
-                        </p>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 7px" }}>
-                          {group.items.map((cat) => {
-                            const active = orgCategories.includes(cat);
-                            const disabled = !active && orgCategories.length >= ORG_CATEGORY_MAX;
-                            return (
-                              <button key={cat} type="button"
-                                onClick={() => { if (!disabled) toggleOrgCategory(cat); }}
-                                title={disabled ? `Limit reached — remove a selection to add ${cat}` : active ? `Remove ${cat}` : `Add ${cat}`}
-                                style={{
-                                  display: "inline-flex", alignItems: "center", gap: 5,
-                                  padding: active ? "5px 9px 5px 11px" : "5px 12px",
-                                  borderRadius: 20,
-                                  border: `1.5px solid ${active ? GREEN : disabled ? "#F1F5F9" : "#E2E8F0"}`,
-                                  backgroundColor: active ? "#F0FDF4" : disabled ? "#F8FAFC" : "#FFFFFF",
-                                  color: active ? GREEN : disabled ? "#CBD5E1" : "#334155",
-                                  fontSize: 12, fontWeight: active ? 600 : 400,
-                                  cursor: disabled ? "not-allowed" : "pointer",
-                                  opacity: disabled ? 0.45 : 1,
-                                  transition: "all 150ms",
-                                }}>
-                                {cat}
-                                {active && <span style={{ fontSize: 15, lineHeight: 1, color: "#4ADE80", fontWeight: 300 }}>×</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {orgTouched.orgCategories && orgErrors.orgCategories && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 6, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.orgCategories}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="orgSize" style={labelStyle}>Organization Size <span style={{ color: RED }}>*</span></label>
-                  <select id="orgSize" value={orgForm.orgSize}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, orgSize: e.target.value }))}
-                    onFocus={() => onOrgFocus("orgSize")} onBlur={() => onOrgBlur("orgSize")}
-                    style={orgFieldStyle("orgSize")}>
-                    <option value="">Select size…</option>
-                    <option value="Small">Small (1–50 members)</option>
-                    <option value="Medium">Medium (51–200 members)</option>
-                    <option value="Large">Large (200+ members)</option>
-                  </select>
-                  {orgTouched.orgSize && orgErrors.orgSize && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.orgSize}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                    <label htmlFor="orgDescription" style={{ ...labelStyle, margin: 0 }}>Description <span style={{ color: RED }}>*</span></label>
-                    <span style={{
-                      fontSize: 11, fontWeight: 500,
-                      color: orgForm.description.length > 500 ? RED : orgForm.description.length > 420 ? "#F59E0B" : "#94A3B8",
-                    }}>
-                      {orgForm.description.length}/500
-                    </span>
-                  </div>
-                  <textarea id="orgDescription" value={orgForm.description}
-                    onChange={(e) => { if (e.target.value.length <= 500) setOrgForm((f) => ({ ...f, description: e.target.value })); }}
-                    onFocus={() => onOrgFocus("description")} onBlur={() => onOrgBlur("description")}
-                    placeholder="Tell us about your organization, its mission, and impact…"
-                    style={{ ...orgFieldStyle("description", 100), padding: "10px 12px" }} />
-                  {orgTouched.description && orgErrors.description && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.description}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Logo <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    {orgForm.logoDataUri
-                      ? <img src={orgForm.logoDataUri} alt="Organization logo" style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover", border: "1px solid #E2E8F0" }} />
-                      : <div style={{ width: 64, height: 64, borderRadius: 12, border: "1px dashed #CBD5E1", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 20 }}>+</div>
-                    }
-                    <label style={{ cursor: "pointer", padding: "8px 14px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, color: "#64748B" }}>
-                      {orgForm.logoDataUri ? "Change Logo" : "Upload Logo"}
-                      <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: "none" }} />
-                    </label>
-                  </div>
-                </div>
-
-                {/* ── SECTION: Contact & Location ────────────────────────── */}
-                <SectionHeader>Contact &amp; Location</SectionHeader>
-
-                <div>
-                  <label htmlFor="orgOfficialEmail" style={labelStyle}>Official Organization Email <span style={{ color: RED }}>*</span></label>
-                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 6px 0" }}>
-                    Provide your organization's public contact email.
-                  </p>
-                  <input id="orgOfficialEmail" type="email" value={orgForm.officialEmail}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, officialEmail: e.target.value }))}
-                    onFocus={() => onOrgFocus("officialEmail")} onBlur={() => onOrgBlur("officialEmail")}
-                    style={orgFieldStyle("officialEmail")} placeholder="contact@organization.org" />
-                  {orgTouched.officialEmail && orgErrors.officialEmail && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.officialEmail}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="orgPhone" style={labelStyle}>Primary Phone Number <span style={{ color: RED }}>*</span></label>
-                  <input id="orgPhone" value={orgForm.phone}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, phone: e.target.value }))}
-                    onFocus={() => onOrgFocus("phone")} onBlur={() => onOrgBlur("phone")}
-                    style={orgFieldStyle("phone")} placeholder="01XXXXXXXXX or 0XXXXXXXXX" />
-                  {orgTouched.phone && orgErrors.phone && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.phone}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#1E293B", margin: "0 0 12px 0" }}>
-                    Headquarters Location <span style={{ color: RED }}>*</span>
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="orgHqGov" style={labelStyle}>Governorate <span style={{ color: RED }}>*</span></label>
-                      <select id="orgHqGov" value={orgForm.hqGovernorate}
-                        onChange={(e) => setOrgForm((f) => ({ ...f, hqGovernorate: e.target.value }))}
-                        onFocus={() => onOrgFocus("hqGovernorate")} onBlur={() => onOrgBlur("hqGovernorate")}
-                        style={orgFieldStyle("hqGovernorate")}>
-                        <option value="">Select governorate…</option>
-                        {GOVERNORATES.map((g) => <option key={g} value={g}>{g}</option>)}
-                      </select>
-                      {orgTouched.hqGovernorate && orgErrors.hqGovernorate && (
-                        <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                          <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                          <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.hqGovernorate}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label htmlFor="orgHqCity" style={labelStyle}>City / District <span style={{ color: RED }}>*</span></label>
-                      <input id="orgHqCity" value={orgForm.hqCity}
-                        onChange={(e) => setOrgForm((f) => ({ ...f, hqCity: e.target.value }))}
-                        onFocus={() => onOrgFocus("hqCity")} onBlur={() => onOrgBlur("hqCity")}
-                        style={orgFieldStyle("hqCity")} placeholder="e.g. Nasr City" />
-                      {orgTouched.hqCity && orgErrors.hqCity && (
-                        <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                          <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                          <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.hqCity}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>
-                    Other Branches <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
-                  </label>
-                  <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>
-                    Select any additional governorates where your organization operates.
-                  </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
-                    {GOVERNORATES.filter((g) => g !== orgForm.hqGovernorate).map((gov) => {
-                      const active = orgBranches.includes(gov);
-                      return (
-                        <button key={gov} type="button" onClick={() => toggleOrgBranch(gov)}
-                          style={{
-                            padding: "5px 10px", borderRadius: 6,
-                            border: `1.5px solid ${active ? GREEN : "#E2E8F0"}`,
-                            backgroundColor: active ? "#F0FDF4" : "#FAFAFA",
-                            color: active ? GREEN : "#475569",
-                            fontSize: 12, fontWeight: active ? 600 : 400,
-                            cursor: "pointer", transition: "all 150ms",
-                          }}>
-                          {active ? "✓ " : ""}{gov}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="orgWebsite" style={labelStyle}>Website <span style={{ color: RED }}>*</span></label>
-                  <input id="orgWebsite" value={orgForm.website}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, website: e.target.value }))}
-                    onFocus={() => onOrgFocus("website")} onBlur={() => onOrgBlur("website")}
-                    style={orgFieldStyle("website")} placeholder="https://www.organization.org" />
-                  {orgTouched.website && orgErrors.website && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                      <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                      <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.website}</span>
-                    </div>
-                  )}
-                </div>
-
-
+                {/* ── SECTION: Org profile fields (shared component) ────── */}
+                <OrgFormFields
+                  mode="register"
+                  state={orgState}
+                  errors={orgFieldErrors}
+                  touched={orgTouched}
+                  focused={focused}
+                  onChange={(patch) => setOrgState((s) => ({ ...s, ...patch }))}
+                  onTouch={(f) => touchOrg(f)}
+                  onFocus={(f) => onOrgFocus(f)}
+                  onBlur={(f) => onOrgBlur(f)}
+                />
 
                 {/* ── SECTION: Verification & Submit ─────────────────────── */}
                 <SectionHeader>Verification &amp; Submit</SectionHeader>
@@ -2026,43 +1625,6 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="orgSubmitterName" style={labelStyle}>Submitter Name <span style={{ color: RED }}>*</span></label>
-                    <input id="orgSubmitterName" value={orgForm.submitterName}
-                      onChange={(e) => setOrgForm((f) => ({ ...f, submitterName: e.target.value }))}
-                      onFocus={() => onOrgFocus("submitterName")} onBlur={() => onOrgBlur("submitterName")}
-                      style={orgFieldStyle("submitterName")} placeholder="e.g. Ahmed Mohamed" />
-                    {orgTouched.submitterName && orgErrors.submitterName && (
-                      <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                        <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                        <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.submitterName}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label htmlFor="orgSubmitterRole" style={labelStyle}>Your Role <span style={{ color: RED }}>*</span></label>
-                    <input id="orgSubmitterRole" value={orgForm.submitterRole}
-                      onChange={(e) => setOrgForm((f) => ({ ...f, submitterRole: e.target.value }))}
-                      onFocus={() => onOrgFocus("submitterRole")} onBlur={() => onOrgBlur("submitterRole")}
-                      style={orgFieldStyle("submitterRole")} placeholder="e.g. Founder, Director" />
-                    {orgTouched.submitterRole && orgErrors.submitterRole && (
-                      <div style={{ display: "flex", gap: 4, marginTop: 5, alignItems: "flex-start" }}>
-                        <span style={{ color: RED, fontSize: 13, lineHeight: 1, marginTop: 1 }}>⚠</span>
-                        <span style={{ fontSize: 12, color: RED, lineHeight: 1.45 }}>{orgErrors.submitterRole}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="orgNotes" style={labelStyle}>Additional Notes <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 400 }}>(optional)</span></label>
-                  <textarea id="orgNotes" value={orgForm.additionalNotes}
-                    onChange={(e) => setOrgForm((f) => ({ ...f, additionalNotes: e.target.value }))}
-                    onFocus={() => onOrgFocus("additionalNotes")} onBlur={() => onOrgBlur("additionalNotes")}
-                    placeholder="Any additional context or information for our review team…"
-                    style={{ ...orgFieldStyle("additionalNotes", 80), padding: "10px 12px" }} />
-                </div>
 
                 {/* Agreements */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
