@@ -7,6 +7,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Any, Optional
 
@@ -166,11 +167,29 @@ def _get_my_org_id(db, user_id: int) -> int:
 def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT * FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            # Join with users to expose the primary admin's email as submitter_email.
+            # admin_user_id IS the submitter — derived from the authoritative users table,
+            # so it's correct for all existing orgs without any column migration.
+            "SELECT o.*, u.email AS submitter_email "
+            "FROM organizations o JOIN users u ON u.id = o.admin_user_id "
+            "WHERE o.admin_user_id = ?",
+            (current_user["id"],),
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
         org = _decode_org_json(org)
+
+        # Forward-compat: if a created_by_user_id column is ever added it takes
+        # precedence over admin_user_id as the canonical submitter identity.
+        # Today the column doesn't exist so org.get() returns None and the
+        # submitter_email set by the JOIN above is used unchanged.
+        if org.get("created_by_user_id"):
+            override = dict_row(db.execute(
+                "SELECT email FROM users WHERE id = ?",
+                (org["created_by_user_id"],),
+            ).fetchone())
+            if override:
+                org["submitter_email"] = override["email"]
 
         pending = dict_rows(db.execute(
             "SELECT id, field, new_value, status, created_at "
@@ -262,16 +281,28 @@ def update_my_profile(
 
 # ── Organization admin management (org-scoped) ───────────────────────────────
 
+def _fetch_org_admins(db, org_id: int) -> list:
+    return dict_rows(db.execute(
+        "SELECT oa.id, oa.user_id, u.email, oa.created_at "
+        "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
+        "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
+        (org_id,),
+    ).fetchall())
+
+
 @router.get("/me/admins")
 def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin)):
     with get_db() as db:
         org_id = _get_my_org_id(db, current_user["id"])
-        rows = dict_rows(db.execute(
-            "SELECT oa.id, oa.user_id, u.email, oa.created_at "
-            "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
-            "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
-            (org_id,),
-        ).fetchall())
+        rows = _fetch_org_admins(db, org_id)
+        # Backward-compat migration: if existing org has no admins, auto-add creator.
+        # Guarantees the invariant even for orgs registered before this change.
+        if not rows:
+            db.execute(
+                "INSERT OR IGNORE INTO org_admins (user_id, org_id) VALUES (?, ?)",
+                (current_user["id"], org_id),
+            )
+            rows = _fetch_org_admins(db, org_id)
         return {"admins": rows}
 
 
@@ -282,14 +313,16 @@ def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require
         user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
         if not user:
             raise HTTPException(404, f"No user found with email '{body.email}'")
-        if user["id"] == current_user["id"]:
-            raise HTTPException(400, "You are already the organization owner")
+        # Idempotent check FIRST — if already admin (including self), return 200 silently.
         existing = db.execute(
             "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], org_id)
         ).fetchone()
         if existing:
-            raise HTTPException(409, "User is already an organization admin")
-        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], org_id))
+            return JSONResponse(status_code=200, content={"message": f"{body.email} is already an organization admin"})
+        if user["id"] == current_user["id"]:
+            raise HTTPException(400, "You are already the organization owner")
+        # INSERT OR IGNORE defends against any concurrent race to the UNIQUE constraint.
+        db.execute("INSERT OR IGNORE INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], org_id))
         return {"message": f"{body.email} is now an organization admin"}
 
 

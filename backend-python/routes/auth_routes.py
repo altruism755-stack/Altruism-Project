@@ -179,6 +179,13 @@ def register(body: RegisterBody):
                 ),
             )
             org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user_id,)).fetchone())
+            # Invariant: creator is always an org admin from day one.
+            # INSERT OR IGNORE is safe against the UNIQUE(user_id, org_id) constraint.
+            if org:
+                db.execute(
+                    "INSERT OR IGNORE INTO org_admins (user_id, org_id) VALUES (?, ?)",
+                    (user_id, org["id"]),
+                )
             token = generate_token({"id": user_id, "email": body.email, "role": "org_admin"})
             return {
                 "token": token,

@@ -413,33 +413,99 @@ function ActivitiesTab({ events, onRefresh }: { events: any[]; onRefresh: () => 
   );
 }
 
+// ─── Skeleton shown while admins tab data loads ───────────────────────────────
+function AdminsTabSkeleton() {
+  const bar = (w: string | number, h = 12, mb = 0): React.CSSProperties => ({
+    width: w, height: h, borderRadius: 6, backgroundColor: "#E2E8F0",
+    marginBottom: mb || undefined,
+  });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Submitter card shape */}
+      <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "18px 20px", display: "flex", gap: 14 }}>
+        <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#E2E8F0", flexShrink: 0 }} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={bar("40%", 10)} />
+          <div style={bar("55%", 13)} />
+          <div style={bar("30%", 10)} />
+        </div>
+      </div>
+      {/* Add-form card shape */}
+      <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={bar("28%", 14)} />
+        <div style={bar("60%", 10)} />
+        <div style={{ height: 40, borderRadius: 8, backgroundColor: "#E2E8F0" }} />
+      </div>
+      {/* List card shape */}
+      <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", backgroundColor: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+          <div style={bar("38%", 11)} />
+        </div>
+        <div style={{ padding: 32, textAlign: "center" }}>
+          <div style={{ ...bar("45%", 11), margin: "0 auto" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Org Admins tab ───────────────────────────────────────────────────────────
-function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
-  const [admins, setAdmins]       = useState<any[]>([]);
-  const [email, setEmail]         = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const [success, setSuccess]     = useState("");
-  const [confirmId, setConfirmId] = useState<number | null>(null);
+// Invariant enforced by backend: creator is always in the admins list.
+// "No admins" is therefore an unexpected state, shown only as a safety fallback.
+const _norm = (e: string) => e.toLowerCase().trim();
+
+function OrgAdminsTab({
+  currentUserEmail,
+  orgProfile,
+}: {
+  currentUserEmail: string;
+  orgProfile: any;
+}) {
+  // ── All hooks unconditional ──────────────────────────────────────────────
+  const [admins, setAdmins]             = useState<any[]>([]);
+  const [adminsLoaded, setAdminsLoaded] = useState(false);
+  const [email, setEmail]               = useState("");
+  const [loading, setLoading]           = useState(false);
+  const [granting, setGranting]         = useState(false);
+  const [error, setError]               = useState("");
+  const [success, setSuccess]           = useState("");
+  // Toast is keyed — same key while visible won't restart the timer unnecessarily.
+  const [toast, setToast]               = useState<{ key: string; msg: string } | null>(null);
+  const [confirmId, setConfirmId]       = useState<number | null>(null);
+
+  // key-based dependency: if a new toast arrives with the same key, the timer resets correctly.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast?.key]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const r = await api.orgListAdmins(); setAdmins(r.admins || []); } catch { /* ignore */ }
+    try {
+      const r = await api.orgListAdmins();
+      setAdmins(r.admins || []);
+      setAdminsLoaded(true);
+    } catch { /* ignore */ }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleGrant = async () => {
+  const handleFormGrant = async () => {
+    const target = _norm(email);
     setError(""); setSuccess("");
-    if (!email.trim()) return;
+    if (!target || granting) return;
+    setGranting(true);
     try {
-      await api.orgAddAdmin(email.trim());
-      setSuccess(`${email.trim()} is now an organization admin.`);
+      await api.orgAddAdmin(target);
+      setSuccess(`${target} is now an organization admin.`);
       setEmail("");
       load();
     } catch (e: any) {
-      setError(e.message || "Failed to grant access");
+      setError(e.message || "Couldn't grant admin access. Please try again.");
+    } finally {
+      setGranting(false);
     }
   };
 
@@ -454,9 +520,42 @@ function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
     }
   };
 
+  // ── Guard: both sources must be ready ───────────────────────────────────
+  if (!orgProfile || !adminsLoaded) {
+    return <AdminsTabSkeleton />;
+  }
+
+  // ── Derived state — normalised emails prevent case-mismatch false negatives ─
+  const submitterEmail = _norm(orgProfile.submitter_email || "");
+  const submitterName  = orgProfile.submitter_name  || "";
+  const submitterRole  = orgProfile.submitter_role  || "";
+  const hasSubmitter   = !!(submitterName || submitterRole);
+  const normCurrentUser = _norm(currentUserEmail);
+
+  const isOwner = !!(submitterEmail && submitterEmail === normCurrentUser);
+
   return (
     <div>
-      {/* Confirm removal modal */}
+      {/* ── Toast ──────────────────────────────────────────────────────── */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 100,
+          backgroundColor: "#1E293B", color: "#fff",
+          padding: "12px 18px", borderRadius: 10,
+          fontSize: 13, fontWeight: 500,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+          display: "flex", alignItems: "center", gap: 8,
+          pointerEvents: "none",
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ADE80"
+               strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── Confirm removal modal ──────────────────────────────────────── */}
       {confirmId !== null && (
         <>
           <div onClick={() => setConfirmId(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 50 }} />
@@ -473,7 +572,51 @@ function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
         </>
       )}
 
-      {/* Add form */}
+      {/* ── Submitter info card — informational only, no CTA ───────────── */}
+      {hasSubmitter && (
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: 14,
+          padding: "18px 20px", marginBottom: 16,
+          backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12,
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: "50%",
+            backgroundColor: "#EFF6FF", border: "1px solid #DBEAFE",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0, marginTop: 1,
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 5px 0" }}>
+              {isOwner ? "You submitted this organization" : "Submitted by"}
+            </p>
+            {!isOwner && submitterName && (
+              <p
+                title={submitterEmail || undefined}
+                style={{
+                  fontSize: 15, fontWeight: 600, color: "#1E293B", margin: "0 0 3px 0",
+                  wordBreak: "break-word", overflowWrap: "break-word",
+                  cursor: "help",
+                  textDecoration: "underline", textDecorationStyle: "dotted",
+                  textDecorationColor: "#CBD5E1",
+                }}
+              >
+                {submitterName}
+              </p>
+            )}
+            {submitterRole && (
+              <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{submitterRole}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Add form — primary action ───────────────────────────────────── */}
       <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: "0 0 4px 0" }}>Add Organization Admin</h3>
         <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 14px 0" }}>Enter the email of an existing user to grant them admin access to your organization.</p>
@@ -485,19 +628,25 @@ function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
             placeholder="user@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleGrant()}
+            onKeyDown={(e) => e.key === "Enter" && handleFormGrant()}
             style={{ flex: 1, height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }}
           />
           <button
-            onClick={handleGrant}
-            style={{ height: 40, padding: "0 18px", backgroundColor: "#0F172A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+            onClick={handleFormGrant}
+            disabled={granting}
+            style={{
+              height: 40, padding: "0 18px",
+              backgroundColor: granting ? "#475569" : "#0F172A", color: "#fff",
+              border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: granting ? "wait" : "pointer", whiteSpace: "nowrap",
+            }}
           >
-            Grant Access
+            {granting ? "Granting…" : "Grant Access"}
           </button>
         </div>
       </div>
 
-      {/* Admin list */}
+      {/* ── Admin list ─────────────────────────────────────────────────── */}
       <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F8FAFC" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>Current Organization Admins ({admins.length})</span>
@@ -505,29 +654,48 @@ function OrgAdminsTab({ currentUserEmail }: { currentUserEmail: string }) {
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading...</div>
         ) : admins.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>No additional organization admins yet.</div>
+          // Unexpected state — backend guarantees creator is always an admin.
+          <div style={{ padding: 32, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+            No organization admins yet.
+          </div>
         ) : (
-          admins.map((a, idx) => (
-            <div key={a.id} className="flex items-center justify-between" style={{ padding: "14px 20px", borderBottom: idx < admins.length - 1 ? "1px solid #F1F5F9" : "none" }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.email}</div>
-                <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Added {a.created_at?.split("T")[0]}</div>
+          admins.map((a, idx) => {
+            const aEmail = _norm(a.email);
+            return (
+              <div key={a.id} className="flex items-center justify-between" style={{ padding: "14px 20px", borderBottom: idx < admins.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.email}</span>
+                    {/* Creator badge — matches via normalised email; future-proofs for userId match */}
+                    {submitterEmail && aEmail === submitterEmail && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+                        backgroundColor: "#EFF6FF", color: "#3B82F6",
+                        border: "1px solid #BFDBFE", borderRadius: 4,
+                        padding: "1px 6px",
+                      }}>
+                        Creator
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Added {a.created_at?.split("T")[0]}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {aEmail === normCurrentUser && (
+                    <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "2px 8px" }}>You</span>
+                  )}
+                  {aEmail !== normCurrentUser && (
+                    <button
+                      onClick={() => setConfirmId(a.id)}
+                      style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, cursor: "pointer" }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                {a.email === currentUserEmail && (
-                  <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "2px 8px" }}>You</span>
-                )}
-                {a.email !== currentUserEmail && (
-                  <button
-                    onClick={() => setConfirmId(a.id)}
-                    style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 7, fontSize: 12, cursor: "pointer" }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -1084,27 +1252,30 @@ export function OrgDashboard() {
   const orgName = profile?.name || "Organization";
   const orgId: number = profile?.id || 0;
 
-  const [stats, setStats]       = useState<any>(null);
-  const [members, setMembers]   = useState<any[]>([]);
-  const [supervisors, setSups]  = useState<any[]>([]);
-  const [events, setEvents]     = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [tab, setTab]           = useState<MainTab>("volunteers");
+  const [stats, setStats]         = useState<any>(null);
+  const [members, setMembers]     = useState<any[]>([]);
+  const [supervisors, setSups]    = useState<any[]>([]);
+  const [events, setEvents]       = useState<any[]>([]);
+  const [orgProfileData, setOrgProfileData] = useState<any>(null);
+  const [loading, setLoading]     = useState(true);
+  const [tab, setTab]             = useState<MainTab>("volunteers");
   const [showImport, setShowImport] = useState(false);
 
   const loadAll = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
     try {
-      const [sumRes, memRes, supRes, evtRes] = await Promise.all([
+      const [sumRes, memRes, supRes, evtRes, profRes] = await Promise.all([
         api.getReportSummary(),
         api.getOrgMembers(orgId),
         api.getSupervisors(),
         api.getEvents({ org_id: String(orgId) }),
+        api.getMyOrgProfile(),
       ]);
       setStats(sumRes);
       setMembers(memRes.volunteers || []);
       setSups(supRes.supervisors || []);
       setEvents(evtRes.events || []);
+      setOrgProfileData(profRes.organization || null);
     } catch (e) { console.error("Dashboard load error:", e); }
     finally { setLoading(false); }
   }, [orgId]);
@@ -1243,7 +1414,10 @@ export function OrgDashboard() {
               <ActivitiesTab events={events} onRefresh={loadAll} />
             )}
             {tab === "admins" && (
-              <OrgAdminsTab currentUserEmail={user?.email || ""} />
+              <OrgAdminsTab
+                currentUserEmail={user?.email || ""}
+                orgProfile={orgProfileData}
+              />
             )}
           </div>
         </div>
