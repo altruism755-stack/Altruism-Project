@@ -25,6 +25,7 @@ export function Navbar({ role = "guest", userName, hideNavLinks = false, hideUse
       ? [
           { label: "Dashboard", to: "/org" },
           { label: "Reports",   to: "/org/reports" },
+          { label: "Profile",   to: "/org/profile" },
         ]
       : role === "supervisor"
       ? [

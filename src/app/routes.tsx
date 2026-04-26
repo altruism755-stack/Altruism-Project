@@ -14,6 +14,7 @@ import { VolunteerOrgDashboard } from "./pages/VolunteerOrgDashboard";
 import { NewsFeed } from "./pages/NewsFeed";
 import { BrowseOrganizations } from "./pages/BrowseOrganizations";
 import { OrgPendingPage } from "./pages/OrgPendingPage";
+import { OrgProfilePage } from "./pages/OrgProfilePage";
 import { PlatformAdminDashboard } from "./pages/PlatformAdminDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
       { path: "/org/activities", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><EventManagement /></ProtectedRoute> },
       { path: "/org/events", element: <Navigate to="/org/activities" replace /> },
       { path: "/org/reports", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><ReportsPage /></ProtectedRoute> },
+      { path: "/org/profile", element: <ProtectedRoute allowedRoles={["org_admin"]} requireApprovedOrg><OrgProfilePage /></ProtectedRoute> },
 
       // Supervisor routes
       { path: "/supervisor", element: <ProtectedRoute allowedRoles={["supervisor"]}><SupervisorDashboard /></ProtectedRoute> },

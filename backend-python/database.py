@@ -269,6 +269,21 @@ def init_schema():
         )
     """)
 
+    # Organization profile change requests — for sensitive fields (name, official_email)
+    # that need platform-admin review before being applied.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS org_profile_change_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            org_id INTEGER NOT NULL REFERENCES organizations(id),
+            requested_by INTEGER NOT NULL REFERENCES users(id),
+            field TEXT NOT NULL,
+            new_value TEXT,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+            created_at TEXT DEFAULT (datetime('now')),
+            reviewed_at TEXT
+        )
+    """)
+
     # Organization admins table — scoped per org, managed by org owners & platform admins
     # Migration: if old schema (user_id PK, no org_id) exists, recreate it
     _cols = {row[1] for row in conn.execute("PRAGMA table_info(org_admins)").fetchall()}

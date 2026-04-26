@@ -3,6 +3,7 @@ import io
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from typing import Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles, require_approved_org_admin, hash_password
@@ -11,13 +12,180 @@ from auth import get_current_user, require_roles, require_approved_org_admin, ha
 class AddOrgAdminBody(BaseModel):
     email: str
 
+
+# Fields the org admin can update directly on their own profile.
+EDITABLE_FIELDS = {"description", "logo_url", "category", "location", "phone", "website"}
+# Fields that require platform-admin review — changes are queued, not applied.
+SENSITIVE_FIELDS = {"name", "official_email"}
+
+
+class OrgProfileUpdate(BaseModel):
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    category: Optional[str] = None
+    location: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    # Sensitive — accepted but not applied directly.
+    name: Optional[str] = None
+    official_email: Optional[str] = None
+
+
 router = APIRouter(prefix="/api/organizations", tags=["organizations"])
 
+
+# ── /me routes MUST come before /{org_id} so FastAPI doesn't try to cast
+# the literal string "me" to an integer and fail with a 422. ─────────────────
+
+def _get_my_org_id(db, user_id: int) -> int:
+    org = dict_row(db.execute(
+        "SELECT id FROM organizations WHERE admin_user_id = ?", (user_id,)
+    ).fetchone())
+    if not org:
+        raise HTTPException(404, "Organization not found for this user")
+    return org["id"]
+
+
+# ── Organization profile (self-service) ──────────────────────────────────────
+
+@router.get("/me/profile")
+def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org = dict_row(db.execute(
+            "SELECT * FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+        ).fetchone())
+        if not org:
+            raise HTTPException(404, "Organization not found")
+
+        pending = dict_rows(db.execute(
+            "SELECT id, field, new_value, status, created_at "
+            "FROM org_profile_change_requests "
+            "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
+            (org["id"],),
+        ).fetchall())
+        return {"organization": org, "pending_changes": pending}
+
+
+@router.put("/me/profile")
+def update_my_profile(
+    body: OrgProfileUpdate,
+    current_user: dict = Depends(require_approved_org_admin),
+):
+    payload = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if not payload:
+        raise HTTPException(400, "No fields to update")
+
+    with get_db() as db:
+        org = dict_row(db.execute(
+            "SELECT * FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+        ).fetchone())
+        if not org:
+            raise HTTPException(404, "Organization not found")
+
+        applied: list[str] = []
+        queued: list[str] = []
+
+        edits = {k: v for k, v in payload.items() if k in EDITABLE_FIELDS and v != org.get(k)}
+        if edits:
+            sets = ", ".join(f"{k} = ?" for k in edits)
+            db.execute(f"UPDATE organizations SET {sets} WHERE id = ?", (*edits.values(), org["id"]))
+            applied = list(edits.keys())
+
+        for field in SENSITIVE_FIELDS:
+            new_val = payload.get(field)
+            if new_val is None or new_val == org.get(field):
+                continue
+            db.execute(
+                "DELETE FROM org_profile_change_requests "
+                "WHERE org_id = ? AND field = ? AND status = 'pending'",
+                (org["id"], field),
+            )
+            db.execute(
+                "INSERT INTO org_profile_change_requests (org_id, requested_by, field, new_value) "
+                "VALUES (?, ?, ?, ?)",
+                (org["id"], current_user["id"], field, new_val),
+            )
+            queued.append(field)
+
+        org_after = dict_row(db.execute(
+            "SELECT * FROM organizations WHERE id = ?", (org["id"],)
+        ).fetchone())
+        pending = dict_rows(db.execute(
+            "SELECT id, field, new_value, status, created_at "
+            "FROM org_profile_change_requests "
+            "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
+            (org["id"],),
+        ).fetchall())
+
+        if queued and applied:
+            message = "Changes saved. Updates to sensitive fields require review."
+        elif queued:
+            message = "This change requires review."
+        elif applied:
+            message = "Profile updated."
+        else:
+            message = "No changes to save."
+
+        return {
+            "organization": org_after,
+            "applied": applied,
+            "queued": queued,
+            "pending_changes": pending,
+            "message": message,
+        }
+
+
+# ── Organization admin management (org-scoped) ───────────────────────────────
+
+@router.get("/me/admins")
+def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        rows = dict_rows(db.execute(
+            "SELECT oa.id, oa.user_id, u.email, oa.created_at "
+            "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
+            "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
+            (org_id,),
+        ).fetchall())
+        return {"admins": rows}
+
+
+@router.post("/me/admins", status_code=201)
+def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
+        if not user:
+            raise HTTPException(404, f"No user found with email '{body.email}'")
+        if user["id"] == current_user["id"]:
+            raise HTTPException(400, "You are already the organization owner")
+        existing = db.execute(
+            "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], org_id)
+        ).fetchone()
+        if existing:
+            raise HTTPException(409, "User is already an organization admin")
+        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], org_id))
+        return {"message": f"{body.email} is now an organization admin"}
+
+
+@router.delete("/me/admins/{admin_id}")
+def remove_my_org_admin(admin_id: int, current_user: dict = Depends(require_approved_org_admin)):
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        row = dict_row(db.execute(
+            "SELECT id, user_id FROM org_admins WHERE id = ? AND org_id = ?", (admin_id, org_id)
+        ).fetchone())
+        if not row:
+            raise HTTPException(404, "Organization admin not found")
+        db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
+        return {"message": "Organization admin removed"}
+
+
+# ── Public listing ────────────────────────────────────────────────────────────
 
 @router.get("")
 def list_organizations():
     with get_db() as db:
-        # Public listing: only show approved orgs (or legacy orgs with NULL status)
         orgs = dict_rows(db.execute(
             "SELECT id, name, description, category, color, secondary_color, initials, founded, "
             "founded_year, location, org_type, logo_url, website "
@@ -197,7 +365,6 @@ def import_volunteers_csv(
                     )
                     vol_id = cur.lastrowid
 
-                # Attach to org if not already
                 existing_ov = db.execute(
                     "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
                     (org_id, vol_id),
@@ -234,60 +401,3 @@ def remove_org_member(
             (org_id, vol_id),
         )
         return {"message": "Volunteer removed from organization"}
-
-
-# ── Organization admin management (org-scoped) ───────────────────────────────
-# org_id is ALWAYS derived from the authenticated user's organization — never
-# accepted from frontend input — to prevent cross-org privilege escalation.
-
-def _get_my_org_id(db, user_id: int) -> int:
-    org = dict_row(db.execute(
-        "SELECT id FROM organizations WHERE admin_user_id = ?", (user_id,)
-    ).fetchone())
-    if not org:
-        raise HTTPException(404, "Organization not found for this user")
-    return org["id"]
-
-
-@router.get("/me/admins")
-def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin)):
-    with get_db() as db:
-        org_id = _get_my_org_id(db, current_user["id"])
-        rows = dict_rows(db.execute(
-            "SELECT oa.id, oa.user_id, u.email, oa.created_at "
-            "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
-            "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
-            (org_id,),
-        ).fetchall())
-        return {"admins": rows}
-
-
-@router.post("/me/admins", status_code=201)
-def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require_approved_org_admin)):
-    with get_db() as db:
-        org_id = _get_my_org_id(db, current_user["id"])
-        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
-        if not user:
-            raise HTTPException(404, f"No user found with email '{body.email}'")
-        if user["id"] == current_user["id"]:
-            raise HTTPException(400, "You are already the organization owner")
-        existing = db.execute(
-            "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], org_id)
-        ).fetchone()
-        if existing:
-            raise HTTPException(409, "User is already an organization admin")
-        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], org_id))
-        return {"message": f"{body.email} is now an organization admin"}
-
-
-@router.delete("/me/admins/{admin_id}")
-def remove_my_org_admin(admin_id: int, current_user: dict = Depends(require_approved_org_admin)):
-    with get_db() as db:
-        org_id = _get_my_org_id(db, current_user["id"])
-        row = dict_row(db.execute(
-            "SELECT id, user_id FROM org_admins WHERE id = ? AND org_id = ?", (admin_id, org_id)
-        ).fetchone())
-        if not row:
-            raise HTTPException(404, "Organization admin not found")
-        db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
-        return {"message": "Organization admin removed"}

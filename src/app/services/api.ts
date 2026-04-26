@@ -176,6 +176,11 @@ export const api = {
   adminRemoveAdmin: (userId: number) =>
     request(`/admin/platform-admins/${userId}`, { method: "DELETE" }),
 
+  // Org admin — own organization profile
+  getMyOrgProfile: () => request(`/organizations/me/profile`),
+  updateMyOrgProfile: (data: Record<string, any>) =>
+    request(`/organizations/me/profile`, { method: "PUT", body: JSON.stringify(data) }),
+
   // Org admin — managing admins for own organization (org_id from server token, never from client)
   orgListAdmins: () => request(`/organizations/me/admins`),
   orgAddAdmin: (email: string) =>
