@@ -507,9 +507,12 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
               </p>
             </div>
           ) : (
-            <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "10px 14px", marginBottom: 20 }}>
-              <p style={{ fontSize: 12, color: "#15803D", margin: 0, lineHeight: 1.5 }}>
-                Register your organization for platform review. Our admins will verify your details and approve access within 1–2 business days.
+            <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#15803D", margin: 0, lineHeight: 1.4 }}>
+                Submit your organization for verification
+              </p>
+              <p style={{ fontSize: 12, color: "#15803D", margin: "2px 0 0 0", lineHeight: 1.5 }}>
+                Once we review your submission, we'll notify you when your organization is approved (1–2 business days).
               </p>
             </div>
           )}
