@@ -858,10 +858,10 @@ function ImportModal({ orgId, onClose, onSuccess }: {
 
   const downloadTemplate = () => {
     const rows = [
-      "name,email,phone,city,skills,department,role,source",
-      "Ahmed Ali,ahmed@example.com,01012345678,Cairo,Teaching,Education,volunteer,manual_import",
-      'Mona Khalil,mona@example.com,01098765432,Alexandria,"Event Planning,Communication",Programs,volunteer,manual_import',
-      "Omar Hassan,omar@example.com,01155667788,Giza,Leadership|Management,Operations,volunteer,platform",
+      "name,email,phone,city,skills,department,role,join_source",
+      "Ahmed Ali,ahmed@example.com,01012345678,Cairo,Teaching,Education,volunteer,website",
+      'Mona Khalil,mona@example.com,01098765432,Alexandria,"Event Planning,Communication",Programs,volunteer,referral',
+      "Omar Hassan,omar@example.com,01155667788,Giza,Leadership|Management,Operations,volunteer,campaign",
     ];
     const blob = new Blob([rows.join("\n")], { type: "text/csv" });
     const url  = URL.createObjectURL(blob);

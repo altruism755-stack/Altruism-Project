@@ -183,7 +183,7 @@ def register(body: RegisterBody):
             # INSERT OR IGNORE is safe against the UNIQUE(user_id, org_id) constraint.
             if org:
                 db.execute(
-                    "INSERT OR IGNORE INTO org_admins (user_id, org_id) VALUES (?, ?)",
+                    "INSERT OR IGNORE INTO org_admins (user_id, org_id, role) VALUES (?, ?, 'creator')",
                     (user_id, org["id"]),
                 )
             token = generate_token({"id": user_id, "email": body.email, "role": "org_admin"})

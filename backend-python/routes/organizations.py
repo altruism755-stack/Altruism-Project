@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import Any, Optional
 
@@ -20,6 +20,30 @@ _APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 DUPLICATE_STRATEGIES = {"skip_duplicates", "update_existing", "invite_anyway"}
+
+# Canonical join_source values for analytics/Power BI compatibility.
+# Any unrecognized value from CSV import is coerced to "other".
+VALID_JOIN_SOURCES = {"website", "referral", "campaign", "other"}
+
+# Incremented when the export schema gains new columns.
+# Power BI dashboards can filter on this to detect stale cached exports.
+EXPORT_VERSION = "1.1"
+
+# Note: database uses "Active" while the analytics layer uses "accepted".
+# Both values are treated as active for consistency across the system.
+ACTIVE_STATUSES = {"active", "accepted"}
+
+
+def _utcnow() -> str:
+    """Single source of truth for UTC timestamps across the analytics pipeline.
+    Always produces YYYY-MM-DDTHH:MM:SSZ — consistent with ISO 8601 and Power BI."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _is_active(status: str) -> int:
+    """Derived analytics flag. 1 = active membership, 0 = everything else.
+    Case-insensitive and safe against None or empty input."""
+    return 1 if (status or "").lower() in ACTIVE_STATUSES else 0
 
 
 class AddOrgAdminBody(BaseModel):
@@ -47,25 +71,43 @@ def _validate_csv_row(row: dict, row_num: int) -> tuple:
         return None, {"row": row_num, "reason": "Missing email"}
     if not _EMAIL_RE.match(email):
         return None, {"row": row_num, "reason": f"Invalid email format: {email}"}
+    # Prefer explicit join_source; fall back to legacy source column; default to "other".
+    raw_js = (row.get("join_source") or row.get("source") or "other").strip().lower()
+    join_source = raw_js if raw_js in VALID_JOIN_SOURCES else "other"
+    # channel_detail is only meaningful for campaign joins; blank it out otherwise.
+    raw_cd = (row.get("channel_detail") or "").strip().lower()
+    channel_detail = raw_cd if join_source == "campaign" else ""
+    # Location snapshot fields — stored separately so profile edits don't mutate history.
+    governorate_snap = (row.get("governorate") or "").strip()
+    city_snap        = (row.get("city")        or "").strip()
     return {
-        "name":       name,
-        "email":      email,
-        "phone":      (row.get("phone")      or "").strip(),
-        "city":       (row.get("city")       or row.get("governorate") or "").strip(),
-        "skills":     [s.strip() for s in (row.get("skills") or "").split(",") if s.strip()],
-        "department": (row.get("department") or "").strip(),
-        "role":       (row.get("role")       or "volunteer").strip(),
-        "source":     (row.get("source")     or "manual_import").strip(),
+        "name":               name,
+        "email":              email,
+        "phone":              (row.get("phone")      or "").strip(),
+        "city":               city_snap or governorate_snap,   # backward-compat combined field
+        "skills":             [s.strip() for s in (row.get("skills") or "").split(",") if s.strip()],
+        "department":         (row.get("department") or "").strip(),
+        "role":               (row.get("role")       or "volunteer").strip(),
+        "source":             (row.get("source")     or "manual_import").strip(),
+        "join_source":        join_source,
+        "channel_detail":     channel_detail,
+        "governorate_snap":   governorate_snap,
+        "city_snap":          city_snap,
+        # Quality-logging marker: non-empty when the original value was coerced.
+        "_raw_join_source":   raw_js if raw_js != join_source else "",
     }, None
 
 
 def _parse_csv(csv_text: str) -> tuple:
-    """Parse CSV text. Returns (valid_rows, errors, duplicate_emails_in_csv)."""
-    reader      = csv.DictReader(io.StringIO(csv_text.strip()))
-    valid_rows  = []
-    errors      = []
-    seen_emails = set()
-    csv_dupes   = set()
+    """Parse CSV text. Returns (valid_rows, errors, duplicate_emails_in_csv, quality_warnings).
+    quality_warnings: list of rows where join_source was invalid and coerced to 'other'.
+    """
+    reader           = csv.DictReader(io.StringIO(csv_text.strip()))
+    valid_rows       = []
+    errors           = []
+    seen_emails      = set()
+    csv_dupes        = set()
+    quality_warnings = []
 
     for i, row in enumerate(reader, start=2):  # row 1 = header
         cleaned, err = _validate_csv_row(row, i)
@@ -74,13 +116,20 @@ def _parse_csv(csv_text: str) -> tuple:
             continue
         email = cleaned["email"]
         if email in seen_emails:
+            # Keep first occurrence; skip subsequent duplicates without raising an error.
             csv_dupes.add(email)
-            errors.append({"row": i, "reason": f"Duplicate email in CSV: {email}"})
+            quality_warnings.append({"row": i, "field": "email", "issue": "duplicate_in_file"})
             continue
         seen_emails.add(email)
+        # Surface join_source coercions so callers can log data-quality issues.
+        if cleaned.get("_raw_join_source"):
+            quality_warnings.append({
+                "row": i, "field": "join_source",
+                "original": cleaned["_raw_join_source"], "coerced_to": "other",
+            })
         valid_rows.append(cleaned)
 
-    return valid_rows, errors, csv_dupes
+    return valid_rows, errors, csv_dupes, quality_warnings
 
 
 # Fields the org admin can update directly on their own profile.
@@ -283,7 +332,7 @@ def update_my_profile(
 
 def _fetch_org_admins(db, org_id: int) -> list:
     return dict_rows(db.execute(
-        "SELECT oa.id, oa.user_id, u.email, oa.created_at "
+        "SELECT oa.id, oa.user_id, u.email, oa.created_at, oa.role "
         "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
         "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
         (org_id,),
@@ -295,11 +344,11 @@ def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin))
     with get_db() as db:
         org_id = _get_my_org_id(db, current_user["id"])
         rows = _fetch_org_admins(db, org_id)
-        # Backward-compat migration: if existing org has no admins, auto-add creator.
-        # Guarantees the invariant even for orgs registered before this change.
+        # This acts as a one-time lazy migration for legacy organizations.
+        # INSERT OR IGNORE prevents duplicate rows against the UNIQUE(user_id, org_id) constraint.
         if not rows:
             db.execute(
-                "INSERT OR IGNORE INTO org_admins (user_id, org_id) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO org_admins (user_id, org_id, role) VALUES (?, ?, 'creator')",
                 (current_user["id"], org_id),
             )
             rows = _fetch_org_admins(db, org_id)
@@ -313,16 +362,17 @@ def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require
         user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
         if not user:
             raise HTTPException(404, f"No user found with email '{body.email}'")
-        # Idempotent check FIRST — if already admin (including self), return 200 silently.
+        # Idempotent check FIRST — handles both "already-admin other" and "already-admin self".
         existing = db.execute(
             "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], org_id)
         ).fetchone()
         if existing:
             return JSONResponse(status_code=200, content={"message": f"{body.email} is already an organization admin"})
+        # Self-grant prevention: a non-admin user must not be able to escalate their own privileges.
         if user["id"] == current_user["id"]:
-            raise HTTPException(400, "You are already the organization owner")
+            raise HTTPException(403, "You cannot grant yourself admin access")
         # INSERT OR IGNORE defends against any concurrent race to the UNIQUE constraint.
-        db.execute("INSERT OR IGNORE INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], org_id))
+        db.execute("INSERT OR IGNORE INTO org_admins (user_id, org_id, role) VALUES (?, ?, 'admin')", (user["id"], org_id))
         return {"message": f"{body.email} is now an organization admin"}
 
 
@@ -337,6 +387,80 @@ def remove_my_org_admin(admin_id: int, current_user: dict = Depends(require_appr
             raise HTTPException(404, "Organization admin not found")
         db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
         return {"message": "Organization admin removed"}
+
+
+# ── Analytics CSV export (Power BI / flat structure) ─────────────────────────
+
+@router.get("/me/volunteers/export")
+def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admin)):
+    """Flat, denormalized CSV export for analytics tools (Power BI, etc.).
+
+    Schema v1.1 column order (analytics-optimised):
+      export_version, volunteer_id, org_id, email, name,
+      join_source, channel_detail, status, is_active,
+      joined_at, activity_id, governorate, city
+
+    status values: applied | accepted | inactive | unknown
+    is_active: 1 when status = 'accepted', 0 for all other states.
+    channel_detail is non-empty only when join_source = 'campaign'.
+    joined_at: full ISO 8601 UTC (YYYY-MM-DDTHH:MM:SSZ).
+    All nulls replaced with empty strings or 0 for Power BI compatibility.
+    """
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        rows = dict_rows(db.execute(
+            """
+            SELECT
+                v.id                                                        AS volunteer_id,
+                ov.org_id,
+                LOWER(TRIM(v.email))                                        AS email,
+                v.name,
+                COALESCE(ov.join_source, 'other')                          AS join_source,
+                CASE
+                    WHEN ov.join_source = 'campaign'
+                    THEN LOWER(TRIM(COALESCE(ov.channel_detail, '')))
+                    ELSE ''
+                END                                                         AS channel_detail,
+                CASE ov.status
+                    WHEN 'Pending'  THEN 'applied'
+                    WHEN 'Active'   THEN 'accepted'
+                    WHEN 'Inactive' THEN 'inactive'
+                    ELSE            'unknown'
+                END                                                         AS status,
+                COALESCE(ov.is_active, 0)                                  AS is_active,
+                COALESCE(
+                    ov.joined_at,
+                    ov.joined_date || 'T00:00:00Z',
+                    ''
+                )                                                           AS joined_at,
+                ''                                                          AS activity_id,
+                COALESCE(ov.governorate_snapshot, '')                       AS governorate,
+                COALESCE(ov.city_snapshot,        '')                       AS city
+            FROM volunteers v
+            JOIN org_volunteers ov ON v.id = ov.volunteer_id
+            WHERE ov.org_id = ?
+            ORDER BY COALESCE(ov.joined_at, ov.joined_date) ASC
+            """,
+            (org_id,),
+        ).fetchall())
+
+    fieldnames = [
+        "export_version", "volunteer_id", "org_id", "email", "name",
+        "join_source", "channel_detail", "status", "is_active",
+        "joined_at", "activity_id", "governorate", "city",
+    ]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\n")
+    writer.writeheader()
+    for row in rows:
+        row["export_version"] = EXPORT_VERSION
+        writer.writerow(row)
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="volunteers_{org_id}_v{EXPORT_VERSION}.csv"'},
+    )
 
 
 # ── Public listing ────────────────────────────────────────────────────────────
@@ -410,7 +534,7 @@ def get_org_members(org_id: int, current_user: dict = Depends(get_current_user))
 def join_organization(org_id: int, current_user: dict = Depends(require_roles("volunteer"))):
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id, governorate, city FROM volunteers WHERE user_id = ?", (current_user["id"],)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer profile not found")
@@ -422,9 +546,14 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
         if existing:
             raise HTTPException(409, "Already a member of this organization")
 
+        _now = _utcnow()
         db.execute(
-            "INSERT INTO org_volunteers (org_id, volunteer_id, status) VALUES (?, ?, 'Pending')",
-            (org_id, vol["id"]),
+            "INSERT INTO org_volunteers "
+            "(org_id, volunteer_id, status, is_active, join_source, "
+            " governorate_snapshot, city_snapshot, joined_at) "
+            "VALUES (?, ?, 'Pending', ?, 'website', ?, ?, ?)",
+            (org_id, vol["id"], _is_active("Pending"),
+             vol.get("governorate") or "", vol.get("city") or "", _now),
         )
         return {"message": "Application submitted"}
 
@@ -438,9 +567,9 @@ def approve_org_member(
 ):
     with get_db() as db:
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', supervisor_id = ?, department = ? "
+            "UPDATE org_volunteers SET status = 'Active', is_active = ?, supervisor_id = ?, department = ? "
             "WHERE org_id = ? AND volunteer_id = ?",
-            (body.get("supervisor_id"), body.get("department"), org_id, vol_id),
+            (_is_active("Active"), body.get("supervisor_id"), body.get("department"), org_id, vol_id),
         )
         return {"message": "Volunteer approved"}
 
@@ -568,7 +697,7 @@ def import_volunteers_csv(
     if body.duplicate_strategy not in DUPLICATE_STRATEGIES:
         raise HTTPException(400, f"duplicate_strategy must be one of: {', '.join(DUPLICATE_STRATEGIES)}")
 
-    valid_rows, parse_errors, _csv_dupes = _parse_csv(body.csv)
+    valid_rows, parse_errors, _csv_dupes, quality_warnings = _parse_csv(body.csv)
 
     invited_count  = 0
     linked_count   = 0
@@ -614,9 +743,12 @@ def import_volunteers_csv(
                             continue
                         elif body.duplicate_strategy == "update_existing":
                             db.execute(
-                                "UPDATE org_volunteers SET department = ?, source = ? "
+                                "UPDATE org_volunteers "
+                                "SET department = ?, source = ?, join_source = ?, channel_detail = ? "
                                 "WHERE org_id = ? AND volunteer_id = ?",
-                                (r["department"] or None, r["source"], org_id, vol_id),
+                                (r["department"] or None, r["source"],
+                                 r["join_source"], r["channel_detail"],
+                                 org_id, vol_id),
                             )
                             skipped_count += 1
                             continue
@@ -633,10 +765,15 @@ def import_volunteers_csv(
                         continue
 
                     # Existing user, not yet in this org — link them directly
+                    _now = _utcnow()
                     db.execute(
-                        "INSERT INTO org_volunteers (org_id, volunteer_id, status, department, source) "
-                        "VALUES (?, ?, 'Active', ?, 'existing_user')",
-                        (org_id, vol_id, r["department"] or None),
+                        "INSERT INTO org_volunteers "
+                        "(org_id, volunteer_id, status, is_active, department, source, join_source, "
+                        " channel_detail, governorate_snapshot, city_snapshot, joined_at) "
+                        "VALUES (?, ?, 'Active', ?, ?, 'existing_user', ?, ?, ?, ?, ?)",
+                        (org_id, vol_id, _is_active("Active"), r["department"] or None,
+                         r["join_source"], r["channel_detail"],
+                         r["governorate_snap"], r["city_snap"], _now),
                     )
                     linked_count += 1
 
@@ -657,10 +794,15 @@ def import_volunteers_csv(
                          json.dumps(r["skills"])),
                     )
                     vol_id = cur.lastrowid
+                    _now = _utcnow()
                     db.execute(
-                        "INSERT INTO org_volunteers (org_id, volunteer_id, status, department, source) "
-                        "VALUES (?, ?, 'Pending', ?, 'invite')",
-                        (org_id, vol_id, r["department"] or None),
+                        "INSERT INTO org_volunteers "
+                        "(org_id, volunteer_id, status, is_active, department, source, join_source, "
+                        " channel_detail, governorate_snapshot, city_snapshot, joined_at) "
+                        "VALUES (?, ?, 'Pending', ?, ?, 'invite', ?, ?, ?, ?, ?)",
+                        (org_id, vol_id, _is_active("Pending"), r["department"] or None,
+                         r["join_source"], r["channel_detail"],
+                         r["governorate_snap"], r["city_snap"], _now),
                     )
                     invite_links.append({"email": email, "link": _make_invite_link(token)})
                     invited_count += 1
@@ -672,14 +814,16 @@ def import_volunteers_csv(
     success_count = invited_count + linked_count
 
     return {
-        "totalRows":    len(valid_rows) + len(parse_errors),
-        "successCount": success_count,
-        "invitedCount": invited_count,
-        "linkedCount":  linked_count,
-        "skippedCount": skipped_count,
-        "errorCount":   len(all_errors),
-        "errors":       all_errors,
-        "inviteLinks":  invite_links,
+        "totalRows":       len(valid_rows) + len(parse_errors),
+        "successCount":    success_count,
+        "invitedCount":    invited_count,
+        "linkedCount":     linked_count,
+        "skippedCount":    skipped_count,
+        "errorCount":      len(all_errors),
+        "errors":          all_errors,
+        "inviteLinks":     invite_links,
+        # Data-quality report: rows where join_source was invalid and coerced to "other".
+        "qualityWarnings": quality_warnings,
     }
 
 

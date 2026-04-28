@@ -318,5 +318,53 @@ def init_schema():
     except Exception:
         pass
 
+    # Analytics-ready join_source (ENUM: website | referral | campaign | other)
+    # Separate from 'source' which tracks technical import method.
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN join_source TEXT DEFAULT 'other'")
+    except Exception:
+        pass
+
+    # Derived analytics flag: 1 when membership is Active, 0 for all other states.
+    # Stored explicitly so Power BI can filter without a CASE expression.
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
+    # Full UTC timestamp at join time — higher precision than the date-only joined_date.
+    # Format: YYYY-MM-DDTHH:MM:SSZ (ISO 8601 UTC, Power BI compatible).
+    try:
+        conn.execute(
+            "ALTER TABLE org_volunteers ADD COLUMN joined_at TEXT "
+            "DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))"
+        )
+    except Exception:
+        pass
+
+    # Optional campaign detail — meaningful when join_source = 'campaign'.
+    # Examples: facebook_ad, whatsapp, university_event
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN channel_detail TEXT DEFAULT ''")
+    except Exception:
+        pass
+
+    # Location snapshot at time of join — immutable, decoupled from mutable volunteer profile.
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN governorate_snapshot TEXT DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN city_snapshot TEXT DEFAULT ''")
+    except Exception:
+        pass
+
+    # Role column on org_admins — future-ready for creator/admin distinction.
+    # Existing rows default to 'admin'; registration path sets 'creator' explicitly.
+    try:
+        conn.execute("ALTER TABLE org_admins ADD COLUMN role TEXT DEFAULT 'admin'")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
