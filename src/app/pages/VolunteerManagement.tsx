@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../components/Toast";
 
 const GREEN = "#16A34A";
 
@@ -11,6 +12,7 @@ function confirm(message: string): boolean {
 
 export function VolunteerManagement() {
   const { profile } = useAuth();
+  const { showToast } = useToast();
   const orgName = profile?.name || "Organization";
   const orgId: number = profile?.id || 0;
 
@@ -20,6 +22,42 @@ export function VolunteerManagement() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const handleExport = async (format: "xlsx" | "csv") => {
+    if (exporting) return;
+    setExportMenuOpen(false);
+    setExporting(true);
+    try {
+      const { blob, filename, count } = await api.exportOrgVolunteersFull(format);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast(`Exported ${count} volunteer${count === 1 ? "" : "s"}`, "success");
+    } catch (e) {
+      console.error(e);
+      showToast("Export failed. Please try again.", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Approve modal state
   const [approveTarget, setApproveTarget] = useState<any | null>(null);
@@ -136,13 +174,52 @@ export function VolunteerManagement() {
               </span>
             )}
           </div>
-          <input
-            type="text"
-            placeholder="Search by name or email…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 260, height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }}
-          />
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search by name or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: 260, height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }}
+            />
+            {(() => {
+              const totalVolunteers = members.length;
+              const disabled = exporting || totalVolunteers === 0;
+              const tooltip = totalVolunteers === 0 ? "No volunteers to export" : "";
+              return (
+                <div ref={exportMenuRef} style={{ position: "relative" }} title={tooltip}>
+                  <div style={{ display: "flex", alignItems: "stretch", border: `1.5px solid ${disabled ? "#E2E8F0" : GREEN}`, borderRadius: 8, overflow: "hidden", opacity: disabled ? 0.5 : 1 }}>
+                    <button
+                      onClick={() => handleExport("xlsx")}
+                      disabled={disabled}
+                      style={{ height: 40, padding: "0 14px", backgroundColor: "#fff", color: GREEN, border: "none", fontSize: 14, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      <span style={{ fontSize: 15 }}>↓</span>
+                      {exporting ? "Preparing…" : "Export"}
+                    </button>
+                    <button
+                      onClick={() => setExportMenuOpen((o) => !o)}
+                      disabled={disabled}
+                      aria-label="Export options"
+                      style={{ height: 40, width: 30, backgroundColor: "#fff", color: GREEN, border: "none", borderLeft: `1px solid ${disabled ? "#E2E8F0" : GREEN}`, fontSize: 11, cursor: disabled ? "not-allowed" : "pointer" }}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                  {exportMenuOpen && !disabled && (
+                    <div style={{ position: "absolute", top: 44, right: 0, backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.08)", zIndex: 40, minWidth: 200, overflow: "hidden" }}>
+                      <button onClick={() => handleExport("xlsx")} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13, color: "#1E293B", background: "none", border: "none", cursor: "pointer" }}>
+                        Export as Excel (.xlsx)
+                      </button>
+                      <button onClick={() => handleExport("csv")} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13, color: "#1E293B", background: "none", border: "none", cursor: "pointer", borderTop: "1px solid #F1F5F9" }}>
+                        Export as CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Tabs */}

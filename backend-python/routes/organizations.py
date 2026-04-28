@@ -463,6 +463,217 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
     )
 
 
+# ── Full-profile export (Excel / CSV) ────────────────────────────────────────
+
+_EXPORT_COLUMNS = [
+    "volunteer_id", "name", "email", "phone", "national_id", "nationality",
+    "gender", "date_of_birth", "governorate", "city",
+    "education_level", "university_name", "faculty", "field_of_study", "study_year",
+    "languages", "skills", "cause_areas", "availability",
+    "hours_per_week", "prior_experience", "prior_org", "experiences", "about_me",
+    "department", "supervisor_name",
+    "membership_status", "join_source", "channel_detail", "joined_at", "is_active",
+]
+
+# Columns that store JSON-encoded arrays in the DB → joined with "; " for spreadsheets.
+_JSON_LIST_COLUMNS = {"languages", "skills", "cause_areas", "availability", "experiences"}
+
+# Columns that should be rendered as text (preserve leading zeros, Arabic, etc.)
+_TEXT_COLUMNS = {"phone", "national_id"}
+
+# Long free-text columns — wider width + wrap in Excel.
+_WIDE_WRAP_COLUMNS = {"about_me", "experiences", "skills", "cause_areas", "languages", "availability"}
+
+
+def _decode_list(raw: Any) -> str:
+    if raw in (None, "", 0):
+        return ""
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return raw
+    else:
+        parsed = raw
+    if isinstance(parsed, list):
+        parts = []
+        for item in parsed:
+            if isinstance(item, dict):
+                # experiences: prefer a readable summary
+                summary = item.get("title") or item.get("role") or item.get("name") or ""
+                org = item.get("organization") or item.get("org") or ""
+                if summary and org:
+                    parts.append(f"{summary} @ {org}")
+                elif summary:
+                    parts.append(summary)
+                else:
+                    parts.append(json.dumps(item, ensure_ascii=False))
+            else:
+                parts.append(str(item))
+        return "; ".join(p for p in parts if p)
+    return str(parsed)
+
+
+def _shape_row(row: dict) -> dict:
+    out: dict = {}
+    for col in _EXPORT_COLUMNS:
+        val = row.get(col)
+        if col in _JSON_LIST_COLUMNS:
+            out[col] = _decode_list(val)
+        elif col == "prior_experience":
+            out[col] = "Yes" if val else "No"
+        elif col == "is_active":
+            out[col] = 1 if val else 0
+        elif col == "joined_at":
+            out[col] = val or row.get("joined_date") or ""
+        elif val is None:
+            out[col] = ""
+        else:
+            out[col] = val
+    return out
+
+
+def _fetch_export_rows(db, org_id: int) -> list[dict]:
+    return dict_rows(db.execute(
+        """
+        SELECT
+            v.id AS volunteer_id,
+            v.name, v.email, v.phone, v.national_id, v.nationality,
+            v.gender, v.date_of_birth, v.governorate, v.city,
+            v.education_level, v.university_name, v.faculty, v.field_of_study, v.study_year,
+            v.languages, v.skills, v.cause_areas, v.availability,
+            v.hours_per_week, v.prior_experience, v.prior_org, v.experiences, v.about_me,
+            ov.department,
+            s.name AS supervisor_name,
+            ov.status AS membership_status,
+            COALESCE(ov.join_source, 'other') AS join_source,
+            COALESCE(ov.channel_detail, '') AS channel_detail,
+            COALESCE(ov.joined_at, ov.joined_date) AS joined_at,
+            ov.joined_date,
+            COALESCE(ov.is_active, 0) AS is_active
+        FROM volunteers v
+        JOIN org_volunteers ov ON v.id = ov.volunteer_id
+        LEFT JOIN supervisors s ON ov.supervisor_id = s.id
+        WHERE ov.org_id = ?
+        ORDER BY v.name COLLATE NOCASE ASC
+        """,
+        (org_id,),
+    ).fetchall())
+
+
+def _safe_filename(name: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (name or "organization").strip()) or "organization"
+    return cleaned[:60]
+
+
+@router.get("/me/volunteers/export-full")
+def export_volunteers_full(
+    format: str = "xlsx",
+    current_user: dict = Depends(require_approved_org_admin),
+):
+    """Full-profile snapshot export of an organization's volunteers (xlsx | csv).
+
+    Distinct from /me/volunteers/export (analytics-flat for Power BI). This endpoint
+    returns the complete volunteer profile model for in-Excel review and analysis.
+    """
+    fmt = (format or "xlsx").lower()
+    if fmt not in ("xlsx", "csv"):
+        raise HTTPException(400, "format must be 'xlsx' or 'csv'")
+
+    with get_db() as db:
+        org_id = _get_my_org_id(db, current_user["id"])
+        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        rows = _fetch_export_rows(db, org_id)
+
+    shaped = [_shape_row(r) for r in rows]
+    org_slug = _safe_filename(org["name"] if org else "organization")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    base_name = f"volunteers_{org_slug}_{today}"
+
+    if fmt == "csv":
+        output = io.StringIO()
+        # UTF-8 BOM so Excel renders Arabic text correctly when opening CSVs.
+        output.write("﻿")
+        writer = csv.DictWriter(output, fieldnames=_EXPORT_COLUMNS, extrasaction="ignore", lineterminator="\n")
+        writer.writeheader()
+        for row in shaped:
+            writer.writerow(row)
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{base_name}.csv"',
+                "X-Export-Count": str(len(shaped)),
+            },
+        )
+
+    # xlsx path
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Volunteers"
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="16A34A")
+    header_align = Alignment(horizontal="left", vertical="center")
+
+    ws.append(_EXPORT_COLUMNS)
+    for col_idx, _ in enumerate(_EXPORT_COLUMNS, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    wrap_align = Alignment(wrap_text=True, vertical="top")
+    for row in shaped:
+        excel_row = []
+        for col in _EXPORT_COLUMNS:
+            val = row.get(col, "")
+            if col in _TEXT_COLUMNS and val != "":
+                # Force text storage to preserve leading zeros in phone / national_id.
+                val = str(val)
+            excel_row.append(val)
+        ws.append(excel_row)
+
+        r = ws.max_row
+        for col_idx, col in enumerate(_EXPORT_COLUMNS, start=1):
+            cell = ws.cell(row=r, column=col_idx)
+            if col in _TEXT_COLUMNS:
+                cell.number_format = "@"
+            if col in _WIDE_WRAP_COLUMNS:
+                cell.alignment = wrap_align
+
+    # Column widths: roomy for wide/wrap columns, autosized-ish for the rest.
+    for col_idx, col in enumerate(_EXPORT_COLUMNS, start=1):
+        letter = get_column_letter(col_idx)
+        if col in _WIDE_WRAP_COLUMNS:
+            ws.column_dimensions[letter].width = 40
+        elif col in {"email", "name", "supervisor_name", "university_name", "faculty"}:
+            ws.column_dimensions[letter].width = 28
+        elif col in {"joined_at", "date_of_birth"}:
+            ws.column_dimensions[letter].width = 20
+        else:
+            ws.column_dimensions[letter].width = 16
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{base_name}.xlsx"',
+            "X-Export-Count": str(len(shaped)),
+        },
+    )
+
+
 # ── Public listing ────────────────────────────────────────────────────────────
 
 @router.get("")

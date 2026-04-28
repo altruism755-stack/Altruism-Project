@@ -211,6 +211,29 @@ export const api = {
   },
   exportCSV: () => request("/reports/export-csv"),
 
+  // Full-profile volunteer export (xlsx | csv) — returns a Blob + count for download.
+  exportOrgVolunteersFull: async (
+    format: "xlsx" | "csv",
+  ): Promise<{ blob: Blob; filename: string; count: number }> => {
+    const token = sessionStorage.getItem("altruism_token");
+    const headers: Record<string, string> = {};
+    if (token && !token.startsWith("demo-")) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(
+      `${API_BASE}/organizations/me/volunteers/export-full?format=${format}`,
+      { headers },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(body.error || body.message || `Export failed: ${res.status}`, res.status, body);
+    }
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    const filename = match?.[1] || `volunteers.${format}`;
+    const count = Number(res.headers.get("X-Export-Count") || "0");
+    const blob = await res.blob();
+    return { blob, filename, count };
+  },
+
   // Profile picture
   uploadProfilePicture: (volunteerId: number, image: string) =>
     request(`/volunteers/${volunteerId}/profile-picture`, {
