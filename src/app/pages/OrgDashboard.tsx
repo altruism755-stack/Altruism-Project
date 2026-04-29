@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { OrgLogoByName } from "../components/OrgLogos";
 
 const GREEN = "#16A34A";
 
@@ -1330,11 +1331,14 @@ export function OrgDashboard() {
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
         {/* Page title */}
         <div className="flex items-center justify-between" style={{ marginBottom: 24 }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 600, color: "#1E293B", margin: 0 }}>{orgName}</h1>
-            <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-            </p>
+          <div className="flex items-center" style={{ gap: 16 }}>
+            <OrgLogoByName name={orgName} size={56} />
+            <div>
+              <h1 style={{ fontSize: 26, fontWeight: 600, color: "#1E293B", margin: 0 }}>{orgName}</h1>
+              <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
+                {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => setShowImport(true)}

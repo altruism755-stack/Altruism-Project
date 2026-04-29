@@ -43,3 +43,13 @@ export function OrgLogo({ orgId, size = 48 }: { orgId: string; size?: number }) 
   if (orgId === "org3") return <EnactusLogo size={size} />;
   return null;
 }
+
+/** Picks a brand logo by organization name. Case-insensitive substring match.
+ *  Returns null if no known brand matches — caller should render its own fallback. */
+export function OrgLogoByName({ name, size = 48 }: { name?: string | null; size?: number }) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("resala"))                          return <ResalaLogo size={size} />;
+  if (n.includes("red crescent"))                    return <RedCrescentLogo size={size} />;
+  if (n.includes("enactus"))                         return <EnactusLogo size={size} />;
+  return null;
+}
