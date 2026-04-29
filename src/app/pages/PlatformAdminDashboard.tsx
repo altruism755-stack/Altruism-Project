@@ -7,7 +7,7 @@ import { Logo } from "../components/Logo";
 const GREEN = "#16A34A";
 const NAV = "#0F172A";
 
-type MainTab = "organizations" | "volunteers" | "admins";
+type MainTab = "organizations" | "profile_changes" | "volunteers" | "admins";
 type OrgFilterTab = "pending" | "approved" | "rejected" | "all";
 
 export function PlatformAdminDashboard() {
@@ -30,6 +30,13 @@ export function PlatformAdminDashboard() {
   const [volSearch, setVolSearch] = useState("");
   const [volStatusFilter, setVolStatusFilter] = useState("");
   const [volLoading, setVolLoading] = useState(false);
+
+  // Profile changes state
+  const [profileChanges, setProfileChanges] = useState<any[]>([]);
+  const [profileChangesLoading, setProfileChangesLoading] = useState(false);
+  const [rejectingChangeId, setRejectingChangeId] = useState<number | null>(null);
+  const [changeRejectReason, setChangeRejectReason] = useState("");
+  const [profileChangeFilter, setProfileChangeFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
 
   // Admins state
   const [admins, setAdmins] = useState<any[]>([]);
@@ -90,6 +97,15 @@ export function PlatformAdminDashboard() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadProfileChanges = useCallback(async () => {
+    setProfileChangesLoading(true);
+    try {
+      const res = await api.adminListProfileChanges(profileChangeFilter === "all" ? undefined : profileChangeFilter);
+      setProfileChanges(res.changes || []);
+    } catch { /* ignore */ }
+    finally { setProfileChangesLoading(false); }
+  }, [profileChangeFilter]);
+
   const loadOrgAdmins = useCallback(async (orgId?: number) => {
     setOrgAdminsLoading(true);
     try {
@@ -105,6 +121,7 @@ export function PlatformAdminDashboard() {
   }, []);
 
   useEffect(() => { loadOrgs(); }, [loadOrgs]);
+  useEffect(() => { if (mainTab === "profile_changes") loadProfileChanges(); }, [mainTab, loadProfileChanges]);
   useEffect(() => { if (mainTab === "volunteers") loadVolunteers(); }, [mainTab, loadVolunteers]);
   useEffect(() => {
     if (mainTab === "admins") {
@@ -127,6 +144,23 @@ export function PlatformAdminDashboard() {
     setRejectReason("");
     setSelectedOrg(null);
     await Promise.all([loadOrgs(), loadStats()]);
+  };
+
+  const handleApproveChange = async (changeId: number) => {
+    try {
+      await api.adminApproveProfileChange(changeId);
+      await Promise.all([loadProfileChanges(), loadStats()]);
+    } catch (e: any) { console.error(e); }
+  };
+
+  const handleRejectChange = async (changeId: number) => {
+    if (!changeRejectReason.trim()) return;
+    try {
+      await api.adminRejectProfileChange(changeId, changeRejectReason);
+      setRejectingChangeId(null);
+      setChangeRejectReason("");
+      await Promise.all([loadProfileChanges(), loadStats()]);
+    } catch (e: any) { console.error(e); }
   };
 
   const handleVolStatus = async (volId: number, status: string) => {
@@ -197,10 +231,11 @@ export function PlatformAdminDashboard() {
         <h1 style={{ fontSize: 26, fontWeight: 700, color: "#1E293B", margin: "0 0 20px 0" }}>Platform Administration</h1>
 
         {/* Stats grid */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(6, 1fr)", marginBottom: 24 }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 24 }}>
           <StatCard label="Pending Review" value={stats.pending_organizations ?? 0} color="#F59E0B" onClick={() => { setMainTab("organizations"); setOrgTab("pending"); }} active={mainTab === "organizations" && orgTab === "pending"} />
           <StatCard label="Approved Orgs" value={stats.approved_organizations ?? 0} color={GREEN} onClick={() => { setMainTab("organizations"); setOrgTab("approved"); }} active={mainTab === "organizations" && orgTab === "approved"} />
           <StatCard label="Rejected Orgs" value={stats.rejected_organizations ?? 0} color="#EF4444" onClick={() => { setMainTab("organizations"); setOrgTab("rejected"); }} active={mainTab === "organizations" && orgTab === "rejected"} />
+          <StatCard label="Profile Changes" value={stats.pending_profile_changes ?? 0} color="#F97316" onClick={() => setMainTab("profile_changes")} active={mainTab === "profile_changes"} />
           <StatCard label="Total Volunteers" value={stats.total_volunteers ?? 0} color="#8B5CF6" onClick={() => setMainTab("volunteers")} active={mainTab === "volunteers"} />
           <StatCard label="Total Users" value={stats.total_users ?? 0} color="#3B82F6" />
           <StatCard label="Platform Admins" value={stats.total_platform_admins ?? 0} color="#EC4899" onClick={() => setMainTab("admins")} active={mainTab === "admins"} />
@@ -208,18 +243,34 @@ export function PlatformAdminDashboard() {
 
         {/* Main tab bar */}
         <div className="flex gap-1" style={{ marginBottom: 20, borderBottom: "2px solid #E2E8F0" }}>
-          {(["organizations", "volunteers", "admins"] as MainTab[]).map((t) => (
+          {([
+            { id: "organizations",   label: "Organizations" },
+            { id: "profile_changes", label: "Profile Changes" },
+            { id: "volunteers",      label: "Volunteers" },
+            { id: "admins",          label: "Admins" },
+          ] as { id: MainTab; label: string }[]).map(({ id, label }) => (
             <button
-              key={t}
-              onClick={() => setMainTab(t)}
+              key={id}
+              onClick={() => setMainTab(id)}
               style={{
                 padding: "10px 22px", background: "none", border: "none", cursor: "pointer",
-                fontSize: 14, fontWeight: mainTab === t ? 600 : 400,
-                color: mainTab === t ? GREEN : "#64748B",
-                borderBottom: mainTab === t ? `2px solid ${GREEN}` : "2px solid transparent",
-                marginBottom: -2, textTransform: "capitalize",
+                fontSize: 14, fontWeight: mainTab === id ? 600 : 400,
+                color: mainTab === id ? GREEN : "#64748B",
+                borderBottom: mainTab === id ? `2px solid ${GREEN}` : "2px solid transparent",
+                marginBottom: -2,
+                display: "flex", alignItems: "center", gap: 6,
               }}
-            >{t}</button>
+            >
+              {label}
+              {id === "profile_changes" && (stats.pending_profile_changes ?? 0) > 0 && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: "#fff", backgroundColor: "#F97316",
+                  borderRadius: 10, padding: "1px 6px", lineHeight: "16px",
+                }}>
+                  {stats.pending_profile_changes}
+                </span>
+              )}
+            </button>
           ))}
         </div>
 
@@ -295,6 +346,106 @@ export function PlatformAdminDashboard() {
                         <div className="flex gap-2" style={{ marginTop: 10, justifyContent: "flex-end" }}>
                           <button onClick={() => { setRejectingId(null); setRejectReason(""); }} style={btnStyle("#fff", "#64748B", "1px solid #E2E8F0")}>Cancel</button>
                           <button onClick={() => handleReject(org.id)} disabled={!rejectReason.trim()} style={btnStyle(rejectReason.trim() ? "#EF4444" : "#FCA5A5", "#fff")}>Confirm Reject</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Profile Changes tab ── */}
+        {mainTab === "profile_changes" && (
+          <>
+            {/* Filter tabs */}
+            <div className="flex gap-1" style={{ marginBottom: 16 }}>
+              {(["pending", "approved", "rejected", "all"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setProfileChangeFilter(t)}
+                  style={{
+                    padding: "6px 16px", borderRadius: 20, border: "1px solid",
+                    borderColor: profileChangeFilter === t ? GREEN : "#E2E8F0",
+                    backgroundColor: profileChangeFilter === t ? "#DCFCE7" : "#fff",
+                    color: profileChangeFilter === t ? "#15803D" : "#64748B",
+                    fontSize: 13, fontWeight: profileChangeFilter === t ? 600 : 400,
+                    cursor: "pointer", textTransform: "capitalize",
+                  }}
+                >{t}</button>
+              ))}
+            </div>
+
+            {profileChangesLoading ? (
+              <EmptyState message="Loading..." />
+            ) : profileChanges.length === 0 ? (
+              <EmptyState message={`No ${profileChangeFilter === "all" ? "" : profileChangeFilter} profile change requests.`} />
+            ) : (
+              <div className="flex flex-col gap-3">
+                {profileChanges.map((change) => (
+                  <div key={change.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3" style={{ flex: 1 }}>
+                        {change.org_logo ? (
+                          <img src={change.org_logo} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", border: "1px solid #E2E8F0", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: "#E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#64748B", flexShrink: 0 }}>
+                            {(change.org_name || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>
+                            {change.org_name}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 8 }}>
+                            Requested by {change.requested_by_email} · {change.created_at?.split("T")[0]}
+                          </div>
+                          {/* Current → pending value */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: "#64748B", backgroundColor: "#F1F5F9", borderRadius: 4, padding: "2px 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                              {change.field_label}
+                            </span>
+                            <span style={{ fontSize: 13, color: "#64748B" }}>{change.current_value || "—"}</span>
+                            <span style={{ color: "#94A3B8" }}>→</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>{change.new_value}</span>
+                            <ChangeStatusBadge status={change.status} />
+                          </div>
+                        </div>
+                      </div>
+                      {change.status === "pending" && (
+                        <div className="flex flex-col gap-2" style={{ minWidth: 120, flexShrink: 0 }}>
+                          <button
+                            onClick={() => handleApproveChange(change.id)}
+                            style={btnStyle(GREEN, "#fff")}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => { setRejectingChangeId(change.id); setChangeRejectReason(""); }}
+                            style={{ ...btnStyle("#fff", "#EF4444"), border: "1px solid #FECACA" }}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rejection form */}
+                    {rejectingChangeId === change.id && (
+                      <div style={{ marginTop: 14, padding: 14, backgroundColor: "#FEF2F2", borderRadius: 8, border: "1px solid #FECACA" }}>
+                        <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 6 }}>
+                          Rejection reason (optional)
+                        </label>
+                        <textarea
+                          value={changeRejectReason}
+                          onChange={(e) => setChangeRejectReason(e.target.value)}
+                          placeholder="Explain why this change is being rejected…"
+                          style={{ width: "100%", minHeight: 60, padding: 10, fontSize: 13, border: "1px solid #E2E8F0", borderRadius: 6, resize: "vertical", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                        />
+                        <div className="flex gap-2" style={{ marginTop: 8, justifyContent: "flex-end" }}>
+                          <button onClick={() => { setRejectingChangeId(null); setChangeRejectReason(""); }} style={btnStyle("#fff", "#64748B", "1px solid #E2E8F0")}>Cancel</button>
+                          <button onClick={() => handleRejectChange(change.id)} style={btnStyle("#EF4444", "#fff")}>Confirm Reject</button>
                         </div>
                       </div>
                     )}
@@ -610,6 +761,20 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: s.bg, color: s.color, borderRadius: 4, padding: "2px 8px", textTransform: "capitalize" }}>
       {status || "pending"}
+    </span>
+  );
+}
+
+function ChangeStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    pending:  { bg: "#FEF3C7", color: "#B45309", label: "Pending" },
+    approved: { bg: "#DCFCE7", color: "#15803D", label: "Approved" },
+    rejected: { bg: "#FEE2E2", color: "#B91C1C", label: "Rejected" },
+  };
+  const s = map[status] || map.pending;
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: s.bg, color: s.color, borderRadius: 4, padding: "2px 7px" }}>
+      {s.label}
     </span>
   );
 }

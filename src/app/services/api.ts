@@ -96,7 +96,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
 async function parseResponse(res: Response): Promise<any> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const message = body.error || body.message || `Request failed: ${res.status}`;
+    const message = body.error || body.message || body.detail || `Request failed: ${res.status}`;
     throw new ApiError(message, res.status, body);
   }
   if (res.headers.get("content-type")?.includes("text/csv")) {
@@ -304,6 +304,16 @@ export const api = {
     request(`/admin/org-admins`, { method: "POST", body: JSON.stringify({ email, org_id: orgId }) }),
   adminRemoveOrgAdmin: (adminId: number) =>
     request(`/admin/org-admins/${adminId}`, { method: "DELETE" }),
+
+  // Platform admin — profile change requests
+  adminListProfileChanges: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(`/admin/profile-changes${qs}`);
+  },
+  adminApproveProfileChange: (changeId: number) =>
+    request(`/admin/profile-changes/${changeId}/approve`, { method: "POST", body: JSON.stringify({}) }),
+  adminRejectProfileChange: (changeId: number, reason: string) =>
+    request(`/admin/profile-changes/${changeId}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
 
   // Announcements
   getAnnouncements: (orgIds?: number[]) => {

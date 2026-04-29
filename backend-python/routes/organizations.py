@@ -133,44 +133,45 @@ def _parse_csv(csv_text: str) -> tuple:
 
 
 # Fields the org admin can update directly on their own profile.
-# Mirrors the org-registration form (single source of truth) minus the
-# verification step. Sensitive fields (name, official_email) are gated
-# behind admin review and listed separately below.
+# These are applied immediately without any review step.
 EDITABLE_FIELDS = {
     "description", "logo_url", "phone", "website",
-    "org_type", "founded_year", "org_size",
     "category", "categories",
-    "location",   # HQ governorate (legacy column name)
-    "hq_city", "branches",
+    "branches",
     "submitter_name", "submitter_role", "additional_notes",
 }
 # Fields that require platform-admin review — changes are queued, not applied.
-SENSITIVE_FIELDS = {"name", "official_email"}
+SENSITIVE_FIELDS = {
+    "name", "official_email",
+    "org_type", "founded_year", "org_size",
+    "location",   # HQ governorate
+    "hq_city",
+}
 
 # Columns whose value is a JSON-encoded array — serialized on write.
 JSON_ARRAY_FIELDS = {"branches", "categories"}
 
 
 class OrgProfileUpdate(BaseModel):
-    # Editable
+    # Instantly applied fields
     description: Optional[str] = None
     logo_url: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
-    org_type: Optional[str] = None
-    founded_year: Optional[str] = None
-    org_size: Optional[str] = None
     category: Optional[str] = None        # legacy comma-joined string
     categories: Optional[list] = None
-    location: Optional[str] = None        # HQ governorate
-    hq_city: Optional[str] = None
     branches: Optional[list] = None
     submitter_name: Optional[str] = None
     submitter_role: Optional[str] = None
     additional_notes: Optional[str] = None
-    # Sensitive — accepted but not applied directly.
+    # Sensitive — accepted but queued for platform-admin review.
     name: Optional[str] = None
     official_email: Optional[str] = None
+    org_type: Optional[str] = None
+    founded_year: Optional[str] = None
+    org_size: Optional[str] = None
+    location: Optional[str] = None        # HQ governorate
+    hq_city: Optional[str] = None
 
 
 def _decode_org_json(org: dict) -> dict:
@@ -240,13 +241,21 @@ def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
             if override:
                 org["submitter_email"] = override["email"]
 
-        pending = dict_rows(db.execute(
+        pending_rows = dict_rows(db.execute(
             "SELECT id, field, new_value, status, created_at "
             "FROM org_profile_change_requests "
             "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
             (org["id"],),
         ).fetchall())
-        return {"organization": org, "pending_changes": pending}
+        # Build a field → new_value dict for easy frontend consumption.
+        pending_dict = {row["field"]: row["new_value"] for row in pending_rows}
+        return {
+            "current": org,
+            "organization": org,          # backward-compat alias
+            "pending": pending_dict,
+            "pending_changes": pending_rows,
+            "has_pending": len(pending_rows) > 0,
+        }
 
 
 @router.put("/me/profile")
@@ -255,8 +264,6 @@ def update_my_profile(
     current_user: dict = Depends(require_approved_org_admin),
 ):
     payload = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    if not payload:
-        raise HTTPException(400, "No fields to update")
 
     with get_db() as db:
         org = dict_row(db.execute(
@@ -264,6 +271,20 @@ def update_my_profile(
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
+
+        if not payload:
+            org_now = _decode_org_json(dict(org))
+            pending = dict_rows(db.execute(
+                "SELECT id, field, new_value, status, created_at "
+                "FROM org_profile_change_requests "
+                "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
+                (org["id"],),
+            ).fetchall())
+            pending_dict = {row["field"]: row["new_value"] for row in pending}
+            return {"organization": org_now, "current": org_now, "applied": [], "queued": [],
+                    "pending_changes": pending, "pending": pending_dict,
+                    "has_pending": len(pending) > 0, "pending_changes_count": len(pending),
+                    "message": "No changes to save."}
 
         applied: list[str] = []
         queued: list[str] = []
@@ -319,11 +340,16 @@ def update_my_profile(
         else:
             message = "No changes to save."
 
+        pending_dict = {row["field"]: row["new_value"] for row in pending}
         return {
             "organization": org_after,
+            "current": org_after,
             "applied": applied,
             "queued": queued,
             "pending_changes": pending,
+            "pending": pending_dict,
+            "has_pending": len(pending) > 0,
+            "pending_changes_count": len(pending),
             "message": message,
         }
 

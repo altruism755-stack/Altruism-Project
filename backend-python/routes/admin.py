@@ -100,8 +100,114 @@ def platform_stats(current_user: dict = Depends(require_platform_admin)):
             "total_supervisors": db.execute("SELECT COUNT(*) c FROM supervisors").fetchone()["c"],
             "total_users": db.execute("SELECT COUNT(*) c FROM users").fetchone()["c"],
             "total_platform_admins": db.execute("SELECT COUNT(*) c FROM platform_admins").fetchone()["c"],
+            "pending_profile_changes": db.execute(
+                "SELECT COUNT(*) c FROM org_profile_change_requests WHERE status = 'pending'"
+            ).fetchone()["c"],
         }
         return counts
+
+
+# ── Organization profile change requests ───────────────────────────────────
+
+
+# Allowed column names for profile change approval — guards against SQL injection
+# in the dynamic UPDATE below. Must mirror SENSITIVE_FIELDS in organizations.py.
+_SENSITIVE_COLUMNS = frozenset({
+    "name", "official_email", "org_type", "founded_year",
+    "org_size", "location", "hq_city",
+})
+
+_FIELD_LABELS: dict = {
+    "name": "Organization Name",
+    "official_email": "Official Email",
+    "org_type": "Organization Type",
+    "founded_year": "Founded Year",
+    "org_size": "Organization Size",
+    "location": "Headquarters Governorate",
+    "hq_city": "Headquarters City",
+}
+
+
+@router.get("/profile-changes")
+def list_profile_changes(
+    status: Optional[str] = "pending",
+    current_user: dict = Depends(require_platform_admin),
+):
+    """List organization profile change requests, defaulting to pending ones."""
+    with get_db() as db:
+        query = (
+            "SELECT r.id, r.org_id, r.field, r.new_value, r.status, r.created_at, r.reviewed_at, "
+            "o.name as org_name, o.logo_url as org_logo, "
+            "u.email as requested_by_email "
+            "FROM org_profile_change_requests r "
+            "JOIN organizations o ON r.org_id = o.id "
+            "JOIN users u ON r.requested_by = u.id"
+        )
+        params: list = []
+        if status and status != "all":
+            query += " WHERE r.status = ?"
+            params.append(status)
+        query += " ORDER BY r.created_at DESC"
+        rows = dict_rows(db.execute(query, params).fetchall())
+        # Attach current field value and human-readable label to each row.
+        for row in rows:
+            field = row["field"]
+            row["field_label"] = _FIELD_LABELS.get(field, field.replace("_", " ").title())
+            org_row = dict_row(db.execute(
+                f"SELECT {field} FROM organizations WHERE id = ?", (row["org_id"],)
+            ).fetchone()) if field in _SENSITIVE_COLUMNS else {}
+            row["current_value"] = (org_row or {}).get(field)
+        return {"changes": rows, "total": len(rows)}
+
+
+@router.post("/profile-changes/{change_id}/approve")
+def approve_profile_change(change_id: int, current_user: dict = Depends(require_platform_admin)):
+    """Approve a pending profile change — applies the new value to the organization."""
+    with get_db() as db:
+        change = dict_row(db.execute(
+            "SELECT * FROM org_profile_change_requests WHERE id = ?", (change_id,)
+        ).fetchone())
+        if not change:
+            raise HTTPException(404, "Change request not found")
+        if change["status"] != "pending":
+            raise HTTPException(400, f"Change request is already {change['status']}")
+        field = change["field"]
+        if field not in _SENSITIVE_COLUMNS:
+            raise HTTPException(400, f"Field '{field}' is not a recognized sensitive field")
+        db.execute(
+            f"UPDATE organizations SET {field} = ? WHERE id = ?",
+            (change["new_value"], change["org_id"]),
+        )
+        db.execute(
+            "UPDATE org_profile_change_requests SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?",
+            (change_id,),
+        )
+        return {"message": f"Change to '{_FIELD_LABELS.get(field, field)}' approved and applied"}
+
+
+@router.post("/profile-changes/{change_id}/reject")
+def reject_profile_change(
+    change_id: int,
+    body: dict,
+    current_user: dict = Depends(require_platform_admin),
+):
+    """Reject a pending profile change with an optional reason."""
+    reason = (body or {}).get("reason", "")
+    with get_db() as db:
+        change = dict_row(db.execute(
+            "SELECT * FROM org_profile_change_requests WHERE id = ?", (change_id,)
+        ).fetchone())
+        if not change:
+            raise HTTPException(404, "Change request not found")
+        if change["status"] != "pending":
+            raise HTTPException(400, f"Change request is already {change['status']}")
+        db.execute(
+            "UPDATE org_profile_change_requests "
+            "SET status = 'rejected', reviewed_at = datetime('now') WHERE id = ?",
+            (change_id,),
+        )
+        field = change["field"]
+        return {"message": f"Change to '{_FIELD_LABELS.get(field, field)}' rejected"}
 
 
 # ── Volunteer management ────────────────────────────────────────────────────

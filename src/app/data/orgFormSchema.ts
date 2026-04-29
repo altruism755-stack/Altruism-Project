@@ -178,6 +178,15 @@ export function isOrgFormValid(errors: OrgErrors): boolean {
   return Object.values(errors).every((e) => !e);
 }
 
+// Profile-edit variant: skips submitter fields (hidden in OrgProfilePage).
+export function computeOrgProfileErrors(s: OrgEditableState): OrgErrors {
+  return {
+    ...computeOrgErrors(s),
+    submitterName: "",
+    submitterRole: "",
+  };
+}
+
 export const ORG_FIELD_LABELS: Record<string, string> = {
   orgName: "Organization Name",
   officialEmail: "Official Organization Email",
@@ -304,21 +313,21 @@ export function orgStateFromRow(o: any): OrgEditableState {
   })();
 
   return {
-    orgName:       o?.name || "",
-    officialEmail: o?.official_email || "",
-    phone:         o?.phone || "",
-    orgType:       o?.org_type || "",
-    foundedYear:   o?.founded_year || o?.founded || "",
-    orgSize:       o?.org_size || "",
+    orgName:       String(o?.name ?? ""),
+    officialEmail: String(o?.official_email ?? ""),
+    phone:         String(o?.phone ?? ""),
+    orgType:       String(o?.org_type ?? ""),
+    foundedYear:   String(o?.founded_year ?? o?.founded ?? ""),
+    orgSize:       String(o?.org_size ?? ""),
     categories:    cats,
-    hqGovernorate: o?.location || "",
-    hqCity:        o?.hq_city || "",
+    hqGovernorate: String(o?.location ?? ""),
+    hqCity:        String(o?.hq_city ?? ""),
     branches,
-    website:       o?.website || "",
-    description:   o?.description || "",
-    logoDataUri:   o?.logo_url || "",
-    submitterName: o?.submitter_name || "",
-    submitterRole: o?.submitter_role || "",
-    additionalNotes: o?.additional_notes || "",
+    website:       String(o?.website ?? ""),
+    description:   String(o?.description ?? ""),
+    logoDataUri:   String(o?.logo_url ?? ""),
+    submitterName: String(o?.submitter_name ?? ""),
+    submitterRole: String(o?.submitter_role ?? ""),
+    additionalNotes: String(o?.additional_notes ?? ""),
   };
 }
