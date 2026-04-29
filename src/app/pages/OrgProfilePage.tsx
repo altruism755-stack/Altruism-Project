@@ -67,19 +67,19 @@ interface Section {
 const SECTIONS: Section[] = [
   {
     id: "verified", title: "Verified Information",
-    subtitle: "Core identity fields. Changes are reviewed before going live.",
+    subtitle: "Core identity details. Any changes will be reviewed before they appear publicly.",
     approvalRequired: true,
     fields: ["orgName", "officialEmail", "orgType", "hqGovernorate", "hqCity"],
   },
   {
     id: "public", title: "Public Profile",
-    subtitle: "What volunteers see when they browse your page.",
+    subtitle: "This information is visible to volunteers viewing your organization.",
     approvalRequired: false,
     fields: ["description", "logoDataUri", "website", "phone"],
   },
   {
     id: "details", title: "Organization Details",
-    subtitle: "Categories and branches update instantly. Size and founded year require approval.",
+    subtitle: "Categories and branches are updated instantly. Changes to size and founded year are reviewed before going live.",
     approvalRequired: false,
     fields: ["categories", "orgSize", "foundedYear", "branches"],
   },
@@ -433,7 +433,7 @@ function SectionCard(props: SectionCardProps) {
             <span style={{
               fontSize: 11, fontWeight: 500, color: "#92400E",
               backgroundColor: "#FEF3C7", borderRadius: 20, padding: "2px 9px",
-            }}>Requires approval</span>
+            }}>Reviewed before going live</span>
           )}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: MUTED }}>
