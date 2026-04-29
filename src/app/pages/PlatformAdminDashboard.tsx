@@ -54,6 +54,7 @@ export function PlatformAdminDashboard() {
   const [orgAdminSuccess, setOrgAdminSuccess] = useState("");
   const [orgAdminsLoading, setOrgAdminsLoading] = useState(false);
   const [orgAdminConfirmId, setOrgAdminConfirmId] = useState<number | null>(null);
+  const [adminConfirmRemove, setAdminConfirmRemove] = useState<{ userId: number; email: string } | null>(null);
 
   const loadStats = useCallback(async () => {
     try {
@@ -122,7 +123,11 @@ export function PlatformAdminDashboard() {
 
   useEffect(() => { loadOrgs(); }, [loadOrgs]);
   useEffect(() => { if (mainTab === "profile_changes") loadProfileChanges(); }, [mainTab, loadProfileChanges]);
-  useEffect(() => { if (mainTab === "volunteers") loadVolunteers(); }, [mainTab, loadVolunteers]);
+  useEffect(() => {
+    if (mainTab !== "volunteers") return;
+    const t = setTimeout(() => { loadVolunteers(); }, 250);
+    return () => clearTimeout(t);
+  }, [mainTab, loadVolunteers]);
   useEffect(() => {
     if (mainTab === "admins") {
       loadAdmins();
@@ -181,12 +186,15 @@ export function PlatformAdminDashboard() {
     } catch (e: any) { setAdminError(e.message || "Failed to add admin"); }
   };
 
-  const handleRemoveAdmin = async (userId: number, email: string) => {
-    if (!confirm(`Remove platform admin access from ${email}?`)) return;
+  const handleRemoveAdmin = async (userId: number) => {
     try {
       await api.adminRemoveAdmin(userId);
+      setAdminConfirmRemove(null);
       await Promise.all([loadAdmins(), loadStats()]);
-    } catch (e: any) { setAdminError(e.message || "Failed to remove admin"); }
+    } catch (e: any) {
+      setAdminError(e.message || "Failed to remove admin");
+      setAdminConfirmRemove(null);
+    }
   };
 
   const handleAddOrgAdmin = async () => {
@@ -231,7 +239,7 @@ export function PlatformAdminDashboard() {
         <h1 style={{ fontSize: 26, fontWeight: 700, color: "#1E293B", margin: "0 0 20px 0" }}>Platform Administration</h1>
 
         {/* Stats grid */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 24 }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", marginBottom: 24 }}>
           <StatCard label="Pending Review" value={stats.pending_organizations ?? 0} color="#F59E0B" onClick={() => { setMainTab("organizations"); setOrgTab("pending"); }} active={mainTab === "organizations" && orgTab === "pending"} />
           <StatCard label="Approved Orgs" value={stats.approved_organizations ?? 0} color={GREEN} onClick={() => { setMainTab("organizations"); setOrgTab("approved"); }} active={mainTab === "organizations" && orgTab === "approved"} />
           <StatCard label="Rejected Orgs" value={stats.rejected_organizations ?? 0} color="#EF4444" onClick={() => { setMainTab("organizations"); setOrgTab("rejected"); }} active={mainTab === "organizations" && orgTab === "rejected"} />
@@ -561,13 +569,30 @@ export function PlatformAdminDashboard() {
                         <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "2px 8px" }}>You</span>
                       )}
                       {a.email !== user?.email && (
-                        <button onClick={() => handleRemoveAdmin(a.user_id, a.email)} style={{ ...btnStyle("#fff", "#EF4444", "1px solid #FECACA"), fontSize: 12, height: 30, padding: "0 12px" }}>Remove</button>
+                        <button onClick={() => setAdminConfirmRemove({ userId: a.user_id, email: a.email })} style={{ ...btnStyle("#fff", "#EF4444", "1px solid #FECACA"), fontSize: 12, height: 30, padding: "0 12px" }}>Remove</button>
                       )}
                     </div>
                   </div>
                 ))
               )}
             </div>
+
+            {/* Platform admin removal confirmation modal */}
+            {adminConfirmRemove !== null && (
+              <>
+                <div onClick={() => setAdminConfirmRemove(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.4)", zIndex: 60 }} />
+                <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 420, backgroundColor: "#fff", borderRadius: 16, zIndex: 61, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 8px 0" }}>Remove Platform Admin</h3>
+                  <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 24px 0" }}>
+                    <strong style={{ color: "#1E293B" }}>{adminConfirmRemove.email}</strong> will lose platform admin access. You can re-add them at any time.
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setAdminConfirmRemove(null)} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                    <button onClick={() => handleRemoveAdmin(adminConfirmRemove.userId)} style={{ flex: 1, height: 40, backgroundColor: "#EF4444", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* ── Organization Admin Management ── */}
             {/* Removal confirmation modal */}
@@ -740,10 +765,22 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function StatCard({ label, value, color, onClick, active }: { label: string; value: number; color: string; onClick?: () => void; active?: boolean }) {
+  const [hover, setHover] = useState(false);
   return (
     <div
       onClick={onClick}
-      style={{ backgroundColor: "#fff", border: active ? `2px solid ${color}` : "1px solid #E2E8F0", borderRadius: 12, padding: "16px 18px", cursor: onClick ? "pointer" : "default", transition: "all 150ms" }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        backgroundColor: "#fff",
+        border: "1px solid #E2E8F0",
+        boxShadow: active ? `inset 0 0 0 2px ${color}` : (onClick && hover ? "0 4px 12px rgba(15,23,42,0.08)" : "none"),
+        borderRadius: 12,
+        padding: "16px 18px",
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 150ms, transform 150ms",
+        transform: onClick && hover && !active ? "translateY(-1px)" : "none",
+      }}
     >
       <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginBottom: 6, lineHeight: 1.3 }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: 700, color }}>{value}</div>
