@@ -580,7 +580,7 @@ export function ProfilePage() {
 
                 {/* Read-only fields */}
                 <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "12px 16px", marginBottom: 4 }}>
-                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>These details can only be changed by contacting the administration.</p>
+                  <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 10px 0" }}>To request a change, please contact the platform support team.</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label style={{ ...labelStyle, color: "#94A3B8" }}>Full Name</label>
