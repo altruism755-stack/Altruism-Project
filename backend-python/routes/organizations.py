@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles, require_approved_org_admin
+from routes.notifications import create_notification
 
 # Base URL for invite links — set APP_BASE_URL in env for production.
 _APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
@@ -783,6 +784,12 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
         if existing:
             raise HTTPException(409, "Already a member of this organization")
 
+        org = dict_row(db.execute(
+            "SELECT name, admin_user_id FROM organizations WHERE id = ?", (org_id,)
+        ).fetchone())
+        if not org:
+            raise HTTPException(404, "Organization not found")
+
         _now = _utcnow()
         db.execute(
             "INSERT INTO org_volunteers "
@@ -791,6 +798,17 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
             "VALUES (?, ?, 'Pending', ?, 'website', ?, ?, ?)",
             (org_id, vol["id"], _is_active("Pending"),
              vol.get("governorate") or "", vol.get("city") or "", _now),
+        )
+        vol_name = dict_row(db.execute(
+            "SELECT name FROM volunteers WHERE id = ?", (vol["id"],)
+        ).fetchone()) or {}
+        create_notification(
+            db,
+            user_id=org["admin_user_id"],
+            type="volunteer_joined",
+            title="New Volunteer Application",
+            message=f"{vol_name.get('name', 'A volunteer')} has applied to join {org['name']}.",
+            action_url="/org",
         )
         return {"message": "Application submitted"}
 

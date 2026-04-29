@@ -366,5 +366,23 @@ def init_schema():
     except Exception:
         pass
 
+    # Notifications table — in-app alerts for org admins.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_read INTEGER NOT NULL DEFAULT 0,
+            action_url TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()

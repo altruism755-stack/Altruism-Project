@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { Logo } from "./Logo";
+import { NotificationBell } from "./NotificationBell";
 
 interface NavbarProps {
   role?: "org" | "supervisor" | "volunteer" | "guest";
@@ -77,6 +78,7 @@ export function Navbar({ role = "guest", userName, hideNavLinks = false, hideUse
       </div>
 
       <div className="flex items-center gap-4">
+        {role === "org" && <NotificationBell />}
         {!hideUserMenu && (role === "guest" ? (
           <>
             <button

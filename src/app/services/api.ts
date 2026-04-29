@@ -315,6 +315,19 @@ export const api = {
   adminRejectProfileChange: (changeId: number, reason: string) =>
     request(`/admin/profile-changes/${changeId}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
 
+  // Notifications
+  getNotifications: (params?: { unread_only?: boolean; type?: string; limit?: number }) => {
+    const qs = params ? "?" + new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+    ).toString() : "";
+    return request(`/notifications${qs}`);
+  },
+  getUnreadCount: () => request("/notifications/unread-count"),
+  markNotificationRead: (id: number) =>
+    request(`/notifications/${id}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: () =>
+    request("/notifications/read-all", { method: "PATCH" }),
+
   // Announcements
   getAnnouncements: (orgIds?: number[]) => {
     const qs = orgIds && orgIds.length ? `?org_ids=${orgIds.join(",")}` : "";

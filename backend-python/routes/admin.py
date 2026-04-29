@@ -5,6 +5,7 @@ from typing import Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import require_platform_admin, hash_password
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/api/admin", tags=["platform-admin"])
 
@@ -57,10 +58,20 @@ def approve_organization(org_id: int, current_user: dict = Depends(require_platf
         org = dict_row(db.execute("SELECT id FROM organizations WHERE id = ?", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
+        org = dict_row(db.execute("SELECT name, admin_user_id FROM organizations WHERE id = ?", (org_id,)).fetchone())
         db.execute(
             "UPDATE organizations SET status = 'approved', rejection_reason = NULL, reviewed_at = datetime('now') WHERE id = ?",
             (org_id,),
         )
+        if org:
+            create_notification(
+                db,
+                user_id=org["admin_user_id"],
+                type="org_approved",
+                title="Organization Approved",
+                message=f"Your organization '{org['name']}' has been approved. You can now access your dashboard.",
+                action_url="/org",
+            )
         return {"message": "Organization approved"}
 
 
@@ -75,10 +86,23 @@ def reject_organization(
         org = dict_row(db.execute("SELECT id FROM organizations WHERE id = ?", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
+        org = dict_row(db.execute("SELECT name, admin_user_id FROM organizations WHERE id = ?", (org_id,)).fetchone())
         db.execute(
             "UPDATE organizations SET status = 'rejected', rejection_reason = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reason, org_id),
         )
+        if org:
+            msg = f"Your organization '{org['name']}' was not approved."
+            if reason:
+                msg += f" Reason: {reason}"
+            create_notification(
+                db,
+                user_id=org["admin_user_id"],
+                type="org_rejected",
+                title="Organization Application Rejected",
+                message=msg,
+                action_url=None,
+            )
         return {"message": "Organization rejected"}
 
 
@@ -182,6 +206,19 @@ def approve_profile_change(change_id: int, current_user: dict = Depends(require_
             "UPDATE org_profile_change_requests SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?",
             (change_id,),
         )
+        org = dict_row(db.execute(
+            "SELECT admin_user_id FROM organizations WHERE id = ?", (change["org_id"],)
+        ).fetchone())
+        if org:
+            label = _FIELD_LABELS.get(field, field)
+            create_notification(
+                db,
+                user_id=org["admin_user_id"],
+                type="profile_change_approved",
+                title="Profile Change Approved",
+                message=f"Your requested change to '{label}' has been approved and applied to your profile.",
+                action_url="/org/profile",
+            )
         return {"message": f"Change to '{_FIELD_LABELS.get(field, field)}' approved and applied"}
 
 
@@ -207,6 +244,25 @@ def reject_profile_change(
             (change_id,),
         )
         field = change["field"]
+        org = dict_row(db.execute(
+            "SELECT admin_user_id FROM organizations WHERE id = ?", (change["org_id"],)
+        ).fetchone())
+        org_admin_user_id = (org or {}).get("admin_user_id")
+        print("REJECTION TRIGGER FIRED", change_id, org_admin_user_id)
+        if not org_admin_user_id:
+            raise Exception(f"Missing org admin user_id for notification (org_id={change['org_id']})")
+        label = _FIELD_LABELS.get(field, field)
+        msg = f"Your requested change to '{label}' was not approved."
+        if reason:
+            msg += f" Reason: {reason}"
+        create_notification(
+            db,
+            user_id=org_admin_user_id,
+            type="profile_change_rejected",
+            title="Profile Change Rejected",
+            message=msg,
+            action_url="/org/profile",
+        )
         return {"message": f"Change to '{_FIELD_LABELS.get(field, field)}' rejected"}
 
 
