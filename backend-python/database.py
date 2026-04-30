@@ -53,6 +53,13 @@ def get_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
+    # Performance pragmas: WAL + NORMAL synchronous is the standard durable-but-fast
+    # combo (still crash-safe; only loses last txn on power loss). Larger cache and
+    # mmap reduce I/O for read-heavy routes (lists, joins, reports).
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA temp_store = MEMORY")
+    conn.execute("PRAGMA cache_size = -20000")  # ~20 MB page cache
+    conn.execute("PRAGMA mmap_size = 134217728")  # 128 MB memory-mapped reads
     return conn
 
 
@@ -381,6 +388,77 @@ def init_schema():
     """)
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)")
+    except Exception:
+        pass
+
+    # ── Indexes ─────────────────────────────────────────────────────────────
+    # SQLite does not auto-index foreign keys. Every FK used in a JOIN, WHERE,
+    # or correlated subquery below was a full table scan before this block.
+    # Composite indexes are ordered by selectivity / how the routes filter.
+    index_ddls = [
+        # users — auth lookups by token (CSV-import onboarding)
+        "CREATE INDEX IF NOT EXISTS idx_users_invite_token ON users(invite_token)",
+
+        # volunteers — every "who am I" lookup goes through user_id (already UNIQUE,
+        # auto-indexed). Status filter is used on admin listings.
+        "CREATE INDEX IF NOT EXISTS idx_volunteers_status ON volunteers(status)",
+
+        # supervisors — same pattern as volunteers
+        "CREATE INDEX IF NOT EXISTS idx_supervisors_org_id ON supervisors(org_id)",
+
+        # organizations — admin lookup + approval-queue filter
+        "CREATE INDEX IF NOT EXISTS idx_organizations_admin_user_id ON organizations(admin_user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_organizations_status ON organizations(status)",
+
+        # org_volunteers — central join hub. UNIQUE(org_id,volunteer_id) covers
+        # org_id-leading queries; add the reverse and supervisor indexes.
+        "CREATE INDEX IF NOT EXISTS idx_org_volunteers_volunteer_id ON org_volunteers(volunteer_id)",
+        "CREATE INDEX IF NOT EXISTS idx_org_volunteers_supervisor_id ON org_volunteers(supervisor_id)",
+        "CREATE INDEX IF NOT EXISTS idx_org_volunteers_org_status ON org_volunteers(org_id, status)",
+
+        # events — listed/filtered by org + status, ordered by date
+        "CREATE INDEX IF NOT EXISTS idx_events_org_id ON events(org_id)",
+        "CREATE INDEX IF NOT EXISTS idx_events_status_date ON events(status, date)",
+
+        # activities — heaviest read path (volunteer history, supervisor queue, reports)
+        "CREATE INDEX IF NOT EXISTS idx_activities_volunteer_id ON activities(volunteer_id, date DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_activities_event_id ON activities(event_id)",
+        "CREATE INDEX IF NOT EXISTS idx_activities_org_status ON activities(org_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_activities_reviewed_by ON activities(reviewed_by)",
+
+        # certificates — fetched by volunteer (profile) and by org (admin reports)
+        "CREATE INDEX IF NOT EXISTS idx_certificates_volunteer_id ON certificates(volunteer_id)",
+        "CREATE INDEX IF NOT EXISTS idx_certificates_org_id ON certificates(org_id)",
+        "CREATE INDEX IF NOT EXISTS idx_certificates_event_id ON certificates(event_id)",
+
+        # event_applications — listed per volunteer, per event, per org
+        "CREATE INDEX IF NOT EXISTS idx_event_applications_volunteer_id ON event_applications(volunteer_id)",
+        "CREATE INDEX IF NOT EXISTS idx_event_applications_event_status ON event_applications(event_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_event_applications_org_id ON event_applications(org_id)",
+
+        # announcements — per-org feed, newest first
+        "CREATE INDEX IF NOT EXISTS idx_announcements_org_created ON announcements(org_id, created_at DESC)",
+
+        # org_admins — UNIQUE(user_id,org_id) already indexes (user_id, org_id);
+        # add the reverse for "who admins this org" lookups.
+        "CREATE INDEX IF NOT EXISTS idx_org_admins_org_id ON org_admins(org_id)",
+
+        # org_profile_change_requests — admin queue filtered by status, then org
+        "CREATE INDEX IF NOT EXISTS idx_org_profile_change_requests_status ON org_profile_change_requests(status, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_org_profile_change_requests_org_id ON org_profile_change_requests(org_id)",
+
+        # notifications — unread badge counts query (user_id, is_read)
+        "CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at DESC)",
+    ]
+    for ddl in index_ddls:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass
+
+    # ANALYZE lets the query planner pick the right index when multiple cover a query.
+    try:
+        conn.execute("ANALYZE")
     except Exception:
         pass
 

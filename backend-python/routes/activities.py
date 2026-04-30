@@ -19,20 +19,26 @@ def list_activities(
             "SELECT a.*, v.name as volunteer_name, e.name as event_name "
             "FROM activities a "
             "LEFT JOIN volunteers v ON a.volunteer_id = v.id "
-            "LEFT JOIN events e ON a.event_id = e.id WHERE 1=1"
+            "LEFT JOIN events e ON a.event_id = e.id"
         )
+        joins = ""
+        clauses: list[str] = []
         params: list = []
 
         if volunteer_id:
-            query += " AND a.volunteer_id = ?"
+            clauses.append("a.volunteer_id = ?")
             params.append(volunteer_id)
         if status and status != "All":
-            query += " AND a.status = ?"
+            clauses.append("a.status = ?")
             params.append(status)
         if supervisor_id:
-            query += " AND a.volunteer_id IN (SELECT ov.volunteer_id FROM org_volunteers ov WHERE ov.supervisor_id = ?)"
-            params.append(supervisor_id)
+            joins += " INNER JOIN org_volunteers ov ON ov.volunteer_id = a.volunteer_id AND ov.supervisor_id = ?"
+            params.insert(0, supervisor_id)
 
+        if joins:
+            query += joins
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY a.date DESC"
         return {"activities": dict_rows(db.execute(query, params).fetchall())}
 
