@@ -1,14 +1,25 @@
 """Seed the database with realistic demo data.
 
-Layout (small + meaningful, easy to debug):
-    - 3 organizations
-    - 4 org admins  (Resala 2, Red Crescent 1, Enactus 1)
-    - 6 supervisors (2 per org)
-    - 12 volunteers (overlapping memberships → 6-8 per org)
-    - 7 events       (3 / 2 / 2)
-    - ~25 event applications (3-5 per event, mixed statuses)
-    - ~30 activities (2-4 per volunteer, mixed statuses)
-    - certificates, announcements, notifications
+Volunteer fields are generated to satisfy the frontend validation rules in
+src/app/data/volunteerFormSchema.ts EXACTLY:
+
+  fullName       Arabic, ≥ 3 words (first + father + family)
+  email          name.lastname@gmail.com pattern
+  nationalId     Egyptian 14-digit format: C YY MM DD GG SSSS X
+                 - C: century (2 = 1900s, 3 = 2000s)
+                 - YYMMDD matches dateOfBirth
+                 - GG matches governorate of birth (01=Cairo, 02=Alexandria,
+                   12=Giza, 24=Dakahlia, 13=Qalyubia)
+                 - second-to-last digit even=female / odd=male (matches gender)
+  phone          11 digits, starts with 010 / 011 / 012 / 015
+  dateOfBirth    YYYY-MM-DD, age ≥ 15
+  gender         "Male" | "Female"   (exact case from RegisterPage.tsx)
+  governorate    one of GOVERNORATES (English casing)
+  educationLevel one of EDUCATION_LEVELS
+  skills         subset of SKILLS_LIST (≤ 5)
+  languages      [{language, proficiency}], proficiency ∈ PROFICIENCY_LEVELS
+  causeAreas     0 or exactly 5 from CAUSE_GROUPS
+  status         "Active" | "Pending" | "Suspended"
 """
 
 import json
@@ -22,7 +33,6 @@ def seed():
     with get_db() as db:
         print("Seeding database...")
 
-        # Clear in dependency order
         for table in [
             "notifications", "org_profile_change_requests",
             "event_applications", "announcements",
@@ -39,38 +49,33 @@ def seed():
         h = hash_password
 
         # ──────────── USERS ────────────
-        # id, email, password, role
         users = [
-            # platform admin
-            (100, "platform@altruism.org",       h("platform"),   "org_admin"),
+            (100, "platform@altruism.org",            h("Platform#1"),   "org_admin"),
 
-            # org admins (4)
-            (1,   "sherif.aziz@resala.org",      h("admin"),      "org_admin"),
-            (2,   "mona.kamal@resala.org",       h("admin"),      "org_admin"),
-            (3,   "fatima.elsayed@redcrescent.org", h("admin"),   "org_admin"),
-            (4,   "mohamed.farouk@enactus-egypt.org", h("admin"), "org_admin"),
+            (1,   "sherif.aziz@resala.org",           h("Admin#1234"),   "org_admin"),
+            (2,   "mona.kamal@resala.org",            h("Admin#1234"),   "org_admin"),
+            (3,   "fatima.elsayed@redcrescent.org",   h("Admin#1234"),   "org_admin"),
+            (4,   "mohamed.farouk@enactus-egypt.org", h("Admin#1234"),   "org_admin"),
 
-            # supervisors (6 — 2 per org)
-            (10,  "amira.khalil@resala.org",     h("supervisor"), "supervisor"),
-            (11,  "mahmoud.hassan@resala.org",   h("supervisor"), "supervisor"),
-            (12,  "ahmed.elmasry@redcrescent.org", h("supervisor"), "supervisor"),
-            (13,  "nourhan.ali@redcrescent.org", h("supervisor"), "supervisor"),
-            (14,  "sara.nabil@enactus-egypt.org", h("supervisor"),"supervisor"),
-            (15,  "youssef.gamal@enactus-egypt.org", h("supervisor"),"supervisor"),
+            (10,  "amira.khalil@resala.org",          h("Super#1234"),   "supervisor"),
+            (11,  "mahmoud.hassan@resala.org",        h("Super#1234"),   "supervisor"),
+            (12,  "ahmed.elmasry@redcrescent.org",    h("Super#1234"),   "supervisor"),
+            (13,  "nourhan.ali@redcrescent.org",      h("Super#1234"),   "supervisor"),
+            (14,  "sara.nabil@enactus-egypt.org",     h("Super#1234"),   "supervisor"),
+            (15,  "youssef.gamal@enactus-egypt.org",  h("Super#1234"),   "supervisor"),
 
-            # volunteers (12)
-            (20,  "yara.hassan@gmail.com",       h("volunteer"),  "volunteer"),
-            (21,  "nadia.mahmoud@gmail.com",     h("volunteer"),  "volunteer"),
-            (22,  "karim.mostafa@outlook.com",   h("volunteer"),  "volunteer"),
-            (23,  "sofia.alhassan@gmail.com",    h("volunteer"),  "volunteer"),
-            (24,  "tarek.ibrahim@gmail.com",     h("volunteer"),  "volunteer"),
-            (25,  "hana.yousef@outlook.com",     h("volunteer"),  "volunteer"),
-            (26,  "yusuf.bakr@gmail.com",        h("volunteer"),  "volunteer"),
-            (27,  "dina.elsayed@gmail.com",      h("volunteer"),  "volunteer"),
-            (28,  "omar.farouk@outlook.com",     h("volunteer"),  "volunteer"),
-            (29,  "layla.samir@gmail.com",       h("volunteer"),  "volunteer"),
-            (30,  "hossam.adel@gmail.com",       h("volunteer"),  "volunteer"),
-            (31,  "menna.tarek@outlook.com",     h("volunteer"),  "volunteer"),
+            (20,  "yara.hassan@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (21,  "nadia.mahmoud@gmail.com",          h("Vol#12345"),    "volunteer"),
+            (22,  "karim.mostafa@gmail.com",          h("Vol#12345"),    "volunteer"),
+            (23,  "sofia.ahmed@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (24,  "tarek.ibrahim@gmail.com",          h("Vol#12345"),    "volunteer"),
+            (25,  "hana.youssef@gmail.com",           h("Vol#12345"),    "volunteer"),
+            (26,  "youssef.bakr@gmail.com",           h("Vol#12345"),    "volunteer"),
+            (27,  "dina.elsayed@gmail.com",           h("Vol#12345"),    "volunteer"),
+            (28,  "omar.farouk@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (29,  "layla.samir@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (30,  "hossam.adel@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (31,  "menna.tarek@gmail.com",            h("Vol#12345"),    "volunteer"),
         ]
         db.executemany(
             "INSERT INTO users (id, email, password, role) VALUES (?, ?, ?, ?)",
@@ -112,13 +117,12 @@ def seed():
             "Mohamed Farouk", "Country Director",
         ))
 
-        # ──────────── ORG ADMINS (junction) ────────────
-        # (user_id, org_id, role)
+        # ──────────── ORG ADMINS ────────────
         org_admins = [
-            (1, 1, "creator"),  # Sherif — Resala
-            (2, 1, "admin"),    # Mona  — Resala
-            (3, 2, "creator"),  # Fatima — Red Crescent
-            (4, 3, "creator"),  # Mohamed — Enactus
+            (1, 1, "creator"),
+            (2, 1, "admin"),
+            (3, 2, "creator"),
+            (4, 3, "creator"),
         ]
         db.executemany(
             "INSERT INTO org_admins (user_id, org_id, role) VALUES (?, ?, ?)",
@@ -126,14 +130,13 @@ def seed():
         )
 
         # ──────────── SUPERVISORS ────────────
-        # (id, user_id, name, email, phone, team, org_id, status)
         supervisors = [
-            (1, 10, "Dr. Amira Khalil",  "amira.khalil@resala.org",     "01011223344", "Programs",   1, "Active"),
-            (2, 11, "Mahmoud Hassan",    "mahmoud.hassan@resala.org",   "01022334455", "Media",      1, "Active"),
-            (3, 12, "Ahmed El-Masry",    "ahmed.elmasry@redcrescent.org","01044556677","Field Teams",2, "Active"),
-            (4, 13, "Nourhan Ali",       "nourhan.ali@redcrescent.org", "01045566778", "Medical",    2, "Active"),
-            (5, 14, "Sara Nabil",        "sara.nabil@enactus-egypt.org","01055667788", "Projects",   3, "Active"),
-            (6, 15, "Youssef Gamal",     "youssef.gamal@enactus-egypt.org","01056677889","Mentorship",3, "Active"),
+            (1, 10, "Dr. Amira Khalil",  "amira.khalil@resala.org",        "01011223344", "Programs",   1, "Active"),
+            (2, 11, "Mahmoud Hassan",    "mahmoud.hassan@resala.org",      "01122334455", "Media",      1, "Active"),
+            (3, 12, "Ahmed El-Masry",    "ahmed.elmasry@redcrescent.org",  "01044556677", "Field Teams",2, "Active"),
+            (4, 13, "Nourhan Ali",       "nourhan.ali@redcrescent.org",    "01245566778", "Medical",    2, "Active"),
+            (5, 14, "Sara Nabil",        "sara.nabil@enactus-egypt.org",   "01055667788", "Projects",   3, "Active"),
+            (6, 15, "Youssef Gamal",     "youssef.gamal@enactus-egypt.org","01556677889", "Mentorship", 3, "Active"),
         ]
         db.executemany(
             "INSERT INTO supervisors (id, user_id, name, email, phone, team, org_id, status) "
@@ -142,66 +145,171 @@ def seed():
         )
 
         # ──────────── VOLUNTEERS ────────────
-        # (id, user_id, name, email, phone, city, skills, about_me, status, dob, governorate)
+        # Each row: form-compliant. Arabic 3-part names; NID encodes DOB + governorate
+        # of birth + gender (digit 13 even=F / odd=M); phones use 010/011/012/015.
+        # (id, user_id, name, email, phone, city, skills, about_me, status, dob, governorate,
+        #  national_id, gender, nationality, education_level, university_name, faculty,
+        #  study_year, field_of_study, department, hours_per_week, languages,
+        #  cause_areas, availability, prior_experience, prior_org, experiences, health_notes)
+        SKILLS = {
+            "comm":   ["Community Outreach", "Event Planning", "Photography & Videography"],
+            "hr":     ["Administrative Support", "Event Planning", "Community Outreach"],
+            "media":  ["Photography & Videography", "Social Media Management", "Graphic Design"],
+            "tech":   ["Software Development", "Administrative Support"],
+            "fin":    ["Administrative Support", "Fundraising"],
+            "ops":    ["Administrative Support", "Event Planning", "Environmental Work"],
+            "rsrch":  ["Administrative Support", "Community Outreach"],
+            "design": ["Graphic Design", "Social Media Management"],
+            "edu":    ["Teaching / Tutoring", "Community Outreach"],
+            "med":    ["Medical / First Aid", "Community Outreach"],
+            "lead":   ["Community Outreach", "Event Planning", "Fundraising"],
+            "tr":     ["Translation", "Administrative Support"],
+        }
+        CAUSES_FULL = [
+            "Social & Humanitarian", "Children & Youth", "Education & Skills",
+            "Health & Emergency", "Environment",
+        ]
+        AVAIL = ["Weekday afternoons", "Weekends"]
+
         volunteers = [
-            (1,  20, "Yara Hassan",      "yara.hassan@gmail.com",     "01212345678", "Alexandria",
-             json.dumps(["Communication", "Event Planning", "Photography"]),
-             "Community service enthusiast since university. Loves building youth programs.",
-             "Active", "1999-07-15", "Alexandria"),
-            (2,  21, "Nadia Mahmoud",    "nadia.mahmoud@gmail.com",   "01234567890", "Cairo",
-             json.dumps(["HR", "Training", "Team Management"]),
+            (1,  20, "يارا حسن محمد",          "yara.hassan@gmail.com",     "01212345678", "Alexandria",
+             json.dumps(SKILLS["comm"]),
+             "Passionate about community service and youth development since university.",
+             "Active", "1999-07-15", "Alexandria",
+             "29907150201245", "Female", "Egyptian",
+             "University Graduate", "Alexandria University", "Faculty of Arts", "", "Mass Communication", "Media",
+             10, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(AVAIL),
+             0, "", json.dumps([]), ""),
+
+            (2,  21, "نادية محمود علي",         "nadia.mahmoud@gmail.com",   "01234567891", "Cairo",
+             json.dumps(SKILLS["hr"]),
              "HR professional and weekend volunteer trainer focused on capacity building.",
-             "Active", "1997-03-22", "Cairo"),
-            (3,  22, "Karim Mostafa",    "karim.mostafa@outlook.com", "01098765432", "Giza",
-             json.dumps(["Photography", "Video Editing", "Social Media"]),
+             "Active", "1997-03-22", "Cairo",
+             "29703220101226", "Female", "Egyptian",
+             "University Graduate", "Cairo University", "Faculty of Commerce", "", "Business Administration", "HR",
+             8, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
+             1, "Misr El-Kheir Foundation",
+             json.dumps([{"orgName": "Misr El-Kheir Foundation", "department": "HR", "role": "HR Trainer", "duration": "2022-2024", "description": "Designed onboarding curriculum for 60+ volunteers."}]),
+             ""),
+
+            (3,  22, "كريم مصطفى إبراهيم",      "karim.mostafa@gmail.com",   "01098765432", "Giza",
+             json.dumps(SKILLS["media"]),
              "Creative media professional amplifying volunteer impact through storytelling.",
-             "Active", "2000-11-05", "Giza"),
-            (4,  23, "Sofia Al-Hassan",  "sofia.alhassan@gmail.com",  "01112223344", "Giza",
-             json.dumps(["Web Development", "Data Analysis"]),
-             "Software engineering student using technology for social good.",
-             "Active", "2002-05-30", "Giza"),
-            (5,  24, "Tarek Ibrahim",    "tarek.ibrahim@gmail.com",   "01556677889", "Cairo",
-             json.dumps(["Finance", "Accounting", "Budgeting"]),
+             "Active", "2000-11-05", "Giza",
+             "30011051201137", "Male", "Egyptian",
+             "University Graduate", "Cairo University", "Faculty of Mass Communication", "", "Public Relations", "Media",
+             12, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(AVAIL),
+             0, "", json.dumps([]), ""),
+
+            (4,  23, "صوفيا أحمد الحسن",        "sofia.ahmed@gmail.com",     "01112223344", "Giza",
+             json.dumps(SKILLS["tech"]),
+             "Software engineering student passionate about technology for social good.",
+             "Active", "2002-05-30", "Giza",
+             "30205301201248", "Female", "Egyptian",
+             "University Student", "Cairo University", "Faculty of Computers and AI", "3rd Year", "Computer Science", "Content Creation",
+             6, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}, {"language": "French", "proficiency": "Conversational"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekday evenings", "Weekends"]),
+             0, "", json.dumps([]), ""),
+
+            (5,  24, "طارق إبراهيم سالم",        "tarek.ibrahim@gmail.com",   "01556677889", "Cairo",
+             json.dumps(SKILLS["fin"]),
              "Finance graduate helping non-profits manage resources effectively.",
-             "Active", "1998-09-12", "Cairo"),
-            (6,  25, "Hana Yousef",      "hana.yousef@outlook.com",   "01667788990", "Alexandria",
-             json.dumps(["Logistics", "Operations", "Supply Chain"]),
+             "Active", "1998-09-12", "Cairo",
+             "29809120101159", "Male", "Egyptian",
+             "University Graduate", "Ain Shams University", "Faculty of Commerce", "", "Accounting", "Fundraising",
+             8, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
+             0, "", json.dumps([]), ""),
+
+            (6,  25, "هناء يوسف عبدالله",        "hana.youssef@gmail.com",    "01667788991", "Alexandria",
+             json.dumps(SKILLS["ops"]),
              "Operations specialist ensuring smooth delivery of humanitarian aid.",
-             "Active", "2001-02-18", "Alexandria"),
-            (7,  26, "Yusuf Bakr",       "yusuf.bakr@gmail.com",      "01788990011", "Mansoura",
-             json.dumps(["Research", "Fieldwork", "Data Collection"]),
+             "Active", "2001-02-18", "Alexandria",
+             "30102180201264", "Female", "Egyptian",
+             "University Graduate", "Alexandria University", "Faculty of Engineering", "", "Industrial Engineering", "Logistics",
+             10, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(AVAIL),
+             0, "", json.dumps([]), ""),
+
+            (7,  26, "يوسف بكر حسن",            "youssef.bakr@gmail.com",    "01122334456", "Mansoura",
+             json.dumps(SKILLS["rsrch"]),
              "Social researcher measuring impact of volunteer programs.",
-             "Active", "1996-06-08", "Dakahlia"),
-            (8,  27, "Dina El-Sayed",    "dina.elsayed@gmail.com",    "01899001122", "Cairo",
-             json.dumps(["Graphic Design", "Branding"]),
+             "Active", "1996-06-08", "Dakahlia",
+             "29606082401171", "Male", "Egyptian",
+             "Postgraduate (Diploma / Master / PhD)", "Mansoura University", "Faculty of Arts", "", "Sociology", "General",
+             6, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekday mornings"]),
+             1, "Egyptian Foundation for Refugee Rights",
+             json.dumps([{"orgName": "Egyptian Foundation for Refugee Rights", "department": "Research", "role": "Field Researcher", "duration": "2021-2023", "description": "Led impact studies across 3 governorates."}]),
+             ""),
+
+            (8,  27, "دينا السيد محمد",          "dina.elsayed@gmail.com",    "01899001122", "Cairo",
+             json.dumps(SKILLS["design"]),
              "Visual designer creating compelling content for non-profit campaigns.",
-             "Active", "2001-12-25", "Cairo"),
-            (9,  28, "Omar Farouk",      "omar.farouk@outlook.com",   "01900112233", "Mansoura",
-             json.dumps(["Teaching", "Tutoring"]),
+             "Active", "2001-12-25", "Cairo",
+             "30112250101282", "Female", "Egyptian",
+             "University Graduate", "Helwan University", "Faculty of Applied Arts", "", "Graphic Design", "Content Creation",
+             8, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(AVAIL),
+             0, "", json.dumps([]), ""),
+
+            (9,  28, "عمر فاروق علي",            "omar.farouk@gmail.com",     "01500112233", "Mansoura",
+             json.dumps(SKILLS["edu"]),
              "Education advocate teaching underprivileged children on weekends.",
-             "Active", "1995-04-14", "Dakahlia"),
-            (10, 29, "Layla Samir",      "layla.samir@gmail.com",     "01011223345", "Cairo",
-             json.dumps(["First Aid", "Healthcare"]),
+             "Active", "1995-04-14", "Dakahlia",
+             "29504142401193", "Male", "Egyptian",
+             "University Graduate", "Mansoura University", "Faculty of Education", "", "Curriculum & Instruction", "General",
+             10, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Conversational"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
+             1, "Educate Me Foundation",
+             json.dumps([{"orgName": "Educate Me Foundation", "department": "Education", "role": "Volunteer Tutor", "duration": "2020-2024", "description": "Tutored under-served children in Arabic, math, and English."}]),
+             ""),
+
+            (10, 29, "ليلى سمير حسن",            "layla.samir@gmail.com",     "01011223345", "Cairo",
+             json.dumps(SKILLS["med"]),
              "Nursing student volunteering with the Red Crescent blood donation team.",
-             "Active", "2003-08-09", "Cairo"),
-            (11, 30, "Hossam Adel",      "hossam.adel@gmail.com",     "01123344556", "Cairo",
-             json.dumps(["Public Speaking", "Mentorship"]),
+             "Active", "2003-08-09", "Cairo",
+             "30308090101204", "Female", "Egyptian",
+             "University Student", "Ain Shams University", "Faculty of Nursing", "3rd Year", "Critical Care Nursing", "Emergencies",
+             8, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekday afternoons", "Weekends"]),
+             0, "", json.dumps([]),
+             "Mild dust allergy."),
+
+            (11, 30, "حسام عادل محمد",          "hossam.adel@gmail.com",     "01123344557", "Cairo",
+             json.dumps(SKILLS["lead"]),
              "Business student passionate about youth entrepreneurship.",
-             "Active", "2000-01-20", "Cairo"),
-            (12, 31, "Menna Tarek",      "menna.tarek@outlook.com",   "01234455667", "Giza",
-             json.dumps(["Translation", "Writing", "Arabic-English"]),
+             "Active", "2000-01-20", "Cairo",
+             "30001200101115", "Male", "Egyptian",
+             "University Student", "The American University in Cairo", "School of Business", "4th Year", "Entrepreneurship", "Partnerships",
+             6, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Native"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
+             0, "", json.dumps([]), ""),
+
+            (12, 31, "منة طارق أحمد",            "menna.tarek@gmail.com",     "01234455668", "Giza",
+             json.dumps(SKILLS["tr"]),
              "Linguistics student helping NGOs reach bilingual audiences.",
-             "Pending", "2002-10-03", "Giza"),
+             "Pending", "2002-10-03", "Giza",
+             "30210031201226", "Female", "Egyptian",
+             "University Student", "Cairo University", "Faculty of Al-Alsun", "3rd Year", "Translation Studies", "Content Creation",
+             5, json.dumps([{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}, {"language": "French", "proficiency": "Conversational"}]),
+             json.dumps(CAUSES_FULL), json.dumps(["Weekday evenings", "Weekends"]),
+             0, "", json.dumps([]), ""),
         ]
         db.executemany(
-            "INSERT INTO volunteers (id, user_id, name, email, phone, city, skills, about_me, status, date_of_birth, governorate) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO volunteers ("
+            "id, user_id, name, email, phone, city, skills, about_me, status, date_of_birth, governorate, "
+            "national_id, gender, nationality, education_level, university_name, faculty, study_year, "
+            "field_of_study, department, hours_per_week, languages, cause_areas, availability, "
+            "prior_experience, prior_org, experiences, health_notes"
+            ") VALUES (" + ", ".join(["?"] * 28) + ")",
             volunteers,
         )
 
         # ──────────── ORG-VOLUNTEER MEMBERSHIPS ────────────
-        # 7 in Resala, 6 in Red Crescent, 6 in Enactus  (overlap is intentional)
-        # (org_id, volunteer_id, supervisor_id, department, status, joined_date, source, join_source, is_active)
         org_vols = [
             # Resala (sup 1, 2)
             (1, 1,  1, "Programs",  "Active",  "2025-09-01", "self_registration", "website",  1),
@@ -234,45 +342,37 @@ def seed():
         )
 
         # ──────────── EVENTS ────────────
-        # 3 Resala, 2 Red Crescent, 2 Enactus = 7 total
-        # (id, org_id, name, description, location, date, time, duration, max_vol, cur_vol, required_skills, status)
         events = [
             (1, 1, "Ramadan Food Drive 2026",
-             "Annual food package distribution to 500+ families in Greater Cairo. "
-             "Volunteers handle packing, sorting, and delivery.",
+             "Annual food package distribution to 500+ families in Greater Cairo.",
              "Resala HQ, Maadi, Cairo", "2026-03-15", "08:00", 8, 50, 48,
-             "Logistics, Teamwork", "Completed"),
+             "Community Outreach, Event Planning", "Completed"),
             (2, 1, "Youth Leadership Forum",
-             "Day-long forum with panels and workshops for emerging youth leaders. "
-             "Topics: civic responsibility, team leadership, social innovation.",
+             "Day-long forum for emerging youth leaders covering civic responsibility and social innovation.",
              "Bibliotheca Alexandrina, Alexandria", "2026-05-20", "09:00", 6, 30, 18,
-             "Leadership, Communication", "Upcoming"),
+             "Community Outreach, Event Planning", "Upcoming"),
             (3, 1, "Volunteer Onboarding Workshop — April",
              "Orientation for new volunteers: policies, tools, and best practices.",
              "Resala Training Center, Cairo", "2026-04-08", "10:00", 5, 15, 14,
-             "HR, Training", "Completed"),
+             "Administrative Support, Teaching / Tutoring", "Completed"),
 
             (4, 2, "National Blood Donation Drive — Spring",
-             "Biannual blood donation campaign across 12 governorates. Volunteers "
-             "manage donor registration, post-donation care, and logistics.",
+             "Biannual blood donation campaign across 12 governorates.",
              "Multiple Sites — Cairo, Giza, Alexandria", "2026-05-05", "08:00", 7, 60, 45,
-             "Medical Support, First Aid", "Upcoming"),
+             "Medical / First Aid, Community Outreach", "Upcoming"),
             (5, 2, "Winter Aid Distribution — Alexandria",
-             "Distribution of 1,000+ winter kits (blankets, clothing, heaters) to "
-             "displaced families in Alexandria and surrounding areas.",
+             "Distribution of 1,000+ winter kits to displaced families in Alexandria.",
              "Borg El-Arab, Alexandria", "2025-12-20", "07:00", 8, 35, 35,
-             "Logistics, Fieldwork", "Completed"),
+             "Community Outreach, Event Planning", "Completed"),
 
             (6, 3, "Entrepreneurship Bootcamp — Spring",
-             "Three-day bootcamp for student entrepreneurs. Workshops on business "
-             "modeling, pitching, and social impact measurement.",
+             "Three-day bootcamp for student entrepreneurs covering business modeling and pitching.",
              "AUC New Cairo Campus", "2026-05-15", "09:00", 8, 25, 12,
-             "Business, Presentation", "Upcoming"),
+             "Teaching / Tutoring, Event Planning", "Upcoming"),
             (7, 3, "Digital Skills for Women — Shubra",
-             "Free digital literacy and e-commerce training for women entrepreneurs "
-             "in Shubra, helping them market products online.",
+             "Free digital literacy and e-commerce training for women entrepreneurs in Shubra.",
              "Shubra Community Hall, Cairo", "2026-04-05", "10:00", 5, 20, 18,
-             "IT, Teaching", "Completed"),
+             "Teaching / Tutoring, Software Development", "Completed"),
         ]
         db.executemany(
             "INSERT INTO events (id, org_id, name, description, location, date, time, duration, "
@@ -282,8 +382,6 @@ def seed():
         )
 
         # ──────────── EVENT APPLICATIONS ────────────
-        # 3-5 per event, mixed statuses
-        # (id, volunteer_id, event_id, org_id, status, applied_date)
         apps = [
             # Event 1 — Ramadan Food Drive (5)
             (1,  1, 1, 1, "Approved", "2026-02-20 10:00:00"),
@@ -328,56 +426,43 @@ def seed():
         )
 
         # ──────────── ACTIVITIES ────────────
-        # 2-4 per volunteer, mix of Approved/Pending. (Vol 12 is Pending member → no activities.)
-        # (id, volunteer_id, event_id, org_id, date, hours, description, status)
         activities = [
-            # Yara (vol 1) — 4 activities
             (1,  1, 1, 1, "2026-03-15", 8, "Coordinated 6 volunteers for package sorting in Ain Shams; delivered to 80 families.", "Approved"),
             (2,  1, 3, 1, "2026-04-08", 5, "Facilitated two onboarding sessions for 14 new volunteers.", "Approved"),
             (3,  1, 5, 2, "2025-12-20", 8, "Managed donor registration at Borg El-Arab; assisted 200+ donors.", "Approved"),
             (4,  1, 2, 1, "2026-04-25", 3, "Pre-event planning session for the Youth Leadership Forum.", "Pending"),
 
-            # Nadia (vol 2) — 3
             (5,  2, 1, 1, "2026-03-15", 8, "Volunteer scheduling across 5 distribution zones for 48 volunteers.", "Approved"),
             (6,  2, 3, 1, "2026-04-08", 5, "Delivered 'Volunteer Rights & Responsibilities' module.", "Approved"),
             (7,  2, 6, 3, "2026-04-20", 4, "Mentor-prep session for the upcoming Entrepreneurship Bootcamp.", "Pending"),
 
-            # Karim (vol 3) — 2
             (8,  3, 6, 3, "2026-04-22", 4, "Filmed promo video for Entrepreneurship Bootcamp recruitment.", "Approved"),
             (9,  3, 7, 3, "2026-04-05", 5, "Photographed Digital Skills workshop; produced highlight reel.", "Approved"),
 
-            # Sofia (vol 4) — 3
             (10, 4, 3, 1, "2026-04-08", 5, "Set up volunteer management system on tablets for digital check-in.", "Approved"),
             (11, 4, 7, 3, "2026-04-05", 5, "Taught e-commerce basics to 18 women entrepreneurs.", "Approved"),
             (12, 4, 6, 3, "2026-04-28", 3, "Tech-prep for bootcamp: setup of demo accounts and projector tests.", "Pending"),
 
-            # Tarek (vol 5) — 2
             (13, 5, 1, 1, "2026-03-15", 8, "Petty cash and expense tracking for the food drive; reconciled receipts.", "Approved"),
             (14, 5, 3, 1, "2026-04-08", 5, "Budgeting basics workshop for new volunteers.", "Approved"),
 
-            # Hana (vol 6) — 2
             (15, 6, 5, 2, "2025-12-20", 8, "Truck loading and route planning; supervised 8 field volunteers.", "Approved"),
             (16, 6, 4, 2, "2026-04-15", 4, "Pre-event logistics planning for blood donation sites.", "Pending"),
 
-            # Yusuf (vol 7) — 2
             (17, 7, 5, 2, "2025-12-20", 8, "Post-distribution surveys with 50 recipient families.", "Approved"),
             (18, 7, 4, 2, "2026-04-20", 3, "Survey design for upcoming blood drive impact measurement.", "Pending"),
 
-            # Dina (vol 8) — 2
             (19, 8, 1, 1, "2026-03-14", 4, "Designed banners and social posts for the food drive launch.", "Approved"),
             (20, 8, 2, 1, "2026-04-30", 3, "Visual identity drafts for Youth Leadership Forum.", "Pending"),
 
-            # Omar (vol 9) — 3
             (21, 9, 7, 3, "2026-04-05", 5, "Taught computer literacy to 20 women: email, Docs, WhatsApp Business.", "Approved"),
             (22, 9, 4, 2, "2026-04-22", 3, "Outreach session at local university to recruit blood donors.", "Approved"),
             (23, 9, 6, 3, "2026-05-02", 4, "Curriculum prep for entrepreneurship workshop modules.", "Pending"),
 
-            # Layla (vol 10) — 3
             (24, 10, 5, 2, "2025-12-20", 8, "First aid support during long field day; monitored volunteer health.", "Approved"),
             (25, 10, 4, 2, "2026-04-25", 3, "Training session for new medical-support volunteers.", "Approved"),
             (26, 10, 4, 2, "2026-05-01", 2, "Inventory check on first-aid kits for blood drive sites.", "Pending"),
 
-            # Hossam (vol 11) — 2
             (27, 11, 6, 3, "2026-04-15", 4, "Pitch coaching for student teams preparing bootcamp submissions.", "Approved"),
             (28, 11, 2, 1, "2026-04-28", 3, "Volunteer outreach on campus for Youth Leadership Forum.", "Pending"),
         ]
@@ -388,7 +473,6 @@ def seed():
         )
 
         # ──────────── CERTIFICATES ────────────
-        # (id, volunteer_id, org_id, event_id, type, hours, issued_date)
         certificates = [
             (1,  1, 1, 1, "Achievement",   8, "2026-03-20"),
             (2,  1, 1, 3, "Completion",    5, "2026-04-15"),
@@ -411,28 +495,22 @@ def seed():
         # ──────────── ANNOUNCEMENTS ────────────
         announcements = [
             (1, 1, "Ramadan 2026 Food Drive — Thank You",
-             "Thanks to 48 volunteers, we delivered food packages to 500+ families across Greater Cairo. "
-             "Special recognition to our top contributors this season.",
+             "Thanks to 48 volunteers, we delivered food packages to 500+ families across Greater Cairo.",
              "2026-03-18 09:00:00"),
             (2, 1, "Youth Leadership Forum — Registration Open",
-             "Spots are filling fast for our May 20th forum at Bibliotheca Alexandrina. "
-             "This year's theme: 'Leading with Purpose'. Apply via your dashboard.",
+             "Spots are filling fast for our May 20th forum at Bibliotheca Alexandrina.",
              "2026-04-12 11:00:00"),
             (3, 2, "Spring Blood Donation Drive — Volunteers Needed",
-             "Our May 5th drive covers 12 governorates. We need volunteers for donor registration, "
-             "medical support, and logistics. Training and certification provided.",
+             "Our May 5th drive covers 12 governorates. Training and certification provided.",
              "2026-04-11 08:30:00"),
             (4, 2, "Winter Aid Campaign — Final Impact Report",
-             "Our Alexandria distribution reached 1,247 families across 8 districts. "
-             "Thanks to our 35 volunteers who made this possible.",
+             "Our Alexandria distribution reached 1,247 families across 8 districts.",
              "2026-01-15 09:00:00"),
             (5, 3, "Spring Entrepreneurship Bootcamp — Apply Now",
-             "Three days of business modeling, pitching, and impact measurement at AUC New Cairo, "
-             "May 15-17. Mentors from 12 leading companies confirmed.",
+             "Three days of business modeling, pitching, and impact measurement at AUC New Cairo, May 15-17.",
              "2026-04-09 10:00:00"),
             (6, 3, "Digital Skills for Women — Wrap Report",
-             "18 women completed our Shubra workshop on e-commerce and online marketing. "
-             "Three have already launched online stores. Congratulations!",
+             "18 women completed our Shubra workshop on e-commerce and online marketing.",
              "2026-04-08 16:00:00"),
         ]
         db.executemany(
@@ -442,43 +520,31 @@ def seed():
         )
 
         # ──────────── NOTIFICATIONS ────────────
-        # In-app alerts for org admins (drives the bell icon in the UI).
-        notifications = [
+        notifs = [
             (1, "application", "New Event Application",
              "Yara Hassan applied to 'Youth Leadership Forum'.", 0, "/admin/applications", "2026-04-13 10:01:00"),
             (2, "application", "New Event Application",
              "Hossam Adel applied to 'Youth Leadership Forum'.", 0, "/admin/applications", "2026-04-14 09:01:00"),
-            (3, "membership",  "Pending Volunteer",
+            (1, "membership",  "Pending Volunteer",
              "Hossam Adel is pending approval as a Resala volunteer.", 0, "/admin/volunteers", "2026-04-01 12:00:00"),
-            (4, "application", "New Event Application",
+            (3, "application", "New Event Application",
              "Yara Hassan applied to 'Blood Donation Drive'.", 0, "/admin/applications", "2026-04-13 10:06:00"),
-            (5, "membership",  "Pending Volunteer",
+            (3, "membership",  "Pending Volunteer",
              "Menna Tarek is pending approval as a Red Crescent volunteer.", 1, "/admin/volunteers", "2026-04-05 13:00:00"),
         ]
-        # Map notifications to org-admin user IDs:
-        #   1, 2, 3 → Resala admins (users 1 and 2 each get one of {1,2,3})
-        #   4, 5    → Red Crescent admin (user 3)
-        db.execute("INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
-                   "VALUES (?, ?, ?, ?, ?, ?, ?)", (1,) + notifications[0][1:])
-        db.execute("INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
-                   "VALUES (?, ?, ?, ?, ?, ?, ?)", (2,) + notifications[1][1:])
-        db.execute("INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
-                   "VALUES (?, ?, ?, ?, ?, ?, ?)", (1,) + notifications[2][1:])
-        db.execute("INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
-                   "VALUES (?, ?, ?, ?, ?, ?, ?)", (3,) + notifications[3][1:])
-        db.execute("INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
-                   "VALUES (?, ?, ?, ?, ?, ?, ?)", (3,) + notifications[4][1:])
+        db.executemany(
+            "INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            notifs,
+        )
 
     print("Database seeded successfully!")
     print()
     print("Demo credentials:")
-    print("  platform@altruism.org / platform                 (platform admin)")
-    print("  sherif.aziz@resala.org / admin                   (Resala admin — creator)")
-    print("  mona.kamal@resala.org / admin                    (Resala admin)")
-    print("  fatima.elsayed@redcrescent.org / admin           (Red Crescent admin)")
-    print("  mohamed.farouk@enactus-egypt.org / admin         (Enactus admin)")
-    print("  amira.khalil@resala.org / supervisor             (Resala supervisor)")
-    print("  yara.hassan@gmail.com / volunteer                (volunteer — active in Resala & Red Crescent)")
+    print("  platform@altruism.org / Platform#1                 (platform admin)")
+    print("  sherif.aziz@resala.org / Admin#1234                (Resala admin)")
+    print("  amira.khalil@resala.org / Super#1234               (Resala supervisor)")
+    print("  yara.hassan@gmail.com / Vol#12345                  (volunteer demo)")
 
 
 if __name__ == "__main__":
