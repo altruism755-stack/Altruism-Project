@@ -81,7 +81,6 @@ export function BrowseOrganizations() {
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1E293B", margin: 0 }}>Organizations</h1>
-          <span style={{ fontSize: 13, color: "#94A3B8" }}>{filtered.length} organization{filtered.length !== 1 ? "s" : ""}</span>
         </div>
         <p style={{ fontSize: 14, color: "#64748B", margin: "0 0 24px 0" }}>
           Browse and join organizations to start volunteering.
@@ -107,113 +106,93 @@ export function BrowseOrganizations() {
             return (
               <div
                 key={org.id}
-                onClick={() => navigate(`/dashboard/org/${org.id}`)}
                 style={{
                   backgroundColor: "#fff",
                   border: "1px solid #E2E8F0",
-                  borderRadius: 16,
+                  borderRadius: 14,
                   overflow: "hidden",
                   display: "flex",
                   flexDirection: "column",
-                  cursor: "pointer",
-                  transition: "box-shadow 0.15s, transform 0.15s",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.10)";
-                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)";
-                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
                 }}
               >
-                {/* Card top accent bar */}
-                <div style={{ height: 5, background: `linear-gradient(90deg, ${accentColor}, ${accentSecondary})` }} />
+                {/* Accent bar */}
+                <div style={{ height: 4, background: `linear-gradient(90deg, ${accentColor}, ${accentSecondary})` }} />
 
-                <div style={{ padding: 22, flex: 1, display: "flex", flexDirection: "column" }}>
-                  {/* Header: logo + name + category + arrow */}
-                  <div className="flex items-start gap-3" style={{ marginBottom: 14 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #F1F5F9", backgroundColor: "#F8FAFC" }}>
-                      <OrgLogoByName name={org.name} size={52} />
+                <div style={{ padding: 24, flex: 1, display: "flex", flexDirection: "column" }}>
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 14 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 10, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #E2E8F0", backgroundColor: "#fff" }}>
+                      <OrgLogoByName name={org.name} size={48} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#1E293B", marginBottom: 4, lineHeight: 1.2 }}>{org.name}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", marginBottom: 5, lineHeight: 1.3 }}>{org.name}</div>
                       {org.category && (
-                        <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#F1F5F9", color: "#64748B", borderRadius: 20, padding: "3px 10px", display: "inline-block" }}>{org.category}</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, backgroundColor: "#F1F5F9", color: "#475569", borderRadius: 4, padding: "2px 8px", display: "inline-block", letterSpacing: "0.01em" }}>{org.category}</span>
                       )}
                     </div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
-                      <path d="M9 18l6-6-6-6"/>
-                    </svg>
                   </div>
 
+                  {/* Description */}
                   {org.description && (
-                    <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6, margin: "0 0 14px 0", flex: 1 }}>
-                      {org.description.length > 110 ? org.description.slice(0, 110) + "…" : org.description}
+                    <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.7, margin: "0 0 20px 0", flex: 1 }}>
+                      {org.description.length > 115 ? org.description.slice(0, 115) + "…" : org.description}
                     </p>
                   )}
 
-                  {/* Stats row */}
-                  <div style={{ display: "flex", gap: 0, backgroundColor: "#F8FAFC", borderRadius: 10, padding: "10px 0", marginBottom: 16 }}>
-                    <div style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#1E293B" }}>{org.total_volunteers ?? 0}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>Volunteers</div>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: "#E2E8F0", margin: "4px 0" }} />
-                    <div style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#1E293B" }}>{org.active_activities ?? 0}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>Activities</div>
-                    </div>
-                    {org.founded && (
-                      <>
-                        <div style={{ width: 1, backgroundColor: "#E2E8F0", margin: "4px 0" }} />
-                        <div style={{ flex: 1, textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: "#1E293B" }}>{new Date(org.founded).getFullYear()}</div>
-                          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>Founded</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  {/* Divider */}
+                  <div style={{ height: 1, backgroundColor: "#F1F5F9", marginBottom: 16 }} />
 
-                  {/* Join / status button */}
-                  {status === "active" ? (
-                    <div style={{ height: 38, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#DCFCE7", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#15803D" }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-                      Member · View Dashboard
+                  {/* Membership status badge */}
+                  {status === "active" && (
+                    <div style={{ marginBottom: 10, height: 28, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#DCFCE7", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#15803D", letterSpacing: "0.01em" }}>
+                      Member
                     </div>
-                  ) : status === "pending" ? (
-                    <div style={{ height: 38, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#FEF3C7", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#B45309" }}>
+                  )}
+                  {status === "pending" && (
+                    <div style={{ marginBottom: 10, height: 28, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#FEF9C3", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#A16207", letterSpacing: "0.01em" }}>
                       Application Pending
                     </div>
-                  ) : org.student_only && profile?.education_level !== "University Student" ? (
-                    <div>
-                      <button
-                        disabled
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ width: "100%", height: 38, backgroundColor: "#E2E8F0", color: "#94A3B8", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "not-allowed" }}
-                      >
-                        Join Organization
-                      </button>
-                      <div style={{ fontSize: 11, color: "#EF4444", marginTop: 5, lineHeight: 1.4 }}>
-                        Only available for current university students.
+                  )}
+                  {status === "none" && org.student_only && profile?.education_level !== "University Student" && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9", borderRadius: 6, fontSize: 12, fontWeight: 500, color: "#94A3B8" }}>
+                        University Students Only
                       </div>
                     </div>
-                  ) : (
+                  )}
+
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {/* View Profile button — always visible */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleJoin(org.id); }}
-                      disabled={joining === org.id}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/org/${org.id}`); }}
                       style={{
-                        width: "100%", height: 38,
-                        backgroundColor: joining === org.id ? "#86EFAC" : accentColor,
-                        color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                        cursor: joining === org.id ? "not-allowed" : "pointer",
-                        transition: "opacity 0.15s",
+                        flex: 1, height: 38, backgroundColor: "#fff",
+                        color: "#334155", border: "1.5px solid #E2E8F0", borderRadius: 8,
+                        fontSize: 13, fontWeight: 600, cursor: "pointer",
                       }}
                     >
-                      {joining === org.id ? "Submitting…" : "Join Organization"}
+                      View Profile
                     </button>
-                  )}
+
+                    {/* Join / blocked button */}
+                    {status === "none" && !(org.student_only && profile?.education_level !== "University Student") && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleJoin(org.id); }}
+                        disabled={joining === org.id}
+                        style={{
+                          flex: 1, height: 38,
+                          backgroundColor: joining === org.id ? "#86EFAC" : accentColor,
+                          color: "#fff", border: "none", borderRadius: 8,
+                          fontSize: 13, fontWeight: 600,
+                          cursor: joining === org.id ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {joining === org.id ? "Submitting…" : "Join"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
