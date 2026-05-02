@@ -4,7 +4,7 @@ import { Navbar } from "../components/Navbar";
 import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { OrgLogo } from "../components/OrgLogos";
+import { OrgLogoByName } from "../components/OrgLogos";
 
 const GREEN = "#16A34A";
 
@@ -71,8 +71,8 @@ export function VolunteerOrgDashboard() {
         <BackButton to="/dashboard/orgs" label="Organizations" />
 
         <div className="flex items-center gap-4" style={{ marginBottom: 24 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <OrgLogo orgId={org.id} size={56} />
+          <div style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid #E2E8F0", backgroundColor: "#F8FAFC" }}>
+            <OrgLogoByName name={org.name} size={56} />
           </div>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 600, color: "#1E293B", margin: 0 }}>{org.name}</h1>
