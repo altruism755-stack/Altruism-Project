@@ -4,7 +4,7 @@ Volunteer fields are generated to satisfy the frontend validation rules in
 src/app/data/volunteerFormSchema.ts EXACTLY:
 
   fullName       Arabic or English, ≥ 3 words
-  email          name.lastname@gmail.com pattern
+  email          namelastname@gmail.com pattern
   nationalId     Egyptian 14-digit format: C YY MM DD GG SSSS X
                  - C: century (2 = 1900s, 3 = 2000s)
                  - YYMMDD matches dateOfBirth
@@ -52,30 +52,30 @@ def seed():
         users = [
             (100, "platform@altruism.org",            h("Platform#1"),   "org_admin"),
 
-            (1,   "sherif.aziz@resala.org",           h("Admin#1234"),   "org_admin"),
-            (2,   "mona.kamal@resala.org",            h("Admin#1234"),   "org_admin"),
-            (3,   "fatima.elsayed@redcrescent.org",   h("Admin#1234"),   "org_admin"),
-            (4,   "mohamed.farouk@enactus-egypt.org", h("Admin#1234"),   "org_admin"),
+            (1,   "sherifaziz@resala.org",           h("Admin#1234"),   "org_admin"),
+            (2,   "monakamal@resala.org",            h("Admin#1234"),   "org_admin"),
+            (3,   "fatimaelsayed@redcrescent.org",   h("Admin#1234"),   "org_admin"),
+            (4,   "mohamedfarouk@enactus-egypt.org", h("Admin#1234"),   "org_admin"),
 
-            (10,  "amira.khalil@resala.org",          h("Super#1234"),   "supervisor"),
-            (11,  "mahmoud.hassan@resala.org",        h("Super#1234"),   "supervisor"),
-            (12,  "ahmed.elmasry@redcrescent.org",    h("Super#1234"),   "supervisor"),
-            (13,  "nourhan.ali@redcrescent.org",      h("Super#1234"),   "supervisor"),
-            (14,  "sara.nabil@enactus-egypt.org",     h("Super#1234"),   "supervisor"),
-            (15,  "youssef.gamal@enactus-egypt.org",  h("Super#1234"),   "supervisor"),
+            (10,  "amirakhalil@resala.org",          h("Super#1234"),   "supervisor"),
+            (11,  "mahmoudhassan@resala.org",        h("Super#1234"),   "supervisor"),
+            (12,  "ahmedelmasry@redcrescent.org",    h("Super#1234"),   "supervisor"),
+            (13,  "nourhanali@redcrescent.org",      h("Super#1234"),   "supervisor"),
+            (14,  "saranabil@enactus-egypt.org",     h("Super#1234"),   "supervisor"),
+            (15,  "youssefgamal@enactus-egypt.org",  h("Super#1234"),   "supervisor"),
 
-            (20,  "yara.hassan@gmail.com",            h("Vol#12345"),    "volunteer"),
-            (21,  "nadia.mahmoud@gmail.com",          h("Vol#12345"),    "volunteer"),
-            (22,  "karim.mostafa@gmail.com",          h("Vol#12345"),    "volunteer"),
-            (23,  "sofia.ahmed@gmail.com",            h("Vol#12345"),    "volunteer"),
-            (24,  "tarek.ibrahim@gmail.com",          h("Vol#12345"),    "volunteer"),
-            (25,  "hana.youssef@gmail.com",           h("Vol#12345"),    "volunteer"),
-            (26,  "youssef.bakr@gmail.com",           h("Vol#12345"),    "volunteer"),
-            (27,  "dina.elsayed@gmail.com",           h("Vol#12345"),    "volunteer"),
-            (28,  "omar.farouk@gmail.com",            h("Vol#12345"),    "volunteer"),
-            (29,  "layla.samir@gmail.com",            h("Vol#12345"),    "volunteer"),
-            (30,  "hossam.adel@gmail.com",            h("Vol#12345"),    "volunteer"),
-            (31,  "menna.tarek@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (20,  "yarahassan@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (21,  "nadiamahmoud@gmail.com",          h("Vol#12345"),    "volunteer"),
+            (22,  "karimmostafa@gmail.com",          h("Vol#12345"),    "volunteer"),
+            (23,  "sofiaahmed@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (24,  "tarekibrahim@gmail.com",          h("Vol#12345"),    "volunteer"),
+            (25,  "hanayoussef@gmail.com",           h("Vol#12345"),    "volunteer"),
+            (26,  "youssefbakr@gmail.com",           h("Vol#12345"),    "volunteer"),
+            (27,  "dinaelsayed@gmail.com",           h("Vol#12345"),    "volunteer"),
+            (28,  "omarfarouk@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (29,  "laylasamir@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (30,  "hossamadel@gmail.com",            h("Vol#12345"),    "volunteer"),
+            (31,  "mennatarek@gmail.com",            h("Vol#12345"),    "volunteer"),
         ]
         db.executemany(
             "INSERT INTO users (id, email, password, role) VALUES (?, ?, ?, ?)",
@@ -173,7 +173,7 @@ def seed():
         AVAIL = ["Weekday afternoons", "Weekends"]
 
         volunteers = [
-            (1,  20, "Yara Hassan Mohamed",      "yara.hassan@gmail.com",     "01212345678", "Alexandria",
+            (1,  20, "Yara Hassan Mohamed",      "yarahassan@gmail.com",     "01212345678", "Alexandria",
              json.dumps(SKILLS["comm"]),
              "Passionate about community service and youth development since university.",
              "Active", "1999-07-15", "Alexandria",
@@ -183,7 +183,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (2,  21, "نادية محمود علي",         "nadia.mahmoud@gmail.com",   "01234567891", "Cairo",
+            (2,  21, "نادية محمود علي",         "nadiamahmoud@gmail.com",   "01234567891", "Cairo",
              json.dumps(SKILLS["hr"]),
              "HR professional and weekend volunteer trainer focused on capacity building.",
              "Active", "1997-03-22", "Cairo",
@@ -195,7 +195,7 @@ def seed():
              json.dumps([{"orgName": "Misr El-Kheir Foundation", "department": "HR", "role": "HR Trainer", "duration": "2022-2024", "description": "Designed onboarding curriculum for 60+ volunteers."}]),
              ""),
 
-            (3,  22, "كريم مصطفى إبراهيم",      "karim.mostafa@gmail.com",   "01098765432", "Giza",
+            (3,  22, "كريم مصطفى إبراهيم",      "karimmostafa@gmail.com",   "01098765432", "Giza",
              json.dumps(SKILLS["media"]),
              "Creative media professional amplifying volunteer impact through storytelling.",
              "Active", "2000-11-05", "Giza",
@@ -205,7 +205,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (4,  23, "Sofia Ahmed Hassan",       "sofia.ahmed@gmail.com",     "01112223344", "Giza",
+            (4,  23, "Sofia Ahmed Hassan",       "sofiaahmed@gmail.com",     "01112223344", "Giza",
              json.dumps(SKILLS["tech"]),
              "Software engineering student passionate about technology for social good.",
              "Active", "2002-05-30", "Giza",
@@ -215,7 +215,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(["Weekday evenings", "Weekends"]),
              0, "", json.dumps([]), ""),
 
-            (5,  24, "طارق إبراهيم سالم",        "tarek.ibrahim@gmail.com",   "01556677889", "Cairo",
+            (5,  24, "طارق إبراهيم سالم",        "tarekibrahim@gmail.com",   "01556677889", "Cairo",
              json.dumps(SKILLS["fin"]),
              "Finance graduate helping non-profits manage resources effectively.",
              "Active", "1998-09-12", "Cairo",
@@ -225,7 +225,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
              0, "", json.dumps([]), ""),
 
-            (6,  25, "Hana Youssef Abdullah",    "hana.youssef@gmail.com",    "01667788991", "Alexandria",
+            (6,  25, "Hana Youssef Abdullah",    "hanayoussef@gmail.com",    "01667788991", "Alexandria",
              json.dumps(SKILLS["ops"]),
              "Operations specialist ensuring smooth delivery of humanitarian aid.",
              "Active", "2001-02-18", "Alexandria",
@@ -235,7 +235,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (7,  26, "يوسف بكر حسن",            "youssef.bakr@gmail.com",    "01122334456", "Mansoura",
+            (7,  26, "يوسف بكر حسن",            "youssefbakr@gmail.com",    "01122334456", "Mansoura",
              json.dumps(SKILLS["rsrch"]),
              "Social researcher measuring impact of volunteer programs.",
              "Active", "1996-06-08", "Dakahlia",
@@ -247,7 +247,7 @@ def seed():
              json.dumps([{"orgName": "Egyptian Foundation for Refugee Rights", "department": "Research", "role": "Field Researcher", "duration": "2021-2023", "description": "Led impact studies across 3 governorates."}]),
              ""),
 
-            (8,  27, "دينا السيد محمد",          "dina.elsayed@gmail.com",    "01899001122", "Cairo",
+            (8,  27, "دينا السيد محمد",          "dinaelsayed@gmail.com",    "01899001122", "Cairo",
              json.dumps(SKILLS["design"]),
              "Visual designer creating compelling content for non-profit campaigns.",
              "Active", "2001-12-25", "Cairo",
@@ -257,7 +257,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (9,  28, "Omar Farouk Ali",          "omar.farouk@gmail.com",     "01500112233", "Mansoura",
+            (9,  28, "Omar Farouk Ali",          "omarfarouk@gmail.com",     "01500112233", "Mansoura",
              json.dumps(SKILLS["edu"]),
              "Education advocate teaching underprivileged children on weekends.",
              "Active", "1995-04-14", "Dakahlia",
@@ -269,7 +269,7 @@ def seed():
              json.dumps([{"orgName": "Educate Me Foundation", "department": "Education", "role": "Volunteer Tutor", "duration": "2020-2024", "description": "Tutored under-served children in Arabic, math, and English."}]),
              ""),
 
-            (10, 29, "ليلى سمير حسن",            "layla.samir@gmail.com",     "01011223345", "Cairo",
+            (10, 29, "ليلى سمير حسن",            "laylasamir@gmail.com",     "01011223345", "Maadi",
              json.dumps(SKILLS["med"]),
              "Nursing student volunteering with the Red Crescent blood donation team.",
              "Active", "2003-08-09", "Cairo",
@@ -280,7 +280,7 @@ def seed():
              0, "", json.dumps([]),
              "Mild dust allergy."),
 
-            (11, 30, "Hossam Adel Mohamed",      "hossam.adel@gmail.com",     "01123344557", "Cairo",
+            (11, 30, "Hossam Adel Mohamed",      "hossamadel@gmail.com",     "01123344557", "Cairo",
              json.dumps(SKILLS["lead"]),
              "Business student passionate about youth entrepreneurship.",
              "Active", "2000-01-20", "Cairo",
@@ -290,7 +290,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
              0, "", json.dumps([]), ""),
 
-            (12, 31, "منة طارق أحمد",            "menna.tarek@gmail.com",     "01234455668", "Giza",
+            (12, 31, "منة طارق أحمد",            "mennatarek@gmail.com",     "01234455668", "Giza",
              json.dumps(SKILLS["tr"]),
              "Linguistics student helping NGOs reach bilingual audiences.",
              "Pending", "2002-10-03", "Giza",
