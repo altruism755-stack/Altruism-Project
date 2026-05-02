@@ -82,9 +82,6 @@ export function BrowseOrganizations() {
         <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1E293B", margin: 0 }}>Organizations</h1>
         </div>
-        <p style={{ fontSize: 14, color: "#64748B", margin: "0 0 24px 0" }}>
-          Browse and join organizations to start volunteering.
-        </p>
 
         {/* Search */}
         <div style={{ marginBottom: 24 }}>
