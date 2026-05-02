@@ -183,7 +183,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (2,  21, "نادية محمود علي",         "nadiamahmoud@gmail.com",   "01234567891", "Cairo",
+            (2,  21, "نادية محمود علي",         "nadiamahmoud@gmail.com",   "01234567891", "Heliopolis",
              json.dumps(SKILLS["hr"]),
              "HR professional and weekend volunteer trainer focused on capacity building.",
              "Active", "1997-03-22", "Cairo",
