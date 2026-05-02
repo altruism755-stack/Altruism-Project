@@ -66,6 +66,9 @@ export function NewsFeed() {
     setApplyingTo(null);
   };
 
+  const isStudentOnlyBlocked = (item: any) =>
+    item.org_student_only && profile?.education_level !== "University Student";
+
   // Merge events and announcements into a combined feed sorted by date
   const feedItems: any[] = [];
   upcomingEvents.forEach((e) => feedItems.push({ ...e, _type: "event", _sortDate: e.date }));
@@ -170,6 +173,22 @@ export function NewsFeed() {
                         <div style={{ flexShrink: 0 }}>
                           {alreadyApplied ? (
                             <span style={{ fontSize: 12, fontWeight: 600, color: "#15803D", backgroundColor: "#DCFCE7", padding: "6px 16px", borderRadius: 8 }}>Applied</span>
+                          ) : isStudentOnlyBlocked(item) ? (
+                            <div style={{ textAlign: "right" }}>
+                              <button
+                                disabled
+                                style={{
+                                  height: 36, padding: "0 20px", backgroundColor: "#E2E8F0",
+                                  color: "#94A3B8", border: "none", borderRadius: 8, fontSize: 13,
+                                  fontWeight: 600, cursor: "not-allowed",
+                                }}
+                              >
+                                Apply
+                              </button>
+                              <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4, maxWidth: 180, lineHeight: 1.4 }}>
+                                Sorry, Enactus opportunities are only available for current university students.
+                              </div>
+                            </div>
                           ) : (
                             <button
                               onClick={() => handleApply(item.id)}

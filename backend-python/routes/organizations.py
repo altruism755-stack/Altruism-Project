@@ -708,7 +708,7 @@ def list_organizations():
     with get_db() as db:
         orgs = dict_rows(db.execute(
             "SELECT id, name, description, category, color, secondary_color, initials, founded, "
-            "founded_year, location, org_type, logo_url, website "
+            "founded_year, location, org_type, logo_url, website, student_only "
             "FROM organizations WHERE status = 'approved' OR status IS NULL"
         ).fetchall())
 
@@ -772,7 +772,8 @@ def get_org_members(org_id: int, current_user: dict = Depends(get_current_user))
 def join_organization(org_id: int, current_user: dict = Depends(require_roles("volunteer"))):
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id, governorate, city FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id, governorate, city, education_level FROM volunteers WHERE user_id = ?",
+            (current_user["id"],),
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer profile not found")
@@ -785,10 +786,16 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
             raise HTTPException(409, "Already a member of this organization")
 
         org = dict_row(db.execute(
-            "SELECT name, admin_user_id FROM organizations WHERE id = ?", (org_id,)
+            "SELECT name, admin_user_id, student_only FROM organizations WHERE id = ?", (org_id,)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
+
+        if org.get("student_only") and vol.get("education_level") != "University Student":
+            raise HTTPException(
+                403,
+                "Sorry, Enactus opportunities are only available for current university students.",
+            )
 
         _now = _utcnow()
         db.execute(

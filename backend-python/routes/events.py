@@ -15,7 +15,7 @@ def list_events(
 ):
     with get_db() as db:
         query = (
-            "SELECT e.*, o.name as org_name FROM events e "
+            "SELECT e.*, o.name as org_name, o.student_only as org_student_only FROM events e "
             "LEFT JOIN organizations o ON e.org_id = o.id WHERE 1=1"
         )
         params: list = []

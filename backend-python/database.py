@@ -274,6 +274,12 @@ def init_schema():
         except Exception:
             pass
 
+    # Eligibility restriction: when 1, only current university students may apply.
+    try:
+        conn.execute("ALTER TABLE organizations ADD COLUMN student_only INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
     # Platform admins table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS platform_admins (

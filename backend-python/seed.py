@@ -88,9 +88,9 @@ def seed():
         org_cols = (
             "id, name, description, category, color, secondary_color, initials, founded, "
             "admin_user_id, status, org_type, founded_year, location, official_email, "
-            "submitter_name, submitter_role"
+            "submitter_name, submitter_role, student_only"
         )
-        ph = ", ".join(["?"] * 16)
+        ph = ", ".join(["?"] * 17)
         insert_org = f"INSERT INTO organizations ({org_cols}) VALUES ({ph})"
 
         db.execute(insert_org, (
@@ -99,14 +99,14 @@ def seed():
             "youth empowerment, and food drives across all governorates.",
             "Social Welfare", "#D97706", "#F59E0B", "RS", "1999-01-01", 1,
             "approved", "NGO", "1999", "Cairo", "info@resala.org",
-            "Sherif Abdel Aziz", "Executive Director",
+            "Sherif Abdel Aziz", "Executive Director", 0,
         ))
         db.execute(insert_org, (
             2, "Egyptian Red Crescent",
             "Humanitarian aid, disaster relief, and emergency health services across Egypt since 1912.",
             "Humanitarian Aid", "#DC2626", "#EF4444", "RC", "1912-03-15", 3,
             "approved", "NGO", "1912", "Cairo", "info@egyptianrc.org",
-            "Fatima El-Sayed", "Communications Director",
+            "Fatima El-Sayed", "Communications Director", 0,
         ))
         db.execute(insert_org, (
             3, "Enactus Egypt",
@@ -114,7 +114,7 @@ def seed():
             "social projects and sustainable business solutions.",
             "Student Entrepreneurship", "#0891B2", "#06B6D4", "EN", "2004-09-01", 4,
             "approved", "Student Activity", "2004", "Giza", "contact@enactus-egypt.org",
-            "Mohamed Farouk", "Country Director",
+            "Mohamed Farouk", "Country Director", 1,
         ))
 
         # ──────────── ORG ADMINS ────────────
@@ -327,13 +327,11 @@ def seed():
             (2, 10, 4, "Medical",   "Active",  "2026-03-01", "self_registration", "website",  1),
             (2, 9,  4, "Outreach",  "Active",  "2026-02-10", "self_registration", "referral", 1),
             (2, 12, 4, "Translation","Pending","2026-04-05", "self_registration", "website",  0),
-            # Enactus (sup 5, 6)
-            (3, 2,  5, "Business",  "Active",  "2025-10-05", "self_registration", "website",  1),
-            (3, 3,  5, "Media",     "Active",  "2025-11-10", "self_registration", "referral", 1),
-            (3, 4,  6, "Tech",      "Active",  "2026-01-15", "self_registration", "campaign", 1),
-            (3, 9,  6, "Education", "Active",  "2025-09-25", "self_registration", "website",  1),
-            (3, 11, 5, "Mentorship","Active",  "2026-02-12", "self_registration", "referral", 1),
-            (3, 12, 6, "Translation","Active", "2026-03-08", "self_registration", "campaign", 1),
+            # Enactus (sup 5, 6) — university students only
+            (3, 4,  6, "Tech",        "Active",  "2026-01-15", "self_registration", "campaign", 1),
+            (3, 10, 5, "Health",      "Active",  "2026-03-10", "self_registration", "website",  1),
+            (3, 11, 5, "Mentorship",  "Active",  "2026-02-12", "self_registration", "referral", 1),
+            (3, 12, 6, "Translation", "Active",  "2026-03-08", "self_registration", "campaign", 1),
         ]
         db.executemany(
             "INSERT INTO org_volunteers "
@@ -410,14 +408,14 @@ def seed():
             (19,  7, 5, 2, "Approved", "2025-12-02 10:00:00"),
             (20, 10, 5, 2, "Approved", "2025-12-03 11:00:00"),
             (21,  1, 5, 2, "Approved", "2025-12-05 14:00:00"),
-            # Event 6 — Entrepreneurship Bootcamp (4)
-            (22,  2, 6, 3, "Approved", "2026-04-10 09:00:00"),
+            # Event 6 — Entrepreneurship Bootcamp (university students only)
+            (22, 10, 6, 3, "Approved", "2026-04-10 09:00:00"),
             (23, 11, 6, 3, "Pending",  "2026-04-13 12:00:00"),
-            (24,  3, 6, 3, "Approved", "2026-04-11 10:30:00"),
+            (24, 12, 6, 3, "Approved", "2026-04-11 10:30:00"),
             (25,  4, 6, 3, "Pending",  "2026-04-14 16:00:00"),
-            # Event 7 — Digital Skills for Women (3)
+            # Event 7 — Digital Skills for Women (university students only)
             (26,  4, 7, 3, "Approved", "2026-03-25 10:00:00"),
-            (27,  9, 7, 3, "Approved", "2026-03-26 11:00:00"),
+            (27, 10, 7, 3, "Approved", "2026-03-26 11:00:00"),
             (28, 12, 7, 3, "Approved", "2026-03-28 09:30:00"),
         ]
         db.executemany(
@@ -435,10 +433,10 @@ def seed():
 
             (5,  2, 1, 1, "2026-03-15", 8, "Volunteer scheduling across 5 distribution zones for 48 volunteers.", "Approved"),
             (6,  2, 3, 1, "2026-04-08", 5, "Delivered 'Volunteer Rights & Responsibilities' module.", "Approved"),
-            (7,  2, 6, 3, "2026-04-20", 4, "Mentor-prep session for the upcoming Entrepreneurship Bootcamp.", "Pending"),
+            (7, 10, 6, 3, "2026-04-20", 4, "Mentor-prep session for the upcoming Entrepreneurship Bootcamp.", "Pending"),
 
-            (8,  3, 6, 3, "2026-04-22", 4, "Filmed promo video for Entrepreneurship Bootcamp recruitment.", "Approved"),
-            (9,  3, 7, 3, "2026-04-05", 5, "Photographed Digital Skills workshop; produced highlight reel.", "Approved"),
+            (8, 12, 6, 3, "2026-04-22", 4, "Filmed promo video for Entrepreneurship Bootcamp recruitment.", "Approved"),
+            (9, 12, 7, 3, "2026-04-05", 5, "Assisted Digital Skills workshop coordination and documentation.", "Approved"),
 
             (10, 4, 3, 1, "2026-04-08", 5, "Set up volunteer management system on tablets for digital check-in.", "Approved"),
             (11, 4, 7, 3, "2026-04-05", 5, "Taught e-commerce basics to 18 women entrepreneurs.", "Approved"),
@@ -456,9 +454,9 @@ def seed():
             (19, 8, 1, 1, "2026-03-14", 4, "Designed banners and social posts for the food drive launch.", "Approved"),
             (20, 8, 2, 1, "2026-04-30", 3, "Visual identity drafts for Youth Leadership Forum.", "Pending"),
 
-            (21, 9, 7, 3, "2026-04-05", 5, "Taught computer literacy to 20 women: email, Docs, WhatsApp Business.", "Approved"),
-            (22, 9, 4, 2, "2026-04-22", 3, "Outreach session at local university to recruit blood donors.", "Approved"),
-            (23, 9, 6, 3, "2026-05-02", 4, "Curriculum prep for entrepreneurship workshop modules.", "Pending"),
+            (21, 10, 7, 3, "2026-04-05", 5, "Taught computer literacy to 20 women: email, Docs, WhatsApp Business.", "Approved"),
+            (22,  9, 4, 2, "2026-04-22", 3, "Outreach session at local university to recruit blood donors.", "Approved"),
+            (23, 11, 6, 3, "2026-05-02", 4, "Curriculum prep for entrepreneurship workshop modules.", "Pending"),
 
             (24, 10, 5, 2, "2025-12-20", 8, "First aid support during long field day; monitored volunteer health.", "Approved"),
             (25, 10, 4, 2, "2026-04-25", 3, "Training session for new medical-support volunteers.", "Approved"),
@@ -484,7 +482,7 @@ def seed():
             (7,  5, 1, 1, "Participation", 8, "2026-03-20"),
             (8,  6, 2, 5, "Achievement",   8, "2025-12-28"),
             (9,  7, 2, 5, "Completion",    8, "2025-12-28"),
-            (10, 9, 3, 7, "Completion",    5, "2026-04-12"),
+            (10,10, 3, 7, "Completion",    5, "2026-04-12"),
             (11,10, 2, 5, "Completion",    8, "2025-12-28"),
         ]
         db.executemany(

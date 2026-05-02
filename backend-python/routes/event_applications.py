@@ -44,6 +44,19 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
         if not event:
             raise HTTPException(404, "Event not found")
 
+        org = dict_row(db.execute(
+            "SELECT student_only FROM organizations WHERE id = ?", (event["org_id"],)
+        ).fetchone())
+        if org and org.get("student_only"):
+            volunteer = dict_row(db.execute(
+                "SELECT education_level FROM volunteers WHERE id = ?", (vol["id"],)
+            ).fetchone())
+            if not volunteer or volunteer.get("education_level") != "University Student":
+                raise HTTPException(
+                    403,
+                    "Sorry, Enactus opportunities are only available for current university students.",
+                )
+
         existing = dict_row(db.execute(
             "SELECT id FROM event_applications WHERE volunteer_id = ? AND event_id = ?",
             (vol["id"], event_id),

@@ -155,6 +155,22 @@ export function BrowseOrganizations() {
                     <div style={{ height: 38, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#FEF3C7", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#B45309" }}>
                       ⏳ Application Pending
                     </div>
+                  ) : org.student_only && profile?.education_level !== "University Student" ? (
+                    <div>
+                      <button
+                        disabled
+                        style={{
+                          width: "100%", height: 38, backgroundColor: "#E2E8F0",
+                          color: "#94A3B8", border: "none", borderRadius: 8, fontSize: 13,
+                          fontWeight: 600, cursor: "not-allowed",
+                        }}
+                      >
+                        Join Organization
+                      </button>
+                      <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6, lineHeight: 1.4 }}>
+                        Sorry, Enactus opportunities are only available for current university students.
+                      </div>
+                    </div>
                   ) : (
                     <button
                       onClick={() => handleJoin(org.id)}
