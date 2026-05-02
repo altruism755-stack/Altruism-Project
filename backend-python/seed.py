@@ -3,7 +3,7 @@
 Volunteer fields are generated to satisfy the frontend validation rules in
 src/app/data/volunteerFormSchema.ts EXACTLY:
 
-  fullName       Arabic, ≥ 3 words (first + father + family)
+  fullName       Arabic or English, ≥ 3 words
   email          name.lastname@gmail.com pattern
   nationalId     Egyptian 14-digit format: C YY MM DD GG SSSS X
                  - C: century (2 = 1900s, 3 = 2000s)
@@ -145,8 +145,9 @@ def seed():
         )
 
         # ──────────── VOLUNTEERS ────────────
-        # Each row: form-compliant. Arabic 3-part names; NID encodes DOB + governorate
-        # of birth + gender (digit 13 even=F / odd=M); phones use 010/011/012/015.
+        # Each row: form-compliant. Names are Arabic or English (≥ 3 words each);
+        # NID encodes DOB + governorate of birth + gender (digit 13 even=F / odd=M);
+        # phones use 010/011/012/015.
         # (id, user_id, name, email, phone, city, skills, about_me, status, dob, governorate,
         #  national_id, gender, nationality, education_level, university_name, faculty,
         #  study_year, field_of_study, department, hours_per_week, languages,
@@ -172,7 +173,7 @@ def seed():
         AVAIL = ["Weekday afternoons", "Weekends"]
 
         volunteers = [
-            (1,  20, "يارا حسن محمد",          "yara.hassan@gmail.com",     "01212345678", "Alexandria",
+            (1,  20, "Yara Hassan Mohamed",      "yara.hassan@gmail.com",     "01212345678", "Alexandria",
              json.dumps(SKILLS["comm"]),
              "Passionate about community service and youth development since university.",
              "Active", "1999-07-15", "Alexandria",
@@ -204,7 +205,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (4,  23, "صوفيا أحمد الحسن",        "sofia.ahmed@gmail.com",     "01112223344", "Giza",
+            (4,  23, "Sofia Ahmed Hassan",       "sofia.ahmed@gmail.com",     "01112223344", "Giza",
              json.dumps(SKILLS["tech"]),
              "Software engineering student passionate about technology for social good.",
              "Active", "2002-05-30", "Giza",
@@ -224,7 +225,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(["Weekends"]),
              0, "", json.dumps([]), ""),
 
-            (6,  25, "هناء يوسف عبدالله",        "hana.youssef@gmail.com",    "01667788991", "Alexandria",
+            (6,  25, "Hana Youssef Abdullah",    "hana.youssef@gmail.com",    "01667788991", "Alexandria",
              json.dumps(SKILLS["ops"]),
              "Operations specialist ensuring smooth delivery of humanitarian aid.",
              "Active", "2001-02-18", "Alexandria",
@@ -256,7 +257,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(AVAIL),
              0, "", json.dumps([]), ""),
 
-            (9,  28, "عمر فاروق علي",            "omar.farouk@gmail.com",     "01500112233", "Mansoura",
+            (9,  28, "Omar Farouk Ali",          "omar.farouk@gmail.com",     "01500112233", "Mansoura",
              json.dumps(SKILLS["edu"]),
              "Education advocate teaching underprivileged children on weekends.",
              "Active", "1995-04-14", "Dakahlia",
@@ -279,7 +280,7 @@ def seed():
              0, "", json.dumps([]),
              "Mild dust allergy."),
 
-            (11, 30, "حسام عادل محمد",          "hossam.adel@gmail.com",     "01123344557", "Cairo",
+            (11, 30, "Hossam Adel Mohamed",      "hossam.adel@gmail.com",     "01123344557", "Cairo",
              json.dumps(SKILLS["lead"]),
              "Business student passionate about youth entrepreneurship.",
              "Active", "2000-01-20", "Cairo",
