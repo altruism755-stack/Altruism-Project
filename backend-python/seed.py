@@ -131,12 +131,12 @@ def seed():
 
         # ──────────── SUPERVISORS ────────────
         supervisors = [
-            (1, 10, "Dr. Amira Khalil",  "amira.khalil@resala.org",        "01011223344", "Programs",   1, "Active"),
-            (2, 11, "Mahmoud Hassan",    "mahmoud.hassan@resala.org",      "01122334455", "Media",      1, "Active"),
-            (3, 12, "Ahmed El-Masry",    "ahmed.elmasry@redcrescent.org",  "01044556677", "Field Teams",2, "Active"),
-            (4, 13, "Nourhan Ali",       "nourhan.ali@redcrescent.org",    "01245566778", "Medical",    2, "Active"),
-            (5, 14, "Sara Nabil",        "sara.nabil@enactus-egypt.org",   "01055667788", "Projects",   3, "Active"),
-            (6, 15, "Youssef Gamal",     "youssef.gamal@enactus-egypt.org","01556677889", "Mentorship", 3, "Active"),
+            (1, 10, "Dr. Amira Khalil",  "amirakhalil@resala.org",        "01011223344", "Programs",   1, "Active"),
+            (2, 11, "Mahmoud Hassan",    "mahmoudhassan@resala.org",      "01122334455", "Media",      1, "Active"),
+            (3, 12, "Ahmed El-Masry",    "ahmedelmasry@redcrescent.org",  "01044556677", "Field Teams",2, "Active"),
+            (4, 13, "Nourhan Ali",       "nourhanali@redcrescent.org",    "01245566778", "Medical",    2, "Active"),
+            (5, 14, "Sara Nabil",        "saranabil@enactus-egypt.org",   "01055667788", "Projects",   3, "Active"),
+            (6, 15, "Youssef Gamal",     "youssefgamal@enactus-egypt.org","01556677889", "Mentorship", 3, "Active"),
         ]
         db.executemany(
             "INSERT INTO supervisors (id, user_id, name, email, phone, team, org_id, status) "
@@ -543,9 +543,9 @@ def seed():
     print()
     print("Demo credentials:")
     print("  platform@altruism.org / Platform#1                 (platform admin)")
-    print("  sherif.aziz@resala.org / Admin#1234                (Resala admin)")
-    print("  amira.khalil@resala.org / Super#1234               (Resala supervisor)")
-    print("  yara.hassan@gmail.com / Vol#12345                  (volunteer demo)")
+    print("  sherifaziz@resala.org / Admin#1234                 (Resala admin)")
+    print("  amirakhalil@resala.org / Super#1234                (Resala supervisor)")
+    print("  yarahassan@gmail.com / Vol#12345                   (volunteer demo)")
 
 
 if __name__ == "__main__":
