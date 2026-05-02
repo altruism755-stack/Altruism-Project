@@ -347,10 +347,13 @@ def init_schema():
 
     # Full UTC timestamp at join time — higher precision than the date-only joined_date.
     # Format: YYYY-MM-DDTHH:MM:SSZ (ISO 8601 UTC, Power BI compatible).
+    # SQLite forbids non-constant defaults in ALTER TABLE ADD COLUMN, so we add
+    # the column without a default and backfill existing rows.
     try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN joined_at TEXT")
         conn.execute(
-            "ALTER TABLE org_volunteers ADD COLUMN joined_at TEXT "
-            "DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))"
+            "UPDATE org_volunteers SET joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') "
+            "WHERE joined_at IS NULL"
         )
     except Exception:
         pass
