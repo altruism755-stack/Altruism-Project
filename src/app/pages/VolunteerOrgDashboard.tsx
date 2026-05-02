@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router";
+import { useParams, useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
@@ -23,6 +23,7 @@ const certTypeColors: Record<string, { bg: string; text: string }> = {
 export function VolunteerOrgDashboard() {
   const { orgId } = useParams<{ orgId: string }>();
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const volName = profile?.name || "Volunteer";
   const volId = user?.id || 0;
 
@@ -74,10 +75,16 @@ export function VolunteerOrgDashboard() {
           <div style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid #E2E8F0", backgroundColor: "#F8FAFC" }}>
             <OrgLogoByName name={org.name} size={56} />
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 24, fontWeight: 600, color: "#1E293B", margin: 0 }}>{org.name}</h1>
             <div style={{ fontSize: 13, color: "#94A3B8" }}>{org.category || "Organization"}</div>
           </div>
+          <button
+            onClick={() => navigate(`/dashboard/org/${orgId}/profile`)}
+            style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#334155", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+          >
+            View Profile
+          </button>
         </div>
 
         {/* Stat cards */}

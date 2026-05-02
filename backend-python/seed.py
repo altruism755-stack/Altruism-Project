@@ -87,34 +87,47 @@ def seed():
         # ──────────── ORGANIZATIONS ────────────
         org_cols = (
             "id, name, description, category, color, secondary_color, initials, founded, "
-            "admin_user_id, status, org_type, founded_year, location, official_email, "
-            "submitter_name, submitter_role, student_only"
+            "website, phone, admin_user_id, status, org_type, founded_year, location, "
+            "official_email, submitter_name, submitter_role, student_only, "
+            "org_size, hq_city, branches, categories"
         )
-        ph = ", ".join(["?"] * 17)
+        ph = ", ".join(["?"] * 23)
         insert_org = f"INSERT INTO organizations ({org_cols}) VALUES ({ph})"
 
         db.execute(insert_org, (
             1, "Resala",
             "Egypt's largest volunteer organization dedicated to community support, "
             "youth empowerment, and food drives across all governorates.",
-            "Social Welfare", "#D97706", "#F59E0B", "RS", "1999-01-01", 1,
+            "Social Welfare", "#D97706", "#F59E0B", "RS", "1999-01-01",
+            "https://resala.org", "+20 2 2516 8888", 1,
             "approved", "NGO", "1999", "Cairo", "info@resala.org",
             "Sherif Abdel Aziz", "Executive Director", 0,
+            "501-1000", "Maadi",
+            json.dumps(["Cairo", "Alexandria", "Giza", "Mansoura", "Aswan"]),
+            json.dumps(["Social Welfare", "Food Security", "Youth Empowerment", "Community Outreach"]),
         ))
         db.execute(insert_org, (
             2, "Egyptian Red Crescent",
             "Humanitarian aid, disaster relief, and emergency health services across Egypt since 1912.",
-            "Humanitarian Aid", "#DC2626", "#EF4444", "RC", "1912-03-15", 3,
+            "Humanitarian Aid", "#DC2626", "#EF4444", "RC", "1912-03-15",
+            "https://egyptianrc.org", "+20 2 2575 0399", 3,
             "approved", "NGO", "1912", "Cairo", "info@egyptianrc.org",
             "Fatima El-Sayed", "Communications Director", 0,
+            "1000+", "Nasr City",
+            json.dumps(["Cairo", "Alexandria", "Luxor", "Aswan", "Sharm El Sheikh", "Hurghada"]),
+            json.dumps(["Humanitarian Aid", "Disaster Relief", "Healthcare", "Blood Donation"]),
         ))
         db.execute(insert_org, (
             3, "Enactus Egypt",
             "Student-run entrepreneurship organization empowering communities through "
             "social projects and sustainable business solutions.",
-            "Student Entrepreneurship", "#0891B2", "#06B6D4", "EN", "2004-09-01", 4,
+            "Student Entrepreneurship", "#0891B2", "#06B6D4", "EN", "2004-09-01",
+            "https://enactus-egypt.org", "+20 2 3760 1234", 4,
             "approved", "Student Activity", "2004", "Giza", "contact@enactus-egypt.org",
             "Mohamed Farouk", "Country Director", 1,
+            "201-500", "Dokki",
+            json.dumps(["Cairo", "Giza", "Alexandria", "Mansoura"]),
+            json.dumps(["Student Entrepreneurship", "Education", "Sustainability", "Innovation"]),
         ))
 
         # ──────────── ORG ADMINS ────────────

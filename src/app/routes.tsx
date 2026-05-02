@@ -11,6 +11,7 @@ import { SupervisorDashboard } from "./pages/SupervisorDashboard";
 import { VolunteerDetail } from "./pages/VolunteerDetail";
 import { ProfilePage } from "./pages/ProfilePage";
 import { VolunteerOrgDashboard } from "./pages/VolunteerOrgDashboard";
+import { VolunteerOrgProfile } from "./pages/VolunteerOrgProfile";
 import { NewsFeed } from "./pages/NewsFeed";
 import { BrowseOrganizations } from "./pages/BrowseOrganizations";
 import { OrgPendingPage } from "./pages/OrgPendingPage";
@@ -65,6 +66,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><ProfilePage /></ProtectedRoute> },
       { path: "/dashboard/orgs", element: <ProtectedRoute allowedRoles={["volunteer"]}><BrowseOrganizations /></ProtectedRoute> },
       { path: "/dashboard/org/:orgId", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgDashboard /></ProtectedRoute> },
+      { path: "/dashboard/org/:orgId/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgProfile /></ProtectedRoute> },
       { path: "/dashboard/feed", element: <ProtectedRoute allowedRoles={["volunteer"]}><NewsFeed /></ProtectedRoute> },
 
       // Catch-all

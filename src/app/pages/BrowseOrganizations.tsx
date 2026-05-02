@@ -103,6 +103,7 @@ export function BrowseOrganizations() {
             return (
               <div
                 key={org.id}
+                onClick={() => navigate(`/dashboard/org/${org.id}/profile`)}
                 style={{
                   backgroundColor: "#fff",
                   border: "1px solid #E2E8F0",
@@ -111,6 +112,16 @@ export function BrowseOrganizations() {
                   display: "flex",
                   flexDirection: "column",
                   boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+                  cursor: "pointer",
+                  transition: "box-shadow 0.15s, transform 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 20px rgba(0,0,0,0.09)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
                 }}
               >
                 {/* Accent bar */}
@@ -161,17 +172,19 @@ export function BrowseOrganizations() {
 
                   {/* Action buttons */}
                   <div style={{ display: "flex", gap: 8 }}>
-                    {/* View Profile button — always visible */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/org/${org.id}`); }}
-                      style={{
-                        flex: 1, height: 38, backgroundColor: "#fff",
-                        color: "#334155", border: "1.5px solid #E2E8F0", borderRadius: 8,
-                        fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      }}
-                    >
-                      View Profile
-                    </button>
+                    {/* View Dashboard button — only for members */}
+                    {status === "active" && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/org/${org.id}`); }}
+                        style={{
+                          flex: 1, height: 38, backgroundColor: GREEN,
+                          color: "#fff", border: "none", borderRadius: 8,
+                          fontSize: 13, fontWeight: 600, cursor: "pointer",
+                        }}
+                      >
+                        View Dashboard
+                      </button>
+                    )}
 
                     {/* Join / blocked button */}
                     {status === "none" && !(org.student_only && profile?.education_level !== "University Student") && (
