@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams } from "react-router";
 import { Navbar } from "../components/Navbar";
+import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
@@ -21,7 +22,6 @@ const certTypeColors: Record<string, { bg: string; text: string }> = {
 
 export function VolunteerOrgDashboard() {
   const { orgId } = useParams<{ orgId: string }>();
-  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const volName = profile?.name || "Volunteer";
   const volId = user?.id || 0;
@@ -43,14 +43,14 @@ export function VolunteerOrgDashboard() {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="volunteer" userName={volName} />
+      <Navbar role="volunteer" />
       <div className="flex-1 flex items-center justify-center"><p style={{ color: "#94A3B8" }}>Loading...</p></div>
     </div>
   );
 
   if (!data) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="volunteer" userName={volName} />
+      <Navbar role="volunteer" />
       <div className="flex-1 flex items-center justify-center"><p style={{ color: "#94A3B8" }}>Organization not found.</p></div>
     </div>
   );
@@ -65,13 +65,10 @@ export function VolunteerOrgDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="volunteer" userName={volName} />
+      <Navbar role="volunteer" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
-        {/* Back button + Org header */}
-        <button onClick={() => navigate("/dashboard/profile")} style={{ background: "none", border: "none", color: "#64748B", fontSize: 14, cursor: "pointer", marginBottom: 16, padding: 0 }}>
-          &larr; Back to Profile
-        </button>
+        <BackButton to="/dashboard/orgs" label="Organizations" />
 
         <div className="flex items-center gap-4" style={{ marginBottom: 24 }}>
           <div style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

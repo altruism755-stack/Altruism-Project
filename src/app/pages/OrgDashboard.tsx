@@ -1312,7 +1312,7 @@ export function OrgDashboard() {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="org" userName={orgName} />
+      <Navbar role="org" />
       <div className="flex-1 flex items-center justify-center"><p style={{ color: "#94A3B8" }}>Loading…</p></div>
     </div>
   );
@@ -1326,7 +1326,7 @@ export function OrgDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="org" userName={orgName} />
+      <Navbar role="org" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1400, margin: "0 auto", width: "100%" }}>
         {/* Page title */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams } from "react-router";
 import { Navbar } from "../components/Navbar";
+import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,7 +16,6 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 
 export function VolunteerDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { profile } = useAuth();
   const supName = profile?.name || "Supervisor";
 
@@ -51,7 +51,7 @@ export function VolunteerDetail() {
 
   if (loading || !volunteer) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="supervisor" userName={supName} />
+      <Navbar role="supervisor" />
       <div className="flex-1 flex items-center justify-center"><p style={{ color: "#94A3B8" }}>{loading ? "Loading..." : "Volunteer not found."}</p></div>
     </div>
   );
@@ -62,15 +62,10 @@ export function VolunteerDetail() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="supervisor" userName={supName} />
+      <Navbar role="supervisor" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
-        {/* Breadcrumb */}
-        <div className="mb-6" style={{ fontSize: 14 }}>
-          <button onClick={() => navigate("/supervisor")} style={{ color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: 0 }}>My Volunteers</button>
-          <span style={{ color: "#94A3B8", margin: "0 8px" }}>/</span>
-          <span style={{ color: "#64748B" }}>{volunteer.name}</span>
-        </div>
+        <BackButton to="/supervisor" label="My Volunteers" />
 
         <div className="flex gap-6">
           {/* Left - Profile card */}

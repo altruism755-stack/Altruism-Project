@@ -11,7 +11,7 @@ interface AuthContextType {
   token: string | null;
   profile: any;
   orgStatus: "pending" | "approved" | "rejected" | null;
-  login: (email: string, password: string) => Promise<{ ok: boolean; role?: string; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean }>;
+  login: (email: string, password: string) => Promise<{ ok: boolean; role?: string; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean; errorCode?: "invalid_credentials" | "not_activated" | "server_error" }>;
   register: (data: any) => Promise<{ ok: boolean; message?: string; orgStatus?: string }>;
   logout: () => void;
   isLoading: boolean;
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else sessionStorage.removeItem("altruism_profile");
   }, [profile]);
 
-  const login = async (email: string, password: string): Promise<{ ok: boolean; role?: User["role"]; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean }> => {
+  const login = async (email: string, password: string): Promise<{ ok: boolean; role?: User["role"]; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean; errorCode?: "invalid_credentials" | "not_activated" | "server_error" }> => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
@@ -86,6 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
         return { ok: true, role: data.user?.role, orgStatus: status, isPlatformAdmin: data.user?.is_platform_admin };
       }
+      // Parse the backend error detail to pick an error code
+      let errorCode: "invalid_credentials" | "not_activated" | "server_error" = "invalid_credentials";
+      try {
+        const errData = await res.json();
+        const detail: string = errData?.detail ?? "";
+        if (detail.toLowerCase().includes("not yet activated")) errorCode = "not_activated";
+      } catch { /* ignore parse failure */ }
+      setIsLoading(false);
+      return { ok: false, errorCode };
     } catch {
       // Backend unavailable — use demo fallback
     }
@@ -104,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoading(false);
-    return { ok: false };
+    return { ok: false, errorCode: "server_error" };
   };
 
   const register = async (data: any): Promise<{ ok: boolean; message?: string; orgStatus?: string }> => {

@@ -55,14 +55,14 @@ export function VolunteerDashboard() {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="volunteer" userName={volName} />
+      <Navbar role="volunteer" />
       <div className="flex-1 flex items-center justify-center"><p style={{ color: "#94A3B8" }}>Loading...</p></div>
     </div>
   );
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="volunteer" userName={volName} />
+      <Navbar role="volunteer" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
         {/* Stat cards */}

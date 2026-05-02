@@ -63,7 +63,7 @@ export function LogActivityPage() {
   if (submitted) {
     return (
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-        <Navbar role="volunteer" userName={volName} />
+        <Navbar role="volunteer" />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center" style={{ textAlign: "center" }}>
             <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 16 }}>✅</div>
@@ -81,7 +81,7 @@ export function LogActivityPage() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="volunteer" userName={volName} />
+      <Navbar role="volunteer" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
         {/* Breadcrumb */}

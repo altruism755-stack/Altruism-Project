@@ -33,12 +33,31 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validate = (): boolean => {
+    const errs: { email?: string; password?: string } = {};
+    if (!email.trim()) errs.email = "Email is required.";
+    else if (!EMAIL_RE.test(email)) errs.email = "Please enter a valid email address.";
+    if (!password) errs.password = "Password is required.";
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const FORM_ERROR_MESSAGES = {
+    invalid_credentials: "Incorrect email or password. Please try again.",
+    not_activated: "Your account hasn't been activated yet. Check your email for an invitation link to set your password.",
+    server_error: "Something went wrong. Please try again in a moment.",
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(false);
+    setFormError(null);
+    if (!validate()) return;
     const result = await login(email, password);
     if (result.ok) {
       if (result.isPlatformAdmin) navigate("/platform-admin");
@@ -49,7 +68,7 @@ export function LoginPage() {
       else if (result.role === "supervisor") navigate("/supervisor");
       else navigate("/dashboard/profile");
     } else {
-      setError(true);
+      setFormError(FORM_ERROR_MESSAGES[result.errorCode ?? "invalid_credentials"]);
     }
   };
 
@@ -62,14 +81,6 @@ export function LoginPage() {
         </a>
       </nav>
 
-      {/* Error banner */}
-      {error && (
-        <div className="flex items-center justify-between px-6" style={{ backgroundColor: "#FEE2E2", borderLeft: "4px solid #DC2626", minHeight: 48, fontSize: 14, color: "#991B1B" }}>
-          <span>Login unsuccessful. Please check your email and password.</span>
-          <button onClick={() => setError(false)} style={{ background: "none", border: "none", color: "#991B1B", fontSize: 18, cursor: "pointer" }}>×</button>
-        </div>
-      )}
-
       <div className="flex-1 flex items-center justify-center py-12 px-4">
         <div style={{ width: 440, backgroundColor: "#FFFFFF", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.08)", padding: 40 }}>
           {/* Logo */}
@@ -78,16 +89,26 @@ export function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            {formError && (
+              <div role="alert" style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "#FFF1F2", border: "1px solid #FECDD3", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#9F1239" }}>
+                <span style={{ fontSize: 15, lineHeight: 1, marginTop: 1, flexShrink: 0 }}>⚠</span>
+                <span style={{ flex: 1, lineHeight: 1.5 }}>{formError}</span>
+                <button type="button" onClick={() => setFormError(null)} aria-label="Dismiss" style={{ background: "none", border: "none", color: "#9F1239", fontSize: 16, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1">
               <label style={{ fontSize: 13, color: "#1E293B", fontWeight: 500 }}>Email</label>
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setFieldErrors(prev => ({ ...prev, email: undefined })); setFormError(null); }}
                 onFocus={() => setFocusedField("email")}
                 onBlur={() => setFocusedField(null)}
-                style={{ width: "100%", height: 42, border: focusedField === "email" ? "1.5px solid #2563EB" : "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                aria-invalid={!!fieldErrors.email}
+                style={{ width: "100%", height: 42, border: fieldErrors.email ? "1.5px solid #F87171" : focusedField === "email" ? "1.5px solid #2563EB" : "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
               />
+              {fieldErrors.email && <span style={{ fontSize: 12, color: "#DC2626", marginTop: 2 }}>{fieldErrors.email}</span>}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -96,10 +117,11 @@ export function LoginPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setFieldErrors(prev => ({ ...prev, password: undefined })); setFormError(null); }}
                   onFocus={() => setFocusedField("password")}
                   onBlur={() => setFocusedField(null)}
-                  style={{ width: "100%", height: 42, border: focusedField === "password" ? "1.5px solid #2563EB" : "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 40px 0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                  aria-invalid={!!fieldErrors.password}
+                  style={{ width: "100%", height: 42, border: fieldErrors.password ? "1.5px solid #F87171" : focusedField === "password" ? "1.5px solid #2563EB" : "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 40px 0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
@@ -107,6 +129,7 @@ export function LoginPage() {
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
+              {fieldErrors.password && <span style={{ fontSize: 12, color: "#DC2626", marginTop: 2 }}>{fieldErrors.password}</span>}
             </div>
 
             <div className="flex items-center justify-between">

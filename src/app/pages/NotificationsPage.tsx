@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
+import { BackButton } from "../components/BackButton";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
 
@@ -107,9 +108,10 @@ export function NotificationsPage() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#0F172A" }}>
-      <Navbar role="org" userName={user?.email ?? ""} />
+      <Navbar role="org" />
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "32px 16px" }}>
+        <BackButton to="/org" label="Dashboard" />
         {/* Page header */}
         <div
           style={{

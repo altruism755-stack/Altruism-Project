@@ -219,7 +219,7 @@ export function OrgProfilePage() {
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", backgroundColor: BG, fontFamily: "Inter, system-ui, sans-serif" }}>
-        <Navbar role="org" userName={orgName} />
+        <Navbar role="org" />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
           <p style={{ color: MUTED, fontSize: 14 }}>Loading…</p>
         </div>
@@ -240,7 +240,7 @@ export function OrgProfilePage() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: BG, fontFamily: "Inter, system-ui, sans-serif" }}>
-      <Navbar role="org" userName={orgName} />
+      <Navbar role="org" />
 
       <div style={{ maxWidth: 920, margin: "0 auto", padding: "32px 24px 64px" }}>
 
