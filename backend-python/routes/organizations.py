@@ -24,7 +24,7 @@ DUPLICATE_STRATEGIES = {"skip_duplicates", "update_existing", "invite_anyway"}
 
 # Canonical join_source values for analytics/Power BI compatibility.
 # Any unrecognized value from CSV import is coerced to "other".
-VALID_JOIN_SOURCES = {"website", "referral", "campaign", "other"}
+VALID_JOIN_SOURCES = {"website", "referral", "campaign", "other", "manual"}
 
 # Incremented when the export schema gains new columns.
 # Power BI dashboards can filter on this to detect stale cached exports.
@@ -54,6 +54,15 @@ class AddOrgAdminBody(BaseModel):
 class ImportCSVBody(BaseModel):
     csv: str
     duplicate_strategy: str = "skip_duplicates"
+
+
+class AddVolunteerManuallyBody(BaseModel):
+    name: str
+    email: str
+    phone: str
+    city: str
+    skills: str = ""
+    notes: str = ""
 
 
 def _make_invite_link(token: str) -> str:
@@ -755,7 +764,8 @@ def get_organization(org_id: int):
 def get_org_members(org_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         volunteers = dict_rows(db.execute(
-            "SELECT v.*, ov.department, ov.status as org_status, ov.joined_date, s.name as supervisor_name "
+            "SELECT v.*, ov.department, ov.status as org_status, ov.joined_date, "
+            "ov.join_source, s.name as supervisor_name "
             "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
             "LEFT JOIN supervisors s ON ov.supervisor_id = s.id WHERE ov.org_id = ?",
             (org_id,),
@@ -1109,3 +1119,76 @@ def remove_org_member(
             (org_id, vol_id),
         )
         return {"message": "Volunteer removed from organization"}
+
+
+@router.post("/{org_id}/add-volunteer-manually", status_code=201)
+def add_volunteer_manually(
+    org_id: int,
+    body: AddVolunteerManuallyBody,
+    current_user: dict = Depends(require_roles("org_admin")),
+):
+    name  = body.name.strip()
+    email = body.email.strip().lower()
+    phone = body.phone.strip()
+    city  = body.city.strip()
+
+    if not name:
+        raise HTTPException(422, "Full name is required")
+    if not email or not _EMAIL_RE.match(email):
+        raise HTTPException(422, "A valid email address is required")
+    if not phone:
+        raise HTTPException(422, "Phone number is required")
+    if not city:
+        raise HTTPException(422, "City is required")
+
+    _now = _utcnow()
+
+    with get_db() as db:
+        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        if not org:
+            raise HTTPException(404, "Organization not found")
+
+        user = dict_row(db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone())
+
+        if user:
+            volunteer = dict_row(db.execute(
+                "SELECT id FROM volunteers WHERE user_id = ?", (user["id"],)
+            ).fetchone())
+            if not volunteer:
+                cur = db.execute(
+                    "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+                    (user["id"], name, email, phone, city, body.skills),
+                )
+                volunteer_id = cur.lastrowid
+            else:
+                volunteer_id = volunteer["id"]
+
+            existing = dict_row(db.execute(
+                "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                (org_id, volunteer_id),
+            ).fetchone())
+            if existing:
+                raise HTTPException(409, "This volunteer is already a member of your organization")
+        else:
+            cur = db.execute(
+                "INSERT INTO users (email, password, role) VALUES (?, '', 'volunteer')",
+                (email,),
+            )
+            user_id = cur.lastrowid
+            cur = db.execute(
+                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+                (user_id, name, email, phone, city, body.skills),
+            )
+            volunteer_id = cur.lastrowid
+
+        db.execute(
+            "INSERT INTO org_volunteers "
+            "(org_id, volunteer_id, status, is_active, join_source, source, "
+            " city_snapshot, joined_at, added_by_admin_id, notes) "
+            "VALUES (?, ?, 'Active', 1, 'manual', 'manual', ?, ?, ?, ?)",
+            (org_id, volunteer_id, city, _now, current_user["id"], body.notes),
+        )
+
+        return {"message": "Volunteer added successfully (Manual)", "volunteer_id": volunteer_id}

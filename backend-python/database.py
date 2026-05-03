@@ -375,6 +375,16 @@ def init_schema():
     except Exception:
         pass
 
+    # Manual volunteer addition tracking
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN added_by_admin_id INTEGER")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN notes TEXT DEFAULT ''")
+    except Exception:
+        pass
+
     # Timestamp when an activity was reviewed (approved or rejected).
     # Required for days_to_review metric in the analytics star schema.
     try:

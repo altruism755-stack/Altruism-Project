@@ -190,15 +190,10 @@ export const api = {
     request(`/organizations/${orgId}/members/${volId}/reject`, { method: "PUT" }),
   removeOrgMember: (orgId: number, volId: number) =>
     request(`/organizations/${orgId}/members/${volId}`, { method: "DELETE" }),
-  importVolunteersCSV: (orgId: number, csv: string, duplicate_strategy = "skip_duplicates") =>
-    request(`/organizations/${orgId}/import-csv`, {
+  addVolunteerManually: (orgId: number, data: { name: string; email: string; phone: string; city: string; skills: string; notes: string }) =>
+    request(`/organizations/${orgId}/add-volunteer-manually`, {
       method: "POST",
-      body: JSON.stringify({ csv, duplicate_strategy }),
-    }),
-  previewVolunteersCSV: (orgId: number, csv: string, duplicate_strategy = "skip_duplicates") =>
-    request(`/organizations/${orgId}/import-csv/preview`, {
-      method: "POST",
-      body: JSON.stringify({ csv, duplicate_strategy }),
+      body: JSON.stringify(data),
     }),
   acceptInvite: (token: string, password: string) =>
     request("/auth/accept-invite", { method: "POST", body: JSON.stringify({ token, password }) }),
