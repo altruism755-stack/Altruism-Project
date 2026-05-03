@@ -150,16 +150,6 @@ export function LoginPage() {
               <span style={{ fontSize: 14, color: "#64748B" }}>Don't have an account? </span>
               <a onClick={() => navigate("/register")} style={{ fontSize: 14, color: GREEN, fontWeight: 500, cursor: "pointer", textDecoration: "none" }}>Sign up →</a>
             </div>
-
-            <div style={{ marginTop: 4, backgroundColor: "#F8FAFC", borderRadius: 8, padding: "12px 14px", fontSize: 12, color: "#64748B", lineHeight: 1.8 }}>
-              <strong style={{ color: "#1E293B" }}>Demo accounts:</strong><br />
-              volunteer@example.com / <strong>volunteer</strong> — Volunteer<br />
-              admin@resala.org / <strong>admin</strong> — Org Admin (approved)<br />
-              pending@org.com / <strong>pending</strong> — Org Admin (pending)<br />
-              rejected@org.com / <strong>rejected</strong> — Org Admin (rejected)<br />
-              amira@resala.org / <strong>supervisor</strong> — Supervisor<br />
-              platform@altruism.org / <strong>platform</strong> — Platform Admin
-            </div>
           </form>
         </div>
       </div>
