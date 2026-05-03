@@ -375,6 +375,13 @@ def init_schema():
     except Exception:
         pass
 
+    # Timestamp when an activity was reviewed (approved or rejected).
+    # Required for days_to_review metric in the analytics star schema.
+    try:
+        conn.execute("ALTER TABLE activities ADD COLUMN reviewed_at TEXT")
+    except Exception:
+        pass
+
     # Role column on org_admins — future-ready for creator/admin distinction.
     # Existing rows default to 'admin'; registration path sets 'creator' explicitly.
     try:

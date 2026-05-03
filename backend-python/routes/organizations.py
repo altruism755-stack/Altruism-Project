@@ -828,10 +828,18 @@ def approve_org_member(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
+        vol = dict_row(db.execute(
+            "SELECT governorate, city FROM volunteers WHERE id = ?", (vol_id,)
+        ).fetchone())
+        gov_snap = (vol or {}).get("governorate") or ""
+        city_snap = (vol or {}).get("city") or ""
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', is_active = ?, supervisor_id = ?, department = ? "
+            "UPDATE org_volunteers SET status = 'Active', is_active = ?, supervisor_id = ?, department = ?, "
+            "joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), "
+            "governorate_snapshot = ?, city_snapshot = ? "
             "WHERE org_id = ? AND volunteer_id = ?",
-            (_is_active("Active"), body.get("supervisor_id"), body.get("department"), org_id, vol_id),
+            (_is_active("Active"), body.get("supervisor_id"), body.get("department"),
+             gov_snap, city_snap, org_id, vol_id),
         )
         return {"message": "Volunteer approved"}
 

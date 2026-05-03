@@ -150,10 +150,18 @@ def approve_request(vol_id: int, body: dict, current_user: dict = Depends(requir
     """Supervisor approves a pending volunteer join request for their org."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
+        vol = dict_row(db.execute(
+            "SELECT governorate, city FROM volunteers WHERE id = ?", (vol_id,)
+        ).fetchone())
+        gov_snap = (vol or {}).get("governorate") or ""
+        city_snap = (vol or {}).get("city") or ""
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', supervisor_id = ?, department = ? "
+            "UPDATE org_volunteers SET status = 'Active', supervisor_id = ?, department = ?, "
+            "is_active = 1, joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), "
+            "governorate_snapshot = ?, city_snapshot = ? "
             "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
-            (body.get("supervisor_id") or sup["id"], body.get("department", ""), sup["org_id"], vol_id),
+            (body.get("supervisor_id") or sup["id"], body.get("department", ""),
+             gov_snap, city_snap, sup["org_id"], vol_id),
         )
         return {"message": "Volunteer approved"}
 

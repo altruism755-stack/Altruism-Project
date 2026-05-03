@@ -12,6 +12,7 @@ export function ReportsPage() {
   const [summary, setSummary] = useState<any>(null);
   const [report, setReport] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingSchema, setExportingSchema] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -42,6 +43,26 @@ export function ReportsPage() {
     } catch (e) { console.error("Failed to export CSV:", e); }
   };
 
+  const handleExportStarSchema = async () => {
+    if (exportingSchema) return;
+    setExportingSchema(true);
+    try {
+      const { blob, filename } = await api.exportStarSchema();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Failed to export star schema:", e);
+    } finally {
+      setExportingSchema(false);
+    }
+  };
+
   const totalHours = summary?.totalHours || 0;
   const activeVolunteers = summary?.totalVolunteers || 0;
   const completedEvents = summary?.completedEvents || 0;
@@ -68,6 +89,14 @@ export function ReportsPage() {
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ height: 42, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }} />
           <button onClick={handleFilter} style={{ height: 42, padding: "0 20px", backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Filter</button>
           <button onClick={handleExportCSV} style={{ height: 42, padding: "0 20px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", marginLeft: "auto" }}>Export CSV</button>
+          <button
+            onClick={handleExportStarSchema}
+            disabled={exportingSchema}
+            style={{ height: 42, padding: "0 20px", backgroundColor: exportingSchema ? "#F1F5F9" : "#0F172A", color: exportingSchema ? "#94A3B8" : "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: exportingSchema ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8 }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            {exportingSchema ? "Exporting…" : "Export Star Schema"}
+          </button>
         </div>
 
         {/* Summary cards */}

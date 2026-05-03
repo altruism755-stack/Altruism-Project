@@ -94,7 +94,7 @@ def approve_activity(
                 reviewer_id = sup["id"]
 
         db.execute(
-            "UPDATE activities SET status = 'Approved', reviewed_by = ? WHERE id = ?",
+            "UPDATE activities SET status = 'Approved', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reviewer_id, activity_id),
         )
         return {"message": "Activity approved"}
@@ -115,7 +115,7 @@ def reject_activity(
                 reviewer_id = sup["id"]
 
         db.execute(
-            "UPDATE activities SET status = 'Rejected', reviewed_by = ? WHERE id = ?",
+            "UPDATE activities SET status = 'Rejected', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reviewer_id, activity_id),
         )
         return {"message": "Activity rejected"}
