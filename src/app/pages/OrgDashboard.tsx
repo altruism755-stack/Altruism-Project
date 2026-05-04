@@ -279,17 +279,56 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
 // ─── Activities tab ────────────────────────────────────────────────────────────
 const emptyForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming" };
 
-function ActivitiesTab({ events, onRefresh }: { events: any[]; onRefresh: () => void }) {
-  const [sub, setSub] = useState<"Upcoming" | "Active" | "Completed">("Upcoming");
+function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh: () => void; orgId: number }) {
+  const [sub, setSub] = useState<"Upcoming" | "Active" | "Completed" | "Applications">("Upcoming");
   const [showPanel, setShowPanel] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
+  // Event applications state
+  const [applications, setApplications] = useState<any[]>([]);
+  const [appsLoaded, setAppsLoaded] = useState(false);
+  const [appBusy, setAppBusy] = useState<number | null>(null);
+
+  const loadApplications = useCallback(async () => {
+    if (!orgId) return;
+    try {
+      const res = await api.getOrgEventApplications(orgId);
+      setApplications(res.applications || []);
+    } catch (e) { console.error("Failed to load applications:", e); }
+    setAppsLoaded(true);
+  }, [orgId]);
+
+  useEffect(() => {
+    if (sub === "Applications" && !appsLoaded) loadApplications();
+  }, [sub, appsLoaded, loadApplications]);
+
+  const pendingApps = applications.filter((a) => a.status === "Pending");
+
+  const doApproveApp = async (id: number) => {
+    setAppBusy(id);
+    try {
+      await api.approveApplication(id);
+      setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "Approved" } : a));
+    } catch (e) { console.error(e); }
+    setAppBusy(null);
+  };
+
+  const doRejectApp = async (id: number) => {
+    setAppBusy(id);
+    try {
+      await api.rejectApplication(id);
+      setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "Rejected" } : a));
+    } catch (e) { console.error(e); }
+    setAppBusy(null);
+  };
+
   const byStatus = events.filter((e) => e.status === sub);
   const counts = { Upcoming: events.filter((e) => e.status === "Upcoming").length, Active: events.filter((e) => e.status === "Active").length, Completed: events.filter((e) => e.status === "Completed").length };
 
   const openCreate = () => { setEditing(null); setForm({ ...emptyForm, status: sub === "Active" ? "Active" : "Upcoming" }); setShowPanel(true); };
+
   const openEdit = (ev: any) => {
     setEditing(ev);
     setForm({ name: ev.name, description: ev.description || "", location: ev.location || "", date: ev.date, time: ev.time || "", duration: String(ev.duration || ""), maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "", status: ev.status });
@@ -373,18 +412,97 @@ function ActivitiesTab({ events, onRefresh }: { events: any[]; onRefresh: () => 
               </button>
             );
           })}
+          <button onClick={() => setSub("Applications")} style={{
+            padding: "8px 18px", background: "none", border: "none", cursor: "pointer",
+            fontSize: 14, fontWeight: sub === "Applications" ? 600 : 400,
+            color: sub === "Applications" ? "#D97706" : "#64748B",
+            borderBottom: sub === "Applications" ? "2px solid #D97706" : "2px solid transparent",
+            marginBottom: -2,
+          }}>
+            Applications
+            {pendingApps.length > 0 && (
+              <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, backgroundColor: sub === "Applications" ? "#FEF3C7" : "#FEF3C7", color: "#B45309", borderRadius: 20, padding: "2px 7px" }}>{pendingApps.length}</span>
+            )}
+          </button>
         </div>
-        <button onClick={openCreate} style={{ height: 36, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Add Activity</button>
+        {sub !== "Applications" && (
+          <button onClick={openCreate} style={{ height: 36, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ Add Activity</button>
+        )}
       </div>
 
+      {/* Applications tab */}
+      {sub === "Applications" && (
+        <div>
+          {!appsLoaded ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Loading applications…</div>
+          ) : applications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14" style={{ backgroundColor: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", color: "#94A3B8" }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#64748B", marginBottom: 4 }}>No event applications yet</div>
+              <div style={{ fontSize: 13 }}>When volunteers apply to join your events, they'll appear here.</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {/* Group by status: Pending first */}
+              {["Pending", "Approved", "Rejected"].map((status) => {
+                const group = applications.filter((a) => a.status === status);
+                if (group.length === 0) return null;
+                const statusStyle: Record<string, { bg: string; text: string; band: string }> = {
+                  Pending:  { bg: "#FEF3C7", text: "#B45309", band: "#F59E0B" },
+                  Approved: { bg: "#DCFCE7", text: "#15803D", band: "#16A34A" },
+                  Rejected: { bg: "#FEE2E2", text: "#B91C1C", band: "#DC2626" },
+                };
+                const ss = statusStyle[status];
+                return (
+                  <div key={status}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                      {status} ({group.length})
+                    </div>
+                    {group.map((app: any) => (
+                      <div key={app.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderLeft: `4px solid ${ss.band}`, borderRadius: 10, padding: "14px 16px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#1E293B" }}>{app.volunteer_name}</div>
+                          <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                            Applied to: <strong>{app.event_name}</strong>
+                            {app.applied_date ? ` · ${app.applied_date.split("T")[0]}` : ""}
+                          </div>
+                          {app.volunteer_email && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{app.volunteer_email}</div>}
+                        </div>
+                        <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: ss.bg, color: ss.text, borderRadius: 20, padding: "3px 10px" }}>{status}</span>
+                          {status === "Pending" && (
+                            <>
+                              <button
+                                onClick={() => doApproveApp(app.id)}
+                                disabled={appBusy === app.id}
+                                style={{ height: 30, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: appBusy === app.id ? 0.6 : 1 }}
+                              >{appBusy === app.id ? "…" : "Accept"}</button>
+                              <button
+                                onClick={() => doRejectApp(app.id)}
+                                disabled={appBusy === app.id}
+                                style={{ height: 30, padding: "0 14px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer", opacity: appBusy === app.id ? 0.6 : 1 }}
+                              >Reject</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Cards */}
-      {byStatus.length === 0 ? (
+      {sub !== "Applications" && byStatus.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14" style={{ backgroundColor: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", color: "#94A3B8" }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}>{sub === "Upcoming" ? "📅" : sub === "Active" ? "⚡" : "✅"}</div>
-          <div style={{ fontSize: 14 }}>No {actStatus[sub].label.toLowerCase()} activities</div>
+          <div style={{ fontSize: 14 }}>No {actStatus[sub as "Upcoming" | "Active" | "Completed"].label.toLowerCase()} activities</div>
           {sub !== "Completed" && <button onClick={openCreate} style={{ marginTop: 12, height: 36, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Create Activity</button>}
         </div>
-      ) : (
+      ) : sub !== "Applications" && (
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
           {byStatus.map((ev) => {
             const m = actStatus[ev.status as "Upcoming" | "Active" | "Completed"] || actStatus.Completed;
@@ -971,7 +1089,7 @@ export function OrgDashboard() {
               <SupervisorsTab supervisors={supervisors} onRefresh={loadAll} />
             )}
             {tab === "activities" && (
-              <ActivitiesTab events={events} onRefresh={loadAll} />
+              <ActivitiesTab events={events} onRefresh={loadAll} orgId={orgId} />
             )}
             {tab === "admins" && (
               <OrgAdminsTab

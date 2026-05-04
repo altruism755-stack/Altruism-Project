@@ -260,6 +260,7 @@ export const api = {
 
   // Event Applications
   getEventApplications: () => request("/event-applications"),
+  getOrgEventApplications: (orgId: number) => request(`/event-applications/org/${orgId}`),
   applyToEvent: (eventId: number) =>
     request("/event-applications", { method: "POST", body: JSON.stringify({ event_id: eventId }) }),
   approveApplication: (appId: number) =>

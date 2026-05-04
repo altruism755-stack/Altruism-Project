@@ -839,7 +839,8 @@ def approve_org_member(
 ):
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT governorate, city FROM volunteers WHERE id = ?", (vol_id,)
+            "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
+            "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = ?", (vol_id,)
         ).fetchone())
         gov_snap = (vol or {}).get("governorate") or ""
         city_snap = (vol or {}).get("city") or ""
@@ -851,6 +852,19 @@ def approve_org_member(
             (_is_active("Active"), body.get("supervisor_id"), body.get("department"),
              gov_snap, city_snap, org_id, vol_id),
         )
+        # Notify volunteer
+        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org_name = (org or {}).get("name", "the organization")
+        if vol and vol.get("user_id"):
+            create_notification(
+                db,
+                vol["user_id"],
+                "member_approved",
+                "Membership Approved",
+                f"You have been accepted as a volunteer at {org_name}. You can now log activities!",
+                f"/dashboard/org/{org_id}",
+            )
+        db.commit()
         return {"message": "Volunteer approved"}
 
 
@@ -861,10 +875,27 @@ def reject_org_member(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
+        # Get volunteer user_id before deleting
+        vol = dict_row(db.execute(
+            "SELECT v.user_id FROM volunteers v WHERE v.id = ?", (vol_id,)
+        ).fetchone())
         db.execute(
             "DELETE FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
             (org_id, vol_id),
         )
+        # Notify volunteer
+        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org_name = (org or {}).get("name", "the organization")
+        if vol and vol.get("user_id"):
+            create_notification(
+                db,
+                vol["user_id"],
+                "member_rejected",
+                "Membership Request Declined",
+                f"Your request to join {org_name} was not accepted at this time.",
+                "/dashboard/orgs",
+            )
+        db.commit()
         return {"message": "Request rejected"}
 
 

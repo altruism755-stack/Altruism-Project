@@ -27,6 +27,11 @@ export function SupervisorDashboard() {
   const [acceptForm, setAcceptForm] = useState({ supervisor_id: "", department: "" });
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
 
+  // Certificate modal state
+  const [certActivity, setCertActivity] = useState<any | null>(null);
+  const [certForm, setCertForm] = useState({ type: "Participation" });
+  const [certBusy, setCertBusy] = useState(false);
+
   const loadAll = useCallback(async () => {
     try {
       const [profileRes, volsRes, pendingRes, actsRes, evtsRes] = await Promise.all([
@@ -74,6 +79,24 @@ export function SupervisorDashboard() {
       await api.approveActivity(id);
       setActivities((a) => a.filter((act) => act.id !== id));
     } catch (e) { console.error("Approve activity failed:", e); }
+  };
+
+  const handleApproveAndCertify = async () => {
+    if (!certActivity) return;
+    setCertBusy(true);
+    try {
+      await api.approveActivity(certActivity.id);
+      await api.issueCertificate({
+        volunteer_id: certActivity.volunteer_id,
+        org_id: certActivity.org_id,
+        event_id: certActivity.event_id,
+        type: certForm.type,
+        hours: certActivity.hours,
+      });
+      setActivities((a) => a.filter((act) => act.id !== certActivity.id));
+      setCertActivity(null);
+    } catch (e) { console.error("Approve+certify failed:", e); }
+    setCertBusy(false);
   };
 
   const handleRejectActivity = async (id: number) => {
@@ -175,7 +198,7 @@ export function SupervisorDashboard() {
                   All active volunteers in <strong>{org?.name}</strong>. Click a volunteer to view their profile.
                 </div>
                 {volunteers.length === 0 ? (
-                  <EmptyState label="No active volunteers in this organization yet." />
+                  <EmptyState label="No active volunteers yet. Accept pending requests to onboard your first volunteers." />
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
                     {volunteers.map((v) => (
@@ -293,6 +316,11 @@ export function SupervisorDashboard() {
                           </div>
                           <div className="flex gap-2" style={{ flexShrink: 0 }}>
                             <button onClick={() => handleApproveActivity(a.id)} style={{ height: 32, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve</button>
+                            <button
+                              onClick={() => { setCertActivity(a); setCertForm({ type: "Participation" }); }}
+                              title="Approve and issue certificate"
+                              style={{ height: 32, padding: "0 14px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                            >+ Certificate</button>
                             <button onClick={() => handleRejectActivity(a.id)} style={{ height: 32, padding: "0 14px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Reject</button>
                           </div>
                         </div>
@@ -307,40 +335,51 @@ export function SupervisorDashboard() {
             {tab === "events" && (
               <div>
                 <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
-                  All activities for <strong>{org?.name}</strong>.
+                  Events for <strong>{org?.name}</strong>. Volunteers who attend should log their hours after each event.
                 </div>
                 {events.length === 0 ? (
-                  <EmptyState label="No events found." />
+                  <EmptyState label="No events found for your organization." />
                 ) : (
                   <div className="flex flex-col gap-3">
                     {events.map((e) => {
-                      const statusStyle: Record<string, { bg: string; color: string }> = {
-                        Upcoming: { bg: "#DBEAFE", color: "#1D4ED8" },
-                        Active: { bg: "#DCFCE7", color: "#15803D" },
-                        Completed: { bg: "#F1F5F9", color: "#475569" },
+                      const statusStyle: Record<string, { bg: string; color: string; band: string }> = {
+                        Upcoming: { bg: "#DBEAFE", color: "#1D4ED8", band: "#2563EB" },
+                        Active:   { bg: "#DCFCE7", color: "#15803D", band: GREEN },
+                        Completed:{ bg: "#F1F5F9", color: "#475569", band: "#94A3B8" },
                       };
                       const st = statusStyle[e.status] || statusStyle.Upcoming;
+                      const fillPct = e.max_volunteers > 0 ? Math.min(100, Math.round(((e.current_volunteers || 0) / e.max_volunteers) * 100)) : 0;
                       return (
-                        <div key={e.id} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 16 }}>
+                        <div key={e.id} style={{ border: "1px solid #E2E8F0", borderLeft: `4px solid ${st.band}`, borderRadius: 10, padding: 16 }}>
                           <div className="flex items-start justify-between gap-4">
-                            <div>
+                            <div style={{ flex: 1 }}>
                               <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
                                 <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{e.name}</div>
                                 <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: st.bg, color: st.color, borderRadius: 4, padding: "2px 8px" }}>{e.status}</span>
                               </div>
                               <div style={{ fontSize: 13, color: "#64748B" }}>
                                 {e.date}{e.time ? ` · ${e.time}` : ""}
-                                {e.location ? ` · ${e.location}` : ""}
+                                {e.location ? ` · 📍 ${e.location}` : ""}
                                 {e.duration ? ` · ${e.duration} hrs` : ""}
                               </div>
                               {e.description && (
-                                <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6 }}>{e.description.slice(0, 100)}{e.description.length > 100 ? "…" : ""}</div>
+                                <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6 }}>{e.description.slice(0, 120)}{e.description.length > 120 ? "…" : ""}</div>
+                              )}
+                              {e.max_volunteers > 0 && (
+                                <div style={{ marginTop: 10 }}>
+                                  <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+                                    <span style={{ fontSize: 12, color: "#64748B" }}>Volunteer Capacity</span>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}>{e.current_volunteers || 0} / {e.max_volunteers}</span>
+                                  </div>
+                                  <div style={{ height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${fillPct}%`, backgroundColor: fillPct >= 90 ? "#DC2626" : fillPct >= 60 ? "#D97706" : GREEN, borderRadius: 3, transition: "width 300ms" }} />
+                                  </div>
+                                </div>
                               )}
                             </div>
-                            {e.max_volunteers > 0 && (
-                              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                <div style={{ fontSize: 20, fontWeight: 700, color: "#1E293B" }}>{e.current_volunteers || 0}/{e.max_volunteers}</div>
-                                <div style={{ fontSize: 11, color: "#94A3B8" }}>volunteers</div>
+                            {e.status === "Active" && (
+                              <div style={{ flexShrink: 0 }}>
+                                <span style={{ fontSize: 11, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 6, padding: "4px 10px", fontWeight: 600 }}>Ongoing — review activity logs</span>
                               </div>
                             )}
                           </div>
@@ -354,6 +393,40 @@ export function SupervisorDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Certificate modal */}
+      {certActivity && (
+        <div onClick={() => setCertActivity(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 460, padding: 28 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Approve & Issue Certificate</div>
+            <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+              Approving <strong>{certActivity.hours} hr(s)</strong> for <strong>{certActivity.volunteer_name}</strong> — {certActivity.event_name || "activity"}.
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Certificate Type</label>
+              <div className="flex gap-2">
+                {(["Participation", "Achievement", "Completion"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setCertForm({ type: t })}
+                    style={{
+                      flex: 1, height: 38, border: "1.5px solid", borderRadius: 8, fontSize: 13, fontWeight: certForm.type === t ? 600 : 400, cursor: "pointer",
+                      borderColor: certForm.type === t ? (t === "Participation" ? "#2563EB" : t === "Achievement" ? "#D97706" : GREEN) : "#E2E8F0",
+                      backgroundColor: certForm.type === t ? (t === "Participation" ? "#EFF6FF" : t === "Achievement" ? "#FFFBEB" : "#F0FDF4") : "#fff",
+                      color: certForm.type === t ? (t === "Participation" ? "#1D4ED8" : t === "Achievement" ? "#B45309" : "#15803D") : "#64748B",
+                    }}
+                  >{t}</button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+              <button onClick={() => setCertActivity(null)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={async () => { await handleApproveActivity(certActivity.id); setCertActivity(null); }} style={{ height: 36, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve Only</button>
+              <button onClick={handleApproveAndCertify} disabled={certBusy} style={{ height: 36, padding: "0 16px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: certBusy ? "not-allowed" : "pointer", opacity: certBusy ? 0.7 : 1 }}>{certBusy ? "Issuing…" : "Approve + Issue"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Accept modal */}
       {acceptingVol && (

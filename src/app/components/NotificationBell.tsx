@@ -20,6 +20,15 @@ const TYPE_ICON: Record<string, string> = {
   profile_change_approved: "✓",
   profile_change_rejected: "✕",
   volunteer_joined: "👤",
+  member_approved: "✓",
+  member_rejected: "✕",
+  activity_submitted: "📋",
+  activity_approved: "✓",
+  activity_rejected: "✕",
+  event_application: "📅",
+  application_approved: "✓",
+  application_rejected: "✕",
+  certificate_issued: "🏆",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -28,6 +37,15 @@ const TYPE_COLOR: Record<string, string> = {
   profile_change_approved: "#16A34A",
   profile_change_rejected: "#DC2626",
   volunteer_joined: "#2563EB",
+  member_approved: "#16A34A",
+  member_rejected: "#DC2626",
+  activity_submitted: "#D97706",
+  activity_approved: "#16A34A",
+  activity_rejected: "#DC2626",
+  event_application: "#2563EB",
+  application_approved: "#16A34A",
+  application_rejected: "#DC2626",
+  certificate_issued: "#0891B2",
 };
 
 function relativeTime(isoStr: string): string {
@@ -40,7 +58,11 @@ function relativeTime(isoStr: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export function NotificationBell() {
+interface NotificationBellProps {
+  notificationsUrl?: string;
+}
+
+export function NotificationBell({ notificationsUrl = "/org/notifications" }: NotificationBellProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -330,7 +352,7 @@ export function NotificationBell() {
             }}
           >
             <button
-              onClick={() => { setOpen(false); navigate("/org/notifications"); }}
+              onClick={() => { setOpen(false); navigate(notificationsUrl); }}
               style={{
                 background: "none",
                 border: "none",

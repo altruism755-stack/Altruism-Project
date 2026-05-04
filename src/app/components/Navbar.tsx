@@ -78,7 +78,15 @@ export function Navbar({ role = "guest", hideNavLinks = false, hideUserMenu = fa
       </div>
 
       <div className="flex items-center gap-4">
-        {role === "org" && <NotificationBell />}
+        {role !== "guest" && (
+          <NotificationBell
+            notificationsUrl={
+              role === "org" ? "/org/notifications"
+              : role === "supervisor" ? "/supervisor/notifications"
+              : "/dashboard/notifications"
+            }
+          />
+        )}
         {!hideUserMenu && (role === "guest" ? (
           <>
             <button

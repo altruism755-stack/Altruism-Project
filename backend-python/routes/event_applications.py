@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/api/event-applications", tags=["event_applications"])
 
@@ -68,6 +69,22 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
             "INSERT INTO event_applications (volunteer_id, event_id, org_id) VALUES (?, ?, ?)",
             (vol["id"], event_id, event["org_id"]),
         )
+        # Notify org admin about new event application
+        vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = ?", (vol["id"],)).fetchone())
+        vol_name = (vol_info or {}).get("name", "A volunteer")
+        org_admin = dict_row(db.execute(
+            "SELECT admin_user_id FROM organizations WHERE id = ?", (event["org_id"],)
+        ).fetchone())
+        if org_admin and org_admin.get("admin_user_id"):
+            create_notification(
+                db,
+                org_admin["admin_user_id"],
+                "event_application",
+                "New Event Application",
+                f"{vol_name} applied to join '{event['name']}'. Review pending applications.",
+                "/org",
+            )
+        db.commit()
         return {"message": "Application submitted"}
 
 
@@ -88,12 +105,46 @@ def list_org_applications(org_id: int, current_user: dict = Depends(require_role
 @router.put("/{app_id}/approve")
 def approve_application(app_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
+        app = dict_row(db.execute(
+            "SELECT ea.volunteer_id, ea.event_id, e.name as event_name, v.user_id "
+            "FROM event_applications ea "
+            "JOIN events e ON e.id = ea.event_id "
+            "JOIN volunteers v ON v.id = ea.volunteer_id "
+            "WHERE ea.id = ?", (app_id,)
+        ).fetchone())
         db.execute("UPDATE event_applications SET status = 'Approved' WHERE id = ?", (app_id,))
+        if app and app.get("user_id"):
+            create_notification(
+                db,
+                app["user_id"],
+                "application_approved",
+                "Event Application Approved",
+                f"You have been accepted for '{app.get('event_name', 'the event')}'. See you there!",
+                "/dashboard/profile",
+            )
+        db.commit()
         return {"message": "Application approved"}
 
 
 @router.put("/{app_id}/reject")
 def reject_application(app_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
+        app = dict_row(db.execute(
+            "SELECT ea.volunteer_id, e.name as event_name, v.user_id "
+            "FROM event_applications ea "
+            "JOIN events e ON e.id = ea.event_id "
+            "JOIN volunteers v ON v.id = ea.volunteer_id "
+            "WHERE ea.id = ?", (app_id,)
+        ).fetchone())
         db.execute("UPDATE event_applications SET status = 'Rejected' WHERE id = ?", (app_id,))
+        if app and app.get("user_id"):
+            create_notification(
+                db,
+                app["user_id"],
+                "application_rejected",
+                "Event Application Declined",
+                f"Your application for '{app.get('event_name', 'the event')}' was not accepted.",
+                "/dashboard/profile",
+            )
+        db.commit()
         return {"message": "Application rejected"}

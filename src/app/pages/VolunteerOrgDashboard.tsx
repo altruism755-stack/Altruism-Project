@@ -6,6 +6,9 @@ import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogoByName } from "../components/OrgLogos";
 
+const BLUE = "#2563EB";
+const AMBER = "#D97706";
+
 const GREEN = "#16A34A";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
@@ -63,6 +66,7 @@ export function VolunteerOrgDashboard() {
   const pendingApplications = data.pending_applications || [];
   const totalHours = data.total_hours || 0;
   const completedCount = data.completed_activities || 0;
+  const memberStatus = data.member_status || "Pending"; // "Active" | "Pending" | null
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -79,12 +83,22 @@ export function VolunteerOrgDashboard() {
             <h1 style={{ fontSize: 24, fontWeight: 600, color: "#1E293B", margin: 0 }}>{org.name}</h1>
             <div style={{ fontSize: 13, color: "#94A3B8" }}>{org.category || "Organization"}</div>
           </div>
-          <button
-            onClick={() => navigate(`/dashboard/org/${orgId}/profile`)}
-            style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#334155", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
-          >
-            View Profile
-          </button>
+          <div className="flex gap-2" style={{ flexShrink: 0 }}>
+            {memberStatus === "Active" && (
+              <button
+                onClick={() => navigate("/dashboard/log-activity")}
+                style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                Log Activity
+              </button>
+            )}
+            <button
+              onClick={() => navigate(`/dashboard/org/${orgId}/profile`)}
+              style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#334155", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              View Profile
+            </button>
+          </div>
         </div>
 
         {/* Stat cards */}
@@ -102,6 +116,51 @@ export function VolunteerOrgDashboard() {
             <div style={{ fontSize: 36, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{certificates.length}</div>
           </div>
         </div>
+
+        {/* Next Step banner */}
+        {memberStatus === "Pending" && (
+          <div style={{ backgroundColor: "#FFFBEB", border: "1px solid #FDE68A", borderLeft: "4px solid #F59E0B", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 20 }}>⏳</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#B45309" }}>Waiting for Approval</div>
+              <div style={{ fontSize: 13, color: "#92400E", marginTop: 2 }}>Your membership request is under review. You'll get a notification once the admin responds.</div>
+            </div>
+          </div>
+        )}
+        {memberStatus === "Active" && activities.length === 0 && (
+          <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderLeft: "4px solid #16A34A", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 20 }}>🎉</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#15803D" }}>You're a member!</div>
+                <div style={{ fontSize: 13, color: "#166534", marginTop: 2 }}>Start logging your volunteer hours to track your impact.</div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/dashboard/log-activity")}
+              style={{ flexShrink: 0, height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              Log Activity
+            </button>
+          </div>
+        )}
+        {memberStatus === "Active" && activities.length > 0 && pendingActivities.length > 0 && (
+          <div style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE", borderLeft: "4px solid #2563EB", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 20 }}>📋</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1D4ED8" }}>{pendingActivities.length} activity pending review</div>
+                <div style={{ fontSize: 13, color: "#1E40AF", marginTop: 2 }}>Your supervisor will review and approve your submitted hours.</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab("pending")}
+              style={{ flexShrink: 0, height: 36, padding: "0 16px", backgroundColor: BLUE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              View Pending
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1" style={{ marginBottom: 20, borderBottom: "2px solid #E2E8F0" }}>
@@ -126,7 +185,14 @@ export function VolunteerOrgDashboard() {
         {activeTab === "activities" && (
           <div className="flex flex-col gap-3">
             {activities.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 32, color: "#94A3B8", fontSize: 14 }}>No activities recorded for this organization yet.</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#94A3B8", fontSize: 14 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
+                <div style={{ fontWeight: 600, color: "#64748B", marginBottom: 4 }}>No activities yet</div>
+                <div style={{ marginBottom: 16 }}>Log your volunteer hours to start tracking your impact at {org.name}.</div>
+                {memberStatus === "Active" && (
+                  <button onClick={() => navigate("/dashboard/log-activity")} style={{ height: 38, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Log Activity</button>
+                )}
+              </div>
             ) : (
               activities.map((a: any) => {
                 const sc = statusColors[a.status] || statusColors.Pending;
@@ -153,7 +219,11 @@ export function VolunteerOrgDashboard() {
         {activeTab === "certificates" && (
           <div className="flex flex-col gap-3">
             {certificates.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 32, color: "#94A3B8", fontSize: 14 }}>No certificates earned from this organization yet.</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#94A3B8", fontSize: 14 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
+                <div style={{ fontWeight: 600, color: "#64748B", marginBottom: 4 }}>No certificates yet</div>
+                <div>Certificates are issued by the organization after your activities are approved.</div>
+              </div>
             ) : (
               certificates.map((cert: any) => {
                 const tc = certTypeColors[cert.type] || certTypeColors.Participation;
@@ -176,7 +246,11 @@ export function VolunteerOrgDashboard() {
         {activeTab === "pending" && (
           <div className="flex flex-col gap-3">
             {pendingActivities.length === 0 && pendingApplications.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 32, color: "#94A3B8", fontSize: 14 }}>No pending items for this organization.</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#94A3B8", fontSize: 14 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+                <div style={{ fontWeight: 600, color: "#64748B", marginBottom: 4 }}>All caught up!</div>
+                <div>No pending activities or applications for this organization.</div>
+              </div>
             ) : (
               <>
                 {pendingActivities.length > 0 && (

@@ -307,6 +307,12 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             (volunteer_id, org_id),
         ).fetchall())
 
+        membership = dict_row(db.execute(
+            "SELECT status FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            (org_id, volunteer_id),
+        ).fetchone())
+        member_status = (membership or {}).get("status", "Pending")
+
         return {
             "organization": org,
             "activities": activities,
@@ -315,6 +321,7 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "completed_activities": len(approved_activities),
             "pending_activities": pending_activities,
             "pending_applications": pending_applications,
+            "member_status": member_status,
         }
 
 

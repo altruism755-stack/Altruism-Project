@@ -3,6 +3,7 @@ from typing import Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
 
@@ -76,6 +77,47 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("volunte
             (cur.lastrowid,),
         ).fetchone())
 
+        # Notify supervisor and org admin about new activity submission
+        vol_name = dict_row(db.execute(
+            "SELECT name FROM volunteers WHERE id = ?", (vol["id"],)
+        ).fetchone())
+        vol_display = (vol_name or {}).get("name", "A volunteer")
+        event_display = (activity or {}).get("event_name") or "an activity"
+        hrs = body.get("hours", "")
+
+        if org_id:
+            # Notify org admin
+            org_admin = dict_row(db.execute(
+                "SELECT admin_user_id FROM organizations WHERE id = ?", (org_id,)
+            ).fetchone())
+            if org_admin and org_admin.get("admin_user_id"):
+                create_notification(
+                    db,
+                    org_admin["admin_user_id"],
+                    "activity_submitted",
+                    "New Activity Submission",
+                    f"{vol_display} logged {hrs} hr(s) for {event_display}. Awaiting review.",
+                    "/org",
+                )
+            # Notify assigned supervisor if any
+            ov = dict_row(db.execute(
+                "SELECT ov.supervisor_id, s.user_id as sup_user_id "
+                "FROM org_volunteers ov "
+                "JOIN supervisors s ON s.id = ov.supervisor_id "
+                "WHERE ov.org_id = ? AND ov.volunteer_id = ?",
+                (org_id, vol["id"]),
+            ).fetchone())
+            if ov and ov.get("sup_user_id"):
+                create_notification(
+                    db,
+                    ov["sup_user_id"],
+                    "activity_submitted",
+                    "New Activity Submission",
+                    f"{vol_display} logged {hrs} hr(s) for {event_display}. Awaiting your review.",
+                    "/supervisor",
+                )
+
+        db.commit()
         return activity
 
 
@@ -97,6 +139,26 @@ def approve_activity(
             "UPDATE activities SET status = 'Approved', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reviewer_id, activity_id),
         )
+        # Notify volunteer
+        act = dict_row(db.execute(
+            "SELECT a.volunteer_id, a.hours, e.name as event_name, v.user_id "
+            "FROM activities a "
+            "LEFT JOIN events e ON a.event_id = e.id "
+            "JOIN volunteers v ON v.id = a.volunteer_id "
+            "WHERE a.id = ?", (activity_id,)
+        ).fetchone())
+        if act and act.get("user_id"):
+            hrs = act.get("hours", "")
+            event_display = act.get("event_name") or "your activity"
+            create_notification(
+                db,
+                act["user_id"],
+                "activity_approved",
+                "Activity Approved",
+                f"Your {hrs} hr(s) for {event_display} have been approved. Great work!",
+                "/dashboard/profile",
+            )
+        db.commit()
         return {"message": "Activity approved"}
 
 
@@ -118,4 +180,24 @@ def reject_activity(
             "UPDATE activities SET status = 'Rejected', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reviewer_id, activity_id),
         )
+        # Notify volunteer
+        act = dict_row(db.execute(
+            "SELECT a.hours, e.name as event_name, v.user_id "
+            "FROM activities a "
+            "LEFT JOIN events e ON a.event_id = e.id "
+            "JOIN volunteers v ON v.id = a.volunteer_id "
+            "WHERE a.id = ?", (activity_id,)
+        ).fetchone())
+        if act and act.get("user_id"):
+            hrs = act.get("hours", "")
+            event_display = act.get("event_name") or "your activity"
+            create_notification(
+                db,
+                act["user_id"],
+                "activity_rejected",
+                "Activity Not Approved",
+                f"Your {hrs} hr(s) for {event_display} were not approved. Contact your supervisor for details.",
+                "/dashboard/profile",
+            )
+        db.commit()
         return {"message": "Activity rejected"}

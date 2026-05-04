@@ -18,10 +18,11 @@ interface Notification {
 type FilterTab = "all" | "unread" | "approvals" | "volunteers";
 
 const APPROVAL_TYPES = new Set([
-  "org_approved",
-  "org_rejected",
-  "profile_change_approved",
-  "profile_change_rejected",
+  "org_approved", "org_rejected",
+  "profile_change_approved", "profile_change_rejected",
+  "member_approved", "member_rejected",
+  "activity_approved", "activity_rejected",
+  "application_approved", "application_rejected",
 ]);
 
 const TYPE_COLOR: Record<string, string> = {
@@ -30,6 +31,15 @@ const TYPE_COLOR: Record<string, string> = {
   profile_change_approved: "#16A34A",
   profile_change_rejected: "#DC2626",
   volunteer_joined: "#2563EB",
+  member_approved: "#16A34A",
+  member_rejected: "#DC2626",
+  activity_submitted: "#D97706",
+  activity_approved: "#16A34A",
+  activity_rejected: "#DC2626",
+  event_application: "#2563EB",
+  application_approved: "#16A34A",
+  application_rejected: "#DC2626",
+  certificate_issued: "#0891B2",
 };
 
 const TYPE_ICON: Record<string, string> = {
@@ -38,6 +48,15 @@ const TYPE_ICON: Record<string, string> = {
   profile_change_approved: "✓",
   profile_change_rejected: "✕",
   volunteer_joined: "👤",
+  member_approved: "✓",
+  member_rejected: "✕",
+  activity_submitted: "📋",
+  activity_approved: "✓",
+  activity_rejected: "✕",
+  event_application: "📅",
+  application_approved: "✓",
+  application_rejected: "✕",
+  certificate_issued: "🏆",
 };
 
 function relativeTime(isoStr: string): string {
@@ -106,12 +125,16 @@ export function NotificationsPage() {
     if (n.action_url) navigate(n.action_url);
   }
 
+  const navRole = user?.role === "org_admin" ? "org" : user?.role === "supervisor" ? "supervisor" : "volunteer";
+  const backUrl = user?.role === "org_admin" ? "/org" : user?.role === "supervisor" ? "/supervisor" : "/dashboard/profile";
+  const backLabel = user?.role === "org_admin" ? "Dashboard" : user?.role === "supervisor" ? "Dashboard" : "My Profile";
+
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#0F172A" }}>
-      <Navbar role="org" />
+      <Navbar role={navRole} />
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "32px 16px" }}>
-        <BackButton to="/org" label="Dashboard" />
+        <BackButton to={backUrl} label={backLabel} />
         {/* Page header */}
         <div
           style={{
