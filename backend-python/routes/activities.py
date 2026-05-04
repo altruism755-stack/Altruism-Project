@@ -65,6 +65,19 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("volunte
             if event:
                 org_id = event["org_id"]
 
+        # Enforce Active membership — a volunteer cannot log hours for an org
+        # they have not been approved for. This is the single gating rule.
+        if org_id:
+            membership = dict_row(db.execute(
+                "SELECT status FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                (org_id, vol["id"]),
+            ).fetchone())
+            if not membership or membership["status"] != "Active":
+                raise HTTPException(
+                    403,
+                    "You must be an approved (Active) member of this organization to log volunteer hours.",
+                )
+
         cur = db.execute(
             "INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status) "
             "VALUES (?, ?, ?, ?, ?, ?, 'Pending')",

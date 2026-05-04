@@ -16,13 +16,27 @@ export function LogActivityPage() {
   const [error, setError] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
   const [form, setForm] = useState({ date: "", event: "", hours: "", description: "" });
-  const [events, setEvents] = useState<any[]>([]);
+  const [events,    setEvents]    = useState<any[]>([]);
+  const [hasActiveOrg, setHasActiveOrg] = useState(true);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await api.getEvents({});
-        setEvents(res.events || []);
+        // Fetch volunteer profile to determine Active org memberships,
+        // then filter events to only those orgs — a volunteer cannot log
+        // hours for an org they haven't been approved for.
+        const [volRes, evtRes] = await Promise.all([
+          api.getVolunteerMe(),
+          api.getEvents({}),
+        ]);
+        const activeOrgIds = new Set(
+          (volRes.organizations || [])
+            .filter((o: any) => o.membership_status === "Active")
+            .map((o: any) => o.id)
+        );
+        setHasActiveOrg(activeOrgIds.size > 0);
+        const filtered = (evtRes.events || []).filter((e: any) => activeOrgIds.has(e.org_id));
+        setEvents(filtered);
       } catch (e) { console.error("Failed to load events:", e); }
     };
     fetchEvents();
@@ -95,6 +109,15 @@ export function LogActivityPage() {
 
         <div className="flex justify-center">
           <div style={{ width: 640, backgroundColor: "#fff", borderRadius: 16, boxShadow: "0 4px 16px rgba(0,0,0,0.06)", padding: 36 }}>
+            {!hasActiveOrg && (
+              <div style={{ backgroundColor: "#FFFBEB", border: "1px solid #FDE68A", borderLeft: "4px solid #F59E0B", borderRadius: 10, padding: "16px 18px", marginBottom: 24 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#B45309", marginBottom: 4 }}>No approved memberships</div>
+                <div style={{ fontSize: 13, color: "#92400E" }}>
+                  You can only log hours for organizations where your membership has been approved.
+                  Join an organization and wait for admin approval before logging activities.
+                </div>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               {error && (
                 <div style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>{error}</div>
@@ -129,7 +152,7 @@ export function LogActivityPage() {
 
               <div className="flex justify-between" style={{ marginTop: 8 }}>
                 <button type="button" onClick={() => navigate("/dashboard")} style={{ height: 42, padding: "0 20px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
-                <button type="submit" disabled={submitting} style={{ height: 42, padding: "0 24px", backgroundColor: submitting ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}>{submitting ? "Submitting..." : "Submit Activity"}</button>
+                <button type="submit" disabled={submitting || !hasActiveOrg} style={{ height: 42, padding: "0 24px", backgroundColor: (submitting || !hasActiveOrg) ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: (submitting || !hasActiveOrg) ? "not-allowed" : "pointer" }}>{submitting ? "Submitting..." : "Submit Activity"}</button>
               </div>
             </form>
           </div>

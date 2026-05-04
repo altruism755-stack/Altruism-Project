@@ -296,9 +296,27 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             (volunteer_id, org_id),
         ).fetchall())
 
-        pending_activities = [a for a in activities if a["status"] == "Pending"]
-        approved_activities = [a for a in activities if a["status"] == "Approved"]
-        total_hours = sum(a["hours"] for a in approved_activities)
+        membership = dict_row(db.execute(
+            "SELECT status, joined_date, approved_at FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            (org_id, volunteer_id),
+        ).fetchone())
+        member_status = (membership or {}).get("status", "Pending")
+
+        # Single source of truth: member_status gates all activity/certificate data.
+        # A non-Active member must not see or contribute activity data — this prevents
+        # the contradiction where a Pending volunteer appears to have logged hours.
+        if member_status == "Active":
+            pending_activities  = [a for a in activities if a["status"] == "Pending"]
+            approved_activities = [a for a in activities if a["status"] == "Approved"]
+            total_hours         = sum(a["hours"] for a in approved_activities)
+            visible_activities  = activities
+            visible_certs       = certificates
+        else:
+            pending_activities  = []
+            approved_activities = []
+            total_hours         = 0
+            visible_activities  = []
+            visible_certs       = []
 
         pending_applications = dict_rows(db.execute(
             "SELECT ea.*, e.name as event_name, e.date as event_date "
@@ -308,26 +326,20 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             (volunteer_id, org_id),
         ).fetchall())
 
-        membership = dict_row(db.execute(
-            "SELECT status, joined_date, approved_at FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
-            (org_id, volunteer_id),
-        ).fetchone())
-        member_status = (membership or {}).get("status", "Pending")
-
-        lifecycle = compute_volunteer_lifecycle(member_status, activities, certificates)
+        lifecycle = compute_volunteer_lifecycle(member_status, visible_activities, visible_certs)
 
         return {
-            "organization": org,
-            "activities": activities,
-            "certificates": certificates,
-            "total_hours": total_hours,
-            "completed_activities": len(approved_activities),
-            "pending_activities": pending_activities,
-            "pending_applications": pending_applications,
-            "member_status": member_status,
-            "applied_at": (membership or {}).get("joined_date"),
-            "approved_at": (membership or {}).get("approved_at"),
-            "lifecycle": lifecycle,
+            "organization":          org,
+            "activities":            visible_activities,
+            "certificates":          visible_certs,
+            "total_hours":           total_hours,
+            "completed_activities":  len(approved_activities),
+            "pending_activities":    pending_activities,
+            "pending_applications":  pending_applications,
+            "member_status":         member_status,
+            "applied_at":            (membership or {}).get("joined_date"),
+            "approved_at":           (membership or {}).get("approved_at"),
+            "lifecycle":             lifecycle,
         }
 
 

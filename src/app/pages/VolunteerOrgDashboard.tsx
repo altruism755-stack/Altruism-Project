@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
@@ -44,13 +44,16 @@ export function VolunteerOrgDashboard() {
   const { orgId } = useParams<{ orgId: string }>();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const volId = user?.id || 0;
+
+  const initialTab = (searchParams.get("tab") as TabType) || "events";
 
   const [data,           setData]           = useState<any>(null);
   const [orgEvents,      setOrgEvents]      = useState<any[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
   const [loading,        setLoading]        = useState(true);
-  const [activeTab,      setActiveTab]      = useState<TabType>("events");
+  const [activeTab,      setActiveTab]      = useState<TabType>(initialTab);
   const [applyingId,     setApplyingId]     = useState<number | null>(null);
   const [applyError,     setApplyError]     = useState<string | null>(null);
 
@@ -65,6 +68,13 @@ export function VolunteerOrgDashboard() {
         setData(res);
         setOrgEvents(evtRes.events || []);
         setMyApplications(appsRes.applications || []);
+
+        // If ?tab=pending was requested but this org has nothing pending, fall back to events
+        if (searchParams.get("tab") === "pending") {
+          const pAct = (res.pending_activities || []).length;
+          const pApp = (res.pending_applications || []).length;
+          if (pAct + pApp === 0) setActiveTab("events");
+        }
       } catch (e) {
         console.error("Failed to load org dashboard:", e);
       } finally {
@@ -194,11 +204,13 @@ export function VolunteerOrgDashboard() {
           ))}
         </div>
 
-        {/* ── Lifecycle stepper ── */}
-        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 20px", marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Your Journey</div>
-          <LifecycleStepper steps={lifecycleSteps} stuckMsg={stuckMsg} />
-        </div>
+        {/* ── Lifecycle stepper — only shown when backend provides steps ── */}
+        {lifecycleSteps.length > 0 && (
+          <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 20px", marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Your Journey</div>
+            <LifecycleStepper steps={lifecycleSteps} stuckMsg={stuckMsg} />
+          </div>
+        )}
 
         {/* ── Status banners ── */}
         {memberStatus === "Pending" && (
@@ -404,8 +416,13 @@ export function VolunteerOrgDashboard() {
         {activeTab === "pending" && (
           <div className="flex flex-col gap-3">
             {pendingActivities.length === 0 && pendingApplications.length === 0 ? (
-              <EmptyState icon="✅" title="All caught up!"
-                body="No pending activities or applications for this organization." />
+              memberStatus === "Pending" ? (
+                <EmptyState icon="⏳" title="Membership pending"
+                  body="Your request to join this organization is under review. Once approved, you'll be able to apply to events and log activities." />
+              ) : (
+                <EmptyState icon="✅" title="All caught up!"
+                  body="No pending activities or applications for this organization." />
+              )
             ) : (
               <>
                 {pendingActivities.length > 0 && (

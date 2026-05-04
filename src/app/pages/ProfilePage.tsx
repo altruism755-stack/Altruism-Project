@@ -129,8 +129,16 @@ export function ProfilePage() {
         }
       }
 
+      const activeOrgIdSet = new Set(activeOrgIds);
       const allActivities = volRes.activities || [];
-      setPendingActivities(allActivities.filter((a: any) => a.status === "Pending"));
+      // Only surface pending activities from orgs where the volunteer is Active.
+      // Activities at Pending-membership orgs are orphaned data and must not drive
+      // workflow cards — that would contradict the volunteer's actual access state.
+      setPendingActivities(
+        allActivities.filter((a: any) =>
+          a.status === "Pending" && (!a.org_id || activeOrgIdSet.has(a.org_id))
+        )
+      );
 
       const skills: string[] = (() => { try { return JSON.parse(volRes.skills || "[]"); } catch { return []; } })();
       const knownSkills = skills.filter((s) => SKILLS_LIST.includes(s));
@@ -547,7 +555,8 @@ export function ProfilePage() {
                   cta: "View Status",
                   badge: pendingActivities.length,
                   onClick: () => {
-                    if (activeOrgs.length === 1) navigate(`/dashboard/org/${activeOrgs[0].id}`);
+                    const orgId = pendingActivities[0]?.org_id ?? (activeOrgs.length === 1 ? activeOrgs[0].id : null);
+                    if (orgId) navigate(`/dashboard/org/${orgId}?tab=pending`);
                   },
                 });
               }
