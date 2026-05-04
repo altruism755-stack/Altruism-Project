@@ -385,6 +385,12 @@ def init_schema():
     except Exception:
         pass
 
+    # Lifecycle transition timestamps — applied_at = joined_date (when they applied)
+    try:
+        conn.execute("ALTER TABLE org_volunteers ADD COLUMN approved_at TEXT")
+    except Exception:
+        pass
+
     # Timestamp when an activity was reviewed (approved or rejected).
     # Required for days_to_review metric in the analytics star schema.
     try:

@@ -8,6 +8,7 @@ from typing import Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles, hash_password, verify_password
+from routes.lifecycle import compute_volunteer_lifecycle
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "profiles")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -308,10 +309,12 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
         ).fetchall())
 
         membership = dict_row(db.execute(
-            "SELECT status FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            "SELECT status, joined_date, approved_at FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
             (org_id, volunteer_id),
         ).fetchone())
         member_status = (membership or {}).get("status", "Pending")
+
+        lifecycle = compute_volunteer_lifecycle(member_status, activities, certificates)
 
         return {
             "organization": org,
@@ -322,6 +325,9 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "pending_activities": pending_activities,
             "pending_applications": pending_applications,
             "member_status": member_status,
+            "applied_at": (membership or {}).get("joined_date"),
+            "approved_at": (membership or {}).get("approved_at"),
+            "lifecycle": lifecycle,
         }
 
 

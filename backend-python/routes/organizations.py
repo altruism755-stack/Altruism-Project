@@ -847,6 +847,7 @@ def approve_org_member(
         db.execute(
             "UPDATE org_volunteers SET status = 'Active', is_active = ?, supervisor_id = ?, department = ?, "
             "joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), "
+            "approved_at = datetime('now'), "
             "governorate_snapshot = ?, city_snapshot = ? "
             "WHERE org_id = ? AND volunteer_id = ?",
             (_is_active("Active"), body.get("supervisor_id"), body.get("department"),

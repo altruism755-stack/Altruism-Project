@@ -1,8 +1,12 @@
 ﻿import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogoByName } from "../components/OrgLogos";
+import { WorkflowPanel, type WorkflowAction } from "../components/WorkflowPanel";
+import { StatusPill, LifecycleStepper } from "../components/StatusPill";
+import { resolveStepActions, type BackendLifecycle } from "../lib/lifecycle";
 
 const GREEN = "#16A34A";
 
@@ -925,6 +929,7 @@ type MainTab = "volunteers" | "supervisors" | "activities" | "admins";
 
 export function OrgDashboard() {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
   const orgName = profile?.name || "Organization";
   const orgId: number = profile?.id || 0;
 
@@ -933,6 +938,7 @@ export function OrgDashboard() {
   const [supervisors, setSups]    = useState<any[]>([]);
   const [events, setEvents]       = useState<any[]>([]);
   const [orgProfileData, setOrgProfileData] = useState<any>(null);
+  const [orgLifecycle, setOrgLifecycle]   = useState<BackendLifecycle | null>(null);
   const [loading, setLoading]     = useState(true);
   const [tab, setTab]             = useState<MainTab>("volunteers");
   const [showAddManually, setShowAddManually] = useState(false);
@@ -940,18 +946,20 @@ export function OrgDashboard() {
   const loadAll = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
     try {
-      const [sumRes, memRes, supRes, evtRes, profRes] = await Promise.all([
+      const [sumRes, memRes, supRes, evtRes, profRes, lcRes] = await Promise.all([
         api.getReportSummary(),
         api.getOrgMembers(orgId),
         api.getSupervisors(),
         api.getEvents({ org_id: String(orgId) }),
         api.getMyOrgProfile(),
+        api.getOrgLifecycle(),
       ]);
       setStats(sumRes);
       setMembers(memRes.volunteers || []);
       setSups(supRes.supervisors || []);
       setEvents(evtRes.events || []);
       setOrgProfileData(profRes.organization || null);
+      setOrgLifecycle(lcRes.lifecycle || null);
     } catch (e) { console.error("Dashboard load error:", e); }
     finally { setLoading(false); }
   }, [orgId]);
@@ -962,28 +970,81 @@ export function OrgDashboard() {
   const active   = members.filter((m) => m.org_status === "Active");
   const activeEv = events.filter((e) => e.status === "Active" || e.status === "Upcoming");
 
+  const pendingActivityCount = stats?.pendingActivities ?? 0;
+
   const statCards = [
     {
-      label: "Total Volunteers", value: active.length,
+      label: "Active Volunteers", value: active.length,
       gradient: "linear-gradient(135deg,#16A34A,#22C55E)",
       sub: "View list →", tab: "volunteers" as MainTab,
     },
     {
       label: "Pending Requests", value: pending.length,
       gradient: pending.length > 0 ? "linear-gradient(135deg,#D97706,#F59E0B)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)",
-      sub: pending.length > 0 ? "Review requests →" : "No pending", tab: "volunteers" as MainTab,
+      sub: pending.length > 0 ? "Review now →" : "All caught up", tab: "volunteers" as MainTab,
     },
     {
-      label: "Active Activities", value: activeEv.length,
-      gradient: "linear-gradient(135deg,#2563EB,#3B82F6)",
-      sub: "View activities →", tab: "activities" as MainTab,
+      label: "Activity Reviews", value: pendingActivityCount,
+      gradient: pendingActivityCount > 0 ? "linear-gradient(135deg,#7C3AED,#8B5CF6)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)",
+      sub: pendingActivityCount > 0 ? "Approve hours →" : "No pending hours", tab: "volunteers" as MainTab,
     },
     {
-      label: "Total Hours Logged", value: stats?.totalHours ?? 0,
+      label: "Hours Logged", value: stats?.totalHours ?? 0,
       gradient: "linear-gradient(135deg,#0891B2,#06B6D4)",
-      sub: `${active.length} active volunteers`, tab: null,
+      sub: `${active.length} volunteers · ${activeEv.length} events`, tab: null,
     },
   ];
+
+  // Dynamic "Next Best Action" cards
+  const nextActions: WorkflowAction[] = [];
+  if (pending.length > 0) {
+    nextActions.push({
+      priority: "urgent",
+      icon: "👥",
+      title: "Volunteer Requests",
+      desc: `${pending.length} volunteer${pending.length > 1 ? "s" : ""} waiting to join your organization.`,
+      cta: "Review Requests",
+      badge: pending.length,
+      onClick: () => setTab("volunteers"),
+    });
+  }
+  if (pendingActivityCount > 0) {
+    nextActions.push({
+      priority: "urgent",
+      icon: "📋",
+      title: "Activity Hours Pending",
+      desc: `${pendingActivityCount} activity submission${pendingActivityCount > 1 ? "s" : ""} awaiting approval.`,
+      cta: "Review Hours",
+      badge: pendingActivityCount,
+      onClick: () => navigate("/org/volunteers"),
+    });
+  }
+  if (activeEv.length > 0 && pending.length === 0 && pendingActivityCount === 0) {
+    nextActions.push({
+      priority: "normal",
+      icon: "📅",
+      title: "Active Events",
+      desc: `${activeEv.length} event${activeEv.length > 1 ? "s" : ""} running. Ensure volunteers are logging their hours.`,
+      cta: "Manage Events",
+      onClick: () => setTab("activities"),
+    });
+  }
+  if (nextActions.length === 0) {
+    nextActions.push({
+      priority: "success",
+      icon: "✅",
+      title: "All caught up!",
+      desc: "No pending actions. Keep creating events to engage your volunteers.",
+      cta: "Create Event",
+      onClick: () => setTab("activities"),
+    });
+  }
+
+  const orgPipelineSteps = resolveStepActions(orgLifecycle?.steps ?? [], {
+    goto_volunteers: () => setTab("volunteers"),
+    goto_activities: () => setTab("activities"),
+  });
+  const orgStuckMsg = orgLifecycle?.stuck_msg ?? undefined;
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -1034,6 +1095,17 @@ export function OrgDashboard() {
             onSuccess={() => { loadAll(); setShowAddManually(false); }}
           />
         )}
+        {/* Next Best Action */}
+        <WorkflowPanel actions={nextActions} style={{ marginBottom: 20 }} />
+
+        {/* Org Pipeline Lifecycle */}
+        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 20px", marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+            Volunteer Pipeline
+          </div>
+          <LifecycleStepper steps={orgPipelineSteps} stuckMsg={orgStuckMsg} />
+        </div>
+
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 28 }}>
           {statCards.map((s) => (

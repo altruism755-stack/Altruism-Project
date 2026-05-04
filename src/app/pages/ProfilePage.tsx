@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
+import { WorkflowPanel, type WorkflowAction } from "../components/WorkflowPanel";
 import { ASSET_BASE } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
@@ -495,6 +496,72 @@ export function ProfilePage() {
 
           {/* Right column */}
           <div style={{ flex: 1 }}>
+            {/* Next Best Action */}
+            {(() => {
+              const activeOrgs = myOrgs.filter((o: any) => o.membership_status === "Active");
+              const pendingOrgs = myOrgs.filter((o: any) => o.membership_status === "Pending");
+              const actions: WorkflowAction[] = [];
+
+              if (myOrgs.length === 0) {
+                actions.push({
+                  priority: "normal", icon: "🏢",
+                  title: "Join an Organization",
+                  desc: "Browse verified organizations and apply to start volunteering.",
+                  cta: "Browse Organizations", href: "/dashboard/orgs",
+                });
+              }
+              if (pendingOrgs.length > 0) {
+                actions.push({
+                  priority: "urgent", icon: "⏳",
+                  title: "Awaiting Membership Approval",
+                  desc: `${pendingOrgs.length} organization${pendingOrgs.length > 1 ? "s" : ""} (${pendingOrgs.map((o: any) => o.name).join(", ")}) will confirm your request shortly.`,
+                  cta: "View Applications", href: "/dashboard/orgs",
+                  badge: pendingOrgs.length,
+                });
+              }
+              if (pendingActivities.length > 0) {
+                actions.push({
+                  priority: "urgent", icon: "📋",
+                  title: "Hours Under Review",
+                  desc: `${pendingActivities.length} activity log${pendingActivities.length > 1 ? "s" : ""} submitted and awaiting supervisor approval.`,
+                  cta: "View Status",
+                  badge: pendingActivities.length,
+                  onClick: () => {
+                    if (activeOrgs.length === 1) navigate(`/dashboard/org/${activeOrgs[0].id}`);
+                  },
+                });
+              }
+              if (pendingApplications.length > 0) {
+                actions.push({
+                  priority: "info", icon: "📅",
+                  title: "Event Applications Pending",
+                  desc: `${pendingApplications.length} event application${pendingApplications.length > 1 ? "s" : ""} awaiting admin review.`,
+                  cta: "View Events",
+                  badge: pendingApplications.length,
+                  href: activeOrgs.length === 1 ? `/dashboard/org/${activeOrgs[0].id}` : "/dashboard/orgs",
+                });
+              }
+              if (activeOrgs.length > 0 && pendingActivities.length === 0 && pendingApplications.length === 0) {
+                actions.push({
+                  priority: "success", icon: "⏱️",
+                  title: "Log Your Hours",
+                  desc: `You're active in ${activeOrgs.length} organization${activeOrgs.length > 1 ? "s" : ""}. Submitted hours count toward your certificates.`,
+                  cta: "Log Activity", href: "/dashboard/log-activity",
+                });
+              }
+              if (myCertificates.length > 0 && actions.length < 2) {
+                actions.push({
+                  priority: "info", icon: "🏆",
+                  title: `${myCertificates.length} Certificate${myCertificates.length > 1 ? "s" : ""} Earned`,
+                  desc: "Your volunteer journey is building up. Keep logging hours to earn more.",
+                  cta: "View Certificates",
+                  onClick: () => document.querySelector("[data-section='certificates']")?.scrollIntoView({ behavior: "smooth" }),
+                });
+              }
+              if (actions.length === 0) return null;
+              return <WorkflowPanel actions={actions} style={{ marginBottom: 20 }} />;
+            })()}
+
             {/* Pending Section */}
             <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 16px 0" }}>Pending</h3>

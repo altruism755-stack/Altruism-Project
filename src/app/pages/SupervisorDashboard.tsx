@@ -3,6 +3,9 @@ import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { WorkflowPanel, type WorkflowAction } from "../components/WorkflowPanel";
+import { LifecycleStepper, MiniLifecycleStepper } from "../components/StatusPill";
+import { resolveStepActions, buildEventMiniSteps, type BackendLifecycle } from "../lib/lifecycle";
 
 const GREEN = "#16A34A";
 
@@ -21,6 +24,7 @@ export function SupervisorDashboard() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<DashTab>("volunteers");
+  const [supLifecycle, setSupLifecycle] = useState<BackendLifecycle | null>(null);
 
   // Accept modal state
   const [acceptingVol, setAcceptingVol] = useState<any | null>(null);
@@ -34,12 +38,13 @@ export function SupervisorDashboard() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [profileRes, volsRes, pendingRes, actsRes, evtsRes] = await Promise.all([
+      const [profileRes, volsRes, pendingRes, actsRes, evtsRes, lcRes] = await Promise.all([
         api.getMyProfile(),
         api.getMyVolunteers(),
         api.getMyPendingRequests(),
         api.getMyActivities(),
         api.getMyEvents(),
+        api.getSupervisorLifecycle(),
       ]);
       setOrg(profileRes.organization);
       setVolunteers(volsRes.volunteers || []);
@@ -47,6 +52,7 @@ export function SupervisorDashboard() {
       setPendingSupervisors(pendingRes.supervisors || []);
       setActivities(actsRes.activities || []);
       setEvents(evtsRes.events || []);
+      setSupLifecycle(lcRes.lifecycle || null);
     } catch (e) { console.error("Failed to load supervisor dashboard:", e); }
     finally { setLoading(false); }
   }, []);
@@ -108,6 +114,67 @@ export function SupervisorDashboard() {
 
   const upcomingEvents = events.filter((e) => e.status === "Upcoming" || e.status === "Active");
 
+  // Next Best Action cards
+  const nextActions: WorkflowAction[] = [];
+  if (pending.length > 0) {
+    nextActions.push({
+      priority: "urgent",
+      icon: "👥",
+      title: "Pending Requests",
+      desc: `${pending.length} volunteer${pending.length > 1 ? "s" : ""} applied to join. Accept or reject their requests.`,
+      cta: "Review Requests",
+      badge: pending.length,
+      onClick: () => setTab("pending"),
+    });
+  }
+  if (activities.length > 0) {
+    nextActions.push({
+      priority: "urgent",
+      icon: "📋",
+      title: "Activity Logs Pending",
+      desc: `${activities.length} volunteer hour submission${activities.length > 1 ? "s" : ""} waiting for your approval.`,
+      cta: "Review Hours",
+      badge: activities.length,
+      onClick: () => setTab("activities"),
+    });
+  }
+  if (upcomingEvents.length > 0 && pending.length === 0 && activities.length === 0) {
+    nextActions.push({
+      priority: "normal",
+      icon: "📅",
+      title: "Upcoming Events",
+      desc: `${upcomingEvents.length} event${upcomingEvents.length > 1 ? "s" : ""} scheduled. Ensure volunteers are prepared and will log hours after.`,
+      cta: "View Events",
+      onClick: () => setTab("events"),
+    });
+  }
+  if (volunteers.length > 0 && nextActions.length < 3) {
+    nextActions.push({
+      priority: "info",
+      icon: "👤",
+      title: "Your Volunteers",
+      desc: `${volunteers.length} active volunteer${volunteers.length > 1 ? "s" : ""} in ${org?.name || "your organization"}. Review their progress.`,
+      cta: "View Volunteers",
+      onClick: () => setTab("volunteers"),
+    });
+  }
+  if (nextActions.length === 0) {
+    nextActions.push({
+      priority: "success",
+      icon: "✅",
+      title: "All caught up!",
+      desc: "No pending actions. Volunteers will submit hours after upcoming events.",
+      cta: "View Events",
+      onClick: () => setTab("events"),
+    });
+  }
+
+  const supPipelineSteps = resolveStepActions(supLifecycle?.steps ?? [], {
+    goto_volunteers: () => setTab("volunteers"),
+    goto_activities: () => setTab("pending"),
+  });
+  const supStuckMsg = supLifecycle?.stuck_msg ?? undefined;
+
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Navbar role="supervisor" />
@@ -137,6 +204,9 @@ export function SupervisorDashboard() {
             {org?.name || "—"} · Supervisor
           </p>
         </div>
+
+        {/* Next Best Action */}
+        <WorkflowPanel actions={nextActions} style={{ marginBottom: 20 }} />
 
         {/* Stat cards */}
         <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 24 }}>
@@ -295,6 +365,11 @@ export function SupervisorDashboard() {
             {/* Activity approvals tab */}
             {tab === "activities" && (
               <div>
+                {/* Review pipeline stepper */}
+                <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "10px 16px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Review Pipeline</div>
+                  <LifecycleStepper steps={supPipelineSteps} stuckMsg={supStuckMsg} />
+                </div>
                 <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
                   Pending activity logs from volunteers in <strong>{org?.name}</strong> awaiting your review.
                 </div>
@@ -349,6 +424,11 @@ export function SupervisorDashboard() {
                       };
                       const st = statusStyle[e.status] || statusStyle.Upcoming;
                       const fillPct = e.max_volunteers > 0 ? Math.min(100, Math.round(((e.current_volunteers || 0) / e.max_volunteers) * 100)) : 0;
+                      const eventMiniSteps = buildEventMiniSteps({
+                        status: e.status,
+                        current_volunteers: e.current_volunteers || 0,
+                        onViewActivities: () => setTab("activities"),
+                      });
                       return (
                         <div key={e.id} style={{ border: "1px solid #E2E8F0", borderLeft: `4px solid ${st.band}`, borderRadius: 10, padding: 16 }}>
                           <div className="flex items-start justify-between gap-4">
@@ -376,6 +456,11 @@ export function SupervisorDashboard() {
                                   </div>
                                 </div>
                               )}
+                              {/* Event lifecycle mini stepper */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+                                <span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 500, whiteSpace: "nowrap" }}>Event flow:</span>
+                                <MiniLifecycleStepper steps={eventMiniSteps} />
+                              </div>
                             </div>
                             {e.status === "Active" && (
                               <div style={{ flexShrink: 0 }}>

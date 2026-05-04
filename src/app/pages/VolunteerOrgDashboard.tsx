@@ -5,6 +5,8 @@ import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogoByName } from "../components/OrgLogos";
+import { LifecycleStepper } from "../components/StatusPill";
+import { resolveStepActions } from "../lib/lifecycle";
 
 const BLUE = "#2563EB";
 const AMBER = "#D97706";
@@ -68,6 +70,14 @@ export function VolunteerOrgDashboard() {
   const completedCount = data.completed_activities || 0;
   const memberStatus = data.member_status || "Pending"; // "Active" | "Pending" | null
 
+  const lifecycle = data.lifecycle;
+  const lifecycleSteps = resolveStepActions(lifecycle?.steps ?? [], {
+    log_hours:         () => navigate("/dashboard/log-activity"),
+    view_pending:      () => setActiveTab("pending"),
+    view_certificates: () => setActiveTab("certificates"),
+  });
+  const stuckMsg = lifecycle?.stuck_msg ?? undefined;
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Navbar role="volunteer" />
@@ -115,6 +125,14 @@ export function VolunteerOrgDashboard() {
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>Certificates Earned</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{certificates.length}</div>
           </div>
+        </div>
+
+        {/* Lifecycle Progress */}
+        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 20px", marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+            Your Journey
+          </div>
+          <LifecycleStepper steps={lifecycleSteps} stuckMsg={stuckMsg} />
         </div>
 
         {/* Next Step banner */}

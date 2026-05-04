@@ -258,6 +258,10 @@ export const api = {
   getVolunteerOrgDashboard: (volunteerId: number, orgId: number) =>
     request(`/volunteers/${volunteerId}/org/${orgId}`),
 
+  // Lifecycle endpoints
+  getOrgLifecycle: () => request("/lifecycle/org"),
+  getSupervisorLifecycle: () => request("/lifecycle/supervisor"),
+
   // Event Applications
   getEventApplications: () => request("/event-applications"),
   getOrgEventApplications: (orgId: number) => request(`/event-applications/org/${orgId}`),
