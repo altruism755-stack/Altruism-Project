@@ -108,19 +108,29 @@ export function ProfilePage() {
 
       if (activeOrgIds.length > 0) {
         try {
-          const evtRes = await api.getEvents({ status: "Upcoming" });
+          const [evtRes, appsRes] = await Promise.all([
+            api.getEvents({ status: "Upcoming" }),
+            api.getEventApplications(),
+          ]);
+          const allApps: any[] = appsRes.applications || [];
+          const appMap = new Map<number, string>(); // eventId → applicationStatus
+          allApps.forEach((a: any) => appMap.set(a.event_id, a.status));
+
           const filtered = (evtRes.events || []).filter((e: any) => activeOrgIds.includes(e.org_id));
-          setUpcomingEvents(filtered);
-        } catch { setUpcomingEvents([]); }
+          // Attach application status so the calendar can mark applied events
+          setUpcomingEvents(filtered.map((e: any) => ({
+            ...e,
+            applicationStatus: appMap.get(e.id),
+          })));
+          setPendingApplications(allApps.filter((a: any) => a.status === "Pending"));
+        } catch {
+          setUpcomingEvents([]);
+          setPendingApplications([]);
+        }
       }
 
       const allActivities = volRes.activities || [];
       setPendingActivities(allActivities.filter((a: any) => a.status === "Pending"));
-
-      try {
-        const appsRes = await api.getEventApplications();
-        setPendingApplications((appsRes.applications || []).filter((a: any) => a.status === "Pending"));
-      } catch { setPendingApplications([]); }
 
       const skills: string[] = (() => { try { return JSON.parse(volRes.skills || "[]"); } catch { return []; } })();
       const knownSkills = skills.filter((s) => SKILLS_LIST.includes(s));
@@ -491,7 +501,17 @@ export function ProfilePage() {
             </div>
 
             {/* Calendar */}
-            <CalendarWidget events={upcomingEvents.map((e: any) => ({ date: e.date, name: e.name }))} />
+            <CalendarWidget events={upcomingEvents.map((e: any) => ({
+                date: e.date,
+                name: e.name,
+                time: e.time,
+                location: e.location,
+                org_name: e.org_name,
+                org_id: e.org_id,
+                type: e.type,
+                id: e.id,
+                applicationStatus: e.applicationStatus,
+              }))} />
           </div>
 
           {/* Right column */}
