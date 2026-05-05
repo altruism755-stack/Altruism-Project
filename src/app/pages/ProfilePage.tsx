@@ -516,6 +516,8 @@ export function ProfilePage() {
                 location: e.location,
                 org_name: e.org_name,
                 org_id: e.org_id,
+                org_initials: e.org_initials,
+                org_color: e.org_color,
                 type: e.type,
                 id: e.id,
                 applicationStatus: e.applicationStatus,

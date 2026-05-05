@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router";
+import { OrgLogoByName } from "../../components/OrgLogos";
 
 // ─── Event type color palette ─────────────────────────────────────────────────
 const TYPE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -42,6 +43,8 @@ export interface CalEvent {
   location?: string;
   org_name?: string;
   org_id?: number;
+  org_initials?: string;
+  org_color?: string;
   type?: string;
   id?: number;
   applicationStatus?: string; // "Pending" | "Approved" | "Rejected"
@@ -65,25 +68,18 @@ function EventPill({ event }: { event: CalEvent }) {
   );
 }
 
-function HappeningNowBadge() {
+function OrgAvatar({ event, size = 20 }: { event: CalEvent; size?: number }) {
+  const brand = OrgLogoByName({ name: event.org_name, size });
+  if (brand) return <div style={{ width: size, height: size, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>{brand}</div>;
+  const initials = event.org_initials || (event.org_name || "?").slice(0, 2).toUpperCase();
+  const bg = event.org_color || "#94A3B8";
   return (
-    <span style={{
-      fontSize: 9, fontWeight: 700,
-      background: "#FEF9C3", color: "#A16207",
-      borderRadius: 4, padding: "1px 5px", flexShrink: 0,
-    }}>Happening Now</span>
-  );
-}
-
-function TypeBadge({ event }: { event: CalEvent }) {
-  const type = inferEventType(event.name, event.type);
-  const colors = TYPE_COLORS[type];
-  return (
-    <span style={{
-      fontSize: 9, fontWeight: 700,
-      background: colors.bg, color: colors.text,
-      borderRadius: 4, padding: "1px 5px",
-    }}>{type}</span>
+    <div style={{
+      width: size, height: size, borderRadius: 4, flexShrink: 0,
+      background: bg, display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <span style={{ fontSize: size * 0.38, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{initials}</span>
+    </div>
   );
 }
 
@@ -123,12 +119,11 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
-  // List events
-  const monthEvents = events
-    .filter((e) => { const d = new Date(e.date); return d.getFullYear() === year && d.getMonth() === month; })
-    .sort((a, b) => a.date.localeCompare(b.date));
+  // List events — all events sorted by date (not limited to current month)
+  const allEvents = [...events].sort((a, b) => a.date.localeCompare(b.date));
+  const monthEvents = allEvents.filter((e) => { const d = new Date(e.date); return d.getFullYear() === year && d.getMonth() === month; });
 
-  const listEvents = selectedDay ? getDayEvents(selectedDay) : monthEvents;
+  const listEvents = selectedDay ? getDayEvents(selectedDay) : allEvents;
 
   // Group list by date string
   const groupedList = new Map<string, CalEvent[]>();
@@ -136,13 +131,6 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
     if (!groupedList.has(e.date)) groupedList.set(e.date, []);
     groupedList.get(e.date)!.push(e);
   });
-
-  const isHappeningNow = (e: CalEvent) => {
-    const dt = new Date(e.date);
-    return dt.getFullYear() === todayDate.getFullYear() &&
-      dt.getMonth() === todayDate.getMonth() &&
-      dt.getDate() === todayDate.getDate();
-  };
 
   const formatDateLabel = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -231,29 +219,30 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
                 >
                   {/* Cell */}
                   <div style={{
-                    borderRadius: 8, padding: "3px 3px 4px",
+                    borderRadius: 6, padding: "2px 2px 3px",
                     backgroundColor: selectedCell ? "#EEF2FF" : (todayCell ? "#F0FDF4" : (hasEvents ? "#FAFAFA" : "transparent")),
                     border: selectedCell ? "1.5px solid #6366F1" : (todayCell ? "1.5px solid #16A34A" : "1px solid transparent"),
                     cursor: hasEvents ? "pointer" : "default",
                     transition: "background 150ms",
-                    minHeight: 60,
+                    minHeight: 46,
                     display: "flex", flexDirection: "column", alignItems: "stretch", gap: 2,
                   }}>
                     {/* Day number */}
                     <div style={{
-                      textAlign: "center", fontSize: 11,
-                      fontWeight: todayCell || selectedCell ? 700 : (hasEvents ? 600 : 400),
-                      lineHeight: "18px",
+                      textAlign: "center", fontSize: 10,
+                      fontWeight: todayCell || selectedCell ? 700 : (hasEvents ? 500 : 400),
+                      lineHeight: "16px",
+                      color: d === null ? "transparent" : (hasEvents || todayCell || selectedCell ? "#1E293B" : "#94A3B8"),
                     }}>
                       {d !== null ? (
                         todayCell ? (
                           <span style={{
                             display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            width: 20, height: 20, borderRadius: "50%",
-                            background: "#16A34A", color: "#fff", fontSize: 11, fontWeight: 700,
+                            width: 18, height: 18, borderRadius: "50%",
+                            background: "#16A34A", color: "#fff", fontSize: 10, fontWeight: 700,
                           }}>{d}</span>
                         ) : (
-                          <span style={{ color: selectedCell ? "#4F46E5" : "#1E293B" }}>{d}</span>
+                          <span style={{ color: selectedCell ? "#4F46E5" : undefined }}>{d}</span>
                         )
                       ) : ""}
                     </div>
@@ -291,22 +280,18 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
                       {dayEvents.map((e, idx) => {
                         const type = inferEventType(e.name, e.type);
                         const colors = TYPE_COLORS[type];
-                        const now = isHappeningNow(e);
                         return (
                           <div key={idx} style={{ padding: "8px 0", borderBottom: idx < dayEvents.length - 1 ? "1px solid #F1F5F9" : "none" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                               <span style={{ width: 8, height: 8, borderRadius: "50%", background: colors.dot, flexShrink: 0 }} />
                               <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", flex: 1, lineHeight: 1.3 }}>{e.name}</span>
-                              {now && <HappeningNowBadge />}
                             </div>
-                            {e.time && <div style={metaRow}>🕐 {formatTime(e.time)}</div>}
-                            {e.location && <div style={metaRow}>📍 {e.location}</div>}
-                            {e.org_name && <div style={metaRow}>🏢 {e.org_name}</div>}
-                            {e.applicationStatus && (
-                              <div style={{ marginLeft: 14, marginTop: 4 }}>
-                                {e.applicationStatus === "Approved" && <span style={{ fontSize: 10, fontWeight: 700, background: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "2px 6px" }}>✓ Application Approved</span>}
-                                {e.applicationStatus === "Pending"  && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEF3C7", color: "#B45309",  borderRadius: 4, padding: "2px 6px" }}>⏳ Application Pending</span>}
-                                {e.applicationStatus === "Rejected" && <span style={{ fontSize: 10, fontWeight: 700, background: "#FEE2E2", color: "#B91C1C",  borderRadius: 4, padding: "2px 6px" }}>✗ Application Rejected</span>}
+                            {e.time && <div style={metaRow}>{formatTime(e.time)}</div>}
+                            {e.location && <div style={metaRow}>{e.location}</div>}
+                            {e.org_name && (
+                              <div style={{ ...metaRow, display: "flex", alignItems: "center", gap: 5 }}>
+                                <OrgAvatar event={e} size={16} />
+                                <span>{e.org_name}</span>
                               </div>
                             )}
                             {e.org_id && (
@@ -329,22 +314,11 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
             })}
           </div>
 
-          {/* ── Legend ── */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid #F1F5F9" }}>
-            {(Object.entries(TYPE_COLORS) as [string, { bg: string; text: string; dot: string }][])
-              .filter(([k]) => k !== "Default")
-              .map(([type, colors]) => (
-                <div key={type} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: colors.dot, flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, color: "#64748B", fontWeight: 500 }}>{type}</span>
-                </div>
-              ))}
-          </div>
         </>
       )}
 
       {/* ── Event List ── */}
-      <div style={{ marginTop: viewMode === "calendar" ? 16 : 0, borderTop: viewMode === "calendar" ? "1px solid #E2E8F0" : "none", paddingTop: viewMode === "calendar" ? 12 : 0 }}>
+      <div style={{ marginTop: viewMode === "calendar" ? 10 : 0, borderTop: viewMode === "calendar" ? "1px solid #E2E8F0" : "none", paddingTop: viewMode === "calendar" ? 10 : 0 }}>
         {/* List header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -375,7 +349,6 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
                   {dayEvts.map((e, idx) => {
                     const type = inferEventType(e.name, e.type);
                     const colors = TYPE_COLORS[type];
-                    const now = isHappeningNow(e);
                     return (
                       <div key={idx}
                         onClick={() => e.org_id && navigate(`/dashboard/org/${e.org_id}`)}
@@ -392,19 +365,17 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
                             <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", flex: 1 }}>{e.name}</span>
-                            {now && <HappeningNowBadge />}
-                            {e.applicationStatus === "Approved" && <span style={{ fontSize: 9, fontWeight: 700, background: "#DCFCE7", color: "#15803D", borderRadius: 4, padding: "1px 5px" }}>Applied ✓</span>}
-                            {e.applicationStatus === "Pending"  && <span style={{ fontSize: 9, fontWeight: 700, background: "#FEF3C7", color: "#B45309",  borderRadius: 4, padding: "1px 5px" }}>Applied ⏳</span>}
-                            {e.applicationStatus === "Rejected" && <span style={{ fontSize: 9, fontWeight: 700, background: "#FEE2E2", color: "#B91C1C",  borderRadius: 4, padding: "1px 5px" }}>Rejected</span>}
-                            <TypeBadge event={e} />
                           </div>
-                          {(e.time || e.location || e.org_name) && (
-                            <div style={{ display: "flex", gap: 10, marginTop: 3, flexWrap: "wrap" }}>
-                              {e.time && <span style={{ fontSize: 11, color: "#64748B" }}>🕐 {formatTime(e.time)}</span>}
-                              {e.location && <span style={{ fontSize: 11, color: "#64748B" }}>📍 {e.location}</span>}
-                              {e.org_name && <span style={{ fontSize: 11, color: "#94A3B8" }}>· {e.org_name}</span>}
-                            </div>
-                          )}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                            {e.org_name && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <OrgAvatar event={e} size={18} />
+                                <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{e.org_name}</span>
+                              </div>
+                            )}
+                            <span style={{ fontSize: 11, color: "#94A3B8" }}>{e.time ? formatTime(e.time) : "All day"}</span>
+                            {e.location && <span style={{ fontSize: 11, color: "#94A3B8" }}>{e.location}</span>}
+                          </div>
                         </div>
                       </div>
                     );
@@ -423,7 +394,7 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
                   fontSize: 12, fontWeight: 600, color: "#6366F1",
                   transition: "all 150ms",
                 }}>
-                {showAll ? "Show less ↑" : `View all ${monthEvents.length} events this month ↓`}
+                {showAll ? "Show less ↑" : `View all ${allEvents.length} events ↓`}
               </button>
             )}
           </>
