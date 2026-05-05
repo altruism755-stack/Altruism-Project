@@ -45,13 +45,17 @@ def list_activities(
 
 
 @router.post("", status_code=201)
-def log_activity(body: dict, current_user: dict = Depends(require_roles("volunteer"))):
+def log_activity(body: dict, current_user: dict = Depends(require_roles("supervisor", "org_admin"))):
     with get_db() as db:
+        volunteer_id = body.get("volunteer_id")
+        if not volunteer_id:
+            raise HTTPException(400, "volunteer_id is required")
+
         vol = dict_row(db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id, name, user_id FROM volunteers WHERE id = ?", (volunteer_id,)
         ).fetchone())
         if not vol:
-            raise HTTPException(404, "Volunteer profile not found")
+            raise HTTPException(404, "Volunteer not found")
 
         date = body.get("date")
         hours = body.get("hours")
@@ -59,29 +63,20 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("volunte
             raise HTTPException(400, "Date and hours are required")
 
         event_id = body.get("event_id")
-        org_id = None
-        if event_id:
+        org_id = body.get("org_id")
+        if not org_id and event_id:
             event = dict_row(db.execute("SELECT org_id FROM events WHERE id = ?", (event_id,)).fetchone())
             if event:
                 org_id = event["org_id"]
 
-        # Enforce Active membership — a volunteer cannot log hours for an org
-        # they have not been approved for. This is the single gating rule.
-        if org_id:
-            membership = dict_row(db.execute(
-                "SELECT status FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
-                (org_id, vol["id"]),
-            ).fetchone())
-            if not membership or membership["status"] != "Active":
-                raise HTTPException(
-                    403,
-                    "You must be an approved (Active) member of this organization to log volunteer hours.",
-                )
+        status = body.get("status", "Pending")
+        if status not in ("Pending", "Approved", "Rejected"):
+            status = "Pending"
 
         cur = db.execute(
             "INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, 'Pending')",
-            (vol["id"], event_id, org_id, date, hours, body.get("description", "")),
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (vol["id"], event_id, org_id, date, hours, body.get("description", ""), status),
         )
 
         activity = dict_row(db.execute(
@@ -90,45 +85,17 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("volunte
             (cur.lastrowid,),
         ).fetchone())
 
-        # Notify supervisor and org admin about new activity submission
-        vol_name = dict_row(db.execute(
-            "SELECT name FROM volunteers WHERE id = ?", (vol["id"],)
-        ).fetchone())
-        vol_display = (vol_name or {}).get("name", "A volunteer")
-        event_display = (activity or {}).get("event_name") or "an activity"
-        hrs = body.get("hours", "")
-
-        if org_id:
-            # Notify org admin
-            org_admin = dict_row(db.execute(
-                "SELECT admin_user_id FROM organizations WHERE id = ?", (org_id,)
-            ).fetchone())
-            if org_admin and org_admin.get("admin_user_id"):
-                create_notification(
-                    db,
-                    org_admin["admin_user_id"],
-                    "activity_submitted",
-                    "New Activity Submission",
-                    f"{vol_display} logged {hrs} hr(s) for {event_display}. Awaiting review.",
-                    "/org",
-                )
-            # Notify assigned supervisor if any
-            ov = dict_row(db.execute(
-                "SELECT ov.supervisor_id, s.user_id as sup_user_id "
-                "FROM org_volunteers ov "
-                "JOIN supervisors s ON s.id = ov.supervisor_id "
-                "WHERE ov.org_id = ? AND ov.volunteer_id = ?",
-                (org_id, vol["id"]),
-            ).fetchone())
-            if ov and ov.get("sup_user_id"):
-                create_notification(
-                    db,
-                    ov["sup_user_id"],
-                    "activity_submitted",
-                    "New Activity Submission",
-                    f"{vol_display} logged {hrs} hr(s) for {event_display}. Awaiting your review.",
-                    "/supervisor",
-                )
+        # Notify volunteer that an activity has been logged for them
+        if vol.get("user_id"):
+            event_display = (activity or {}).get("event_name") or "an activity"
+            create_notification(
+                db,
+                vol["user_id"],
+                "activity_submitted",
+                "Activity Logged for You",
+                f"Your supervisor logged {hours} hr(s) for {event_display}. Status: {status}.",
+                "/dashboard/profile",
+            )
 
         db.commit()
         return activity

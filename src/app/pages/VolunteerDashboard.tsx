@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -20,7 +19,6 @@ const certTypeColors: Record<string, { bg: string; text: string }> = {
 };
 
 export function VolunteerDashboard() {
-  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const volName = profile?.name || "Volunteer";
   const volId = user?.id || 0;
@@ -41,7 +39,7 @@ export function VolunteerDashboard() {
       setVolunteer(volRes);
       setMyActivities(volRes.activities || []);
       setMyOrgs(volRes.organizations || []);
-      setMyCertificates(volRes.certificates || []);
+      setMyCertificates((volRes.certificates || []).filter((c: any) => c.file_url));
       setUpcomingEvents((evtRes.events || []).slice(0, 3));
     } catch (e) { console.error("Failed to load dashboard:", e); }
     finally { setLoading(false); }
@@ -51,7 +49,6 @@ export function VolunteerDashboard() {
 
   const totalHours = myActivities.filter((a) => a.status === "Approved").reduce((s: number, a: any) => s + (a.hours || 0), 0);
   const totalSubmitted = myActivities.length;
-  const pendingReview = myActivities.filter((a) => a.status === "Pending").length;
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -66,11 +63,10 @@ export function VolunteerDashboard() {
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
         {/* Stat cards */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {[
             { label: "Total Hours Logged", value: volunteer?.totalHours || totalHours, gradient: "linear-gradient(135deg,#16A34A,#22C55E)" },
-            { label: "Activities Submitted", value: totalSubmitted, gradient: "linear-gradient(135deg,#2563EB,#3B82F6)" },
-            { label: "Pending Review", value: pendingReview, gradient: "linear-gradient(135deg,#D97706,#F59E0B)" },
+            { label: "Activities Logged", value: totalSubmitted, gradient: "linear-gradient(135deg,#2563EB,#3B82F6)" },
             { label: "Certificates Earned", value: myCertificates.length, gradient: "linear-gradient(135deg,#0891B2,#06B6D4)" },
           ].map((s) => (
             <div key={s.label} style={{ background: s.gradient, borderRadius: 12, padding: "20px 24px", height: 110, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
@@ -116,7 +112,21 @@ export function VolunteerDashboard() {
                         <span style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{cert.event_name}</span>
                         <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "2px 8px" }}>{cert.type}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>{cert.org_name} · {cert.issued_date} · {cert.hours} hrs</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>{cert.org_name} · {cert.issued_date} · {cert.hours} hrs</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
+                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}`).catch(() => {})}
+                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
+                        >
+                          Download
+                        </button>
+                      </div>
                     </div>
                   );
                 })
@@ -143,7 +153,6 @@ export function VolunteerDashboard() {
           <div style={{ flex: "0 0 65%" }}>
             <div className="flex items-center justify-between mb-4">
               <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1E293B", margin: 0 }}>Recent Activity</h2>
-              <button onClick={() => navigate("/dashboard/log-activity")} style={{ height: 40, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Log New Activity</button>
             </div>
 
             <div className="flex flex-col gap-3">
@@ -166,7 +175,7 @@ export function VolunteerDashboard() {
                 );
               })}
               {myActivities.length === 0 && (
-                <div className="text-center py-8" style={{ color: "#94A3B8", fontSize: 14 }}>No activities yet. Log your first activity!</div>
+                <div className="text-center py-8" style={{ color: "#94A3B8", fontSize: 14 }}>No activities logged yet.</div>
               )}
             </div>
           </div>

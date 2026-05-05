@@ -166,7 +166,7 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
     }}>
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 8, flexWrap: "wrap" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: 0 }}>Upcoming Activities</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: 0 }}>Confirmed Events</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {/* View toggle */}
           <div style={{ display: "flex", background: "#F1F5F9", borderRadius: 8, padding: 2 }}>
@@ -334,7 +334,10 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
         </div>
 
         {listEvents.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", padding: "16px 0" }}>No events scheduled.</div>
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 4 }}>No upcoming approved events.</div>
+            <div style={{ fontSize: 12, color: "#CBD5E1" }}>Events appear here once your application is approved.</div>
+          </div>
         ) : (
           <>
             {Array.from(groupedList.entries())

@@ -35,6 +35,17 @@ export function SupervisorDashboard() {
   const [certActivity, setCertActivity] = useState<any | null>(null);
   const [certForm, setCertForm] = useState({ type: "Participation" });
   const [certBusy, setCertBusy] = useState(false);
+  // After issuing, hold the new cert ID so we can attach a file
+  const [issuedCertId, setIssuedCertId] = useState<number | null>(null);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certUploadBusy, setCertUploadBusy] = useState(false);
+  const [certUploadError, setCertUploadError] = useState("");
+
+  // Log activity modal state
+  const [showLogActivity, setShowLogActivity] = useState(false);
+  const [logForm, setLogForm] = useState({ volunteer_id: "", event_id: "", date: "", hours: "", description: "", status: "Approved" });
+  const [logBusy, setLogBusy] = useState(false);
+  const [logError, setLogError] = useState("");
 
   const loadAll = useCallback(async () => {
     try {
@@ -92,7 +103,7 @@ export function SupervisorDashboard() {
     setCertBusy(true);
     try {
       await api.approveActivity(certActivity.id);
-      await api.issueCertificate({
+      const cert = await api.issueCertificate({
         volunteer_id: certActivity.volunteer_id,
         org_id: certActivity.org_id,
         event_id: certActivity.event_id,
@@ -100,9 +111,28 @@ export function SupervisorDashboard() {
         hours: certActivity.hours,
       });
       setActivities((a) => a.filter((act) => act.id !== certActivity.id));
-      setCertActivity(null);
+      // Transition to file upload step instead of closing
+      setIssuedCertId(cert?.id ?? null);
+      setCertFile(null);
+      setCertUploadError("");
     } catch (e) { console.error("Approve+certify failed:", e); }
     setCertBusy(false);
+  };
+
+  const handleCertFileUpload = async () => {
+    if (!issuedCertId || !certFile) return;
+    setCertUploadBusy(true);
+    setCertUploadError("");
+    try {
+      await api.uploadCertificateFile(issuedCertId, certFile);
+      setIssuedCertId(null);
+      setCertActivity(null);
+      setCertFile(null);
+    } catch {
+      setCertUploadError("Upload failed. Please try again.");
+    } finally {
+      setCertUploadBusy(false);
+    }
   };
 
   const handleRejectActivity = async (id: number) => {
@@ -110,6 +140,32 @@ export function SupervisorDashboard() {
       await api.rejectActivity(id);
       setActivities((a) => a.filter((act) => act.id !== id));
     } catch (e) { console.error("Reject activity failed:", e); }
+  };
+
+  const handleLogActivity = async () => {
+    if (!logForm.volunteer_id || !logForm.date || !logForm.hours) {
+      setLogError("Volunteer, date, and hours are required.");
+      return;
+    }
+    setLogBusy(true);
+    setLogError("");
+    try {
+      await api.logActivity({
+        volunteer_id: Number(logForm.volunteer_id),
+        event_id: logForm.event_id ? Number(logForm.event_id) : undefined,
+        date: logForm.date,
+        hours: Number(logForm.hours),
+        description: logForm.description,
+        status: logForm.status,
+      });
+      setShowLogActivity(false);
+      setLogForm({ volunteer_id: "", event_id: "", date: "", hours: "", description: "", status: "Approved" });
+      loadAll();
+    } catch (e: any) {
+      setLogError(e?.message || "Failed to log activity.");
+    } finally {
+      setLogBusy(false);
+    }
   };
 
   const upcomingEvents = events.filter((e) => e.status === "Upcoming" || e.status === "Active");
@@ -370,8 +426,16 @@ export function SupervisorDashboard() {
                   <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Review Pipeline</div>
                   <LifecycleStepper steps={supPipelineSteps} stuckMsg={supStuckMsg} />
                 </div>
-                <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
-                  Pending activity logs from volunteers in <strong>{org?.name}</strong> awaiting your review.
+                <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, color: "#64748B" }}>
+                    Activity logs for volunteers in <strong>{org?.name}</strong>. You can also log hours on behalf of a volunteer.
+                  </div>
+                  <button
+                    onClick={() => { setShowLogActivity(true); setLogError(""); }}
+                    style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    + Log Activity
+                  </button>
                 </div>
                 {activities.length === 0 ? (
                   <EmptyState label="No pending activity approvals." />
@@ -481,33 +545,196 @@ export function SupervisorDashboard() {
 
       {/* Certificate modal */}
       {certActivity && (
-        <div onClick={() => setCertActivity(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
+        <div
+          onClick={() => { if (!issuedCertId) setCertActivity(null); }}
+          style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}
+        >
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 460, padding: 28 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Approve & Issue Certificate</div>
-            <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
-              Approving <strong>{certActivity.hours} hr(s)</strong> for <strong>{certActivity.volunteer_name}</strong> — {certActivity.event_name || "activity"}.
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Certificate Type</label>
-              <div className="flex gap-2">
-                {(["Participation", "Achievement", "Completion"] as const).map((t) => (
+
+            {/* Step 1 — Type selection */}
+            {!issuedCertId ? (
+              <>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Approve & Issue Certificate</div>
+                <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+                  Approving <strong>{certActivity.hours} hr(s)</strong> for <strong>{certActivity.volunteer_name}</strong> — {certActivity.event_name || "activity"}.
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Certificate Type</label>
+                  <div className="flex gap-2">
+                    {(["Participation", "Achievement", "Completion"] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setCertForm({ type: t })}
+                        style={{
+                          flex: 1, height: 38, border: "1.5px solid", borderRadius: 8, fontSize: 13, fontWeight: certForm.type === t ? 600 : 400, cursor: "pointer",
+                          borderColor: certForm.type === t ? (t === "Participation" ? "#2563EB" : t === "Achievement" ? "#D97706" : GREEN) : "#E2E8F0",
+                          backgroundColor: certForm.type === t ? (t === "Participation" ? "#EFF6FF" : t === "Achievement" ? "#FFFBEB" : "#F0FDF4") : "#fff",
+                          color: certForm.type === t ? (t === "Participation" ? "#1D4ED8" : t === "Achievement" ? "#B45309" : "#15803D") : "#64748B",
+                        }}
+                      >{t}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+                  <button onClick={() => setCertActivity(null)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={async () => { await handleApproveActivity(certActivity.id); setCertActivity(null); }} style={{ height: 36, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve Only</button>
+                  <button onClick={handleApproveAndCertify} disabled={certBusy} style={{ height: 36, padding: "0 16px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: certBusy ? "not-allowed" : "pointer", opacity: certBusy ? 0.7 : 1 }}>{certBusy ? "Issuing…" : "Approve + Issue"}</button>
+                </div>
+              </>
+            ) : (
+              /* Step 2 — File upload */
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>✅</div>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: "#1E293B" }}>Certificate Issued!</div>
+                </div>
+                <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+                  Upload the certificate file so <strong>{certActivity.volunteer_name}</strong> can view and download it from their profile.
+                </div>
+
+                <div
+                  style={{ border: "2px dashed #E2E8F0", borderRadius: 10, padding: "20px 16px", textAlign: "center", marginBottom: 16, backgroundColor: certFile ? "#F0FDF4" : "#FAFAFA", cursor: "pointer" }}
+                  onClick={() => document.getElementById("cert-file-input")?.click()}
+                >
+                  <input
+                    id="cert-file-input"
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    style={{ display: "none" }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setCertFile(f); setCertUploadError(""); } }}
+                  />
+                  {certFile ? (
+                    <>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#15803D" }}>{certFile.name}</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{(certFile.size / 1024).toFixed(0)} KB — click to change</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 13, color: "#64748B" }}>Click to select a file</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>PDF, PNG, or JPG</div>
+                    </>
+                  )}
+                </div>
+
+                {certUploadError && (
+                  <div style={{ fontSize: 12, color: "#B91C1C", backgroundColor: "#FEE2E2", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>{certUploadError}</div>
+                )}
+
+                <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
                   <button
-                    key={t}
-                    onClick={() => setCertForm({ type: t })}
-                    style={{
-                      flex: 1, height: 38, border: "1.5px solid", borderRadius: 8, fontSize: 13, fontWeight: certForm.type === t ? 600 : 400, cursor: "pointer",
-                      borderColor: certForm.type === t ? (t === "Participation" ? "#2563EB" : t === "Achievement" ? "#D97706" : GREEN) : "#E2E8F0",
-                      backgroundColor: certForm.type === t ? (t === "Participation" ? "#EFF6FF" : t === "Achievement" ? "#FFFBEB" : "#F0FDF4") : "#fff",
-                      color: certForm.type === t ? (t === "Participation" ? "#1D4ED8" : t === "Achievement" ? "#B45309" : "#15803D") : "#64748B",
-                    }}
-                  >{t}</button>
-                ))}
+                    onClick={() => { setIssuedCertId(null); setCertActivity(null); setCertFile(null); }}
+                    style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+                  >
+                    Skip for now
+                  </button>
+                  <button
+                    onClick={handleCertFileUpload}
+                    disabled={!certFile || certUploadBusy}
+                    style={{ height: 36, padding: "0 18px", backgroundColor: (!certFile || certUploadBusy) ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!certFile || certUploadBusy) ? "not-allowed" : "pointer" }}
+                  >
+                    {certUploadBusy ? "Uploading…" : "Upload File"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Log Activity modal */}
+      {showLogActivity && (
+        <div onClick={() => setShowLogActivity(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Log Activity for Volunteer</div>
+            <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>Record volunteer hours on behalf of a member of {org?.name}.</div>
+
+            {logError && (
+              <div style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{logError}</div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Volunteer <span style={{ color: "#DC2626" }}>*</span></label>
+                <select
+                  value={logForm.volunteer_id}
+                  onChange={(e) => setLogForm((f) => ({ ...f, volunteer_id: e.target.value }))}
+                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
+                >
+                  <option value="">Select volunteer…</option>
+                  {volunteers.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-            <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
-              <button onClick={() => setCertActivity(null)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-              <button onClick={async () => { await handleApproveActivity(certActivity.id); setCertActivity(null); }} style={{ height: 36, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve Only</button>
-              <button onClick={handleApproveAndCertify} disabled={certBusy} style={{ height: 36, padding: "0 16px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: certBusy ? "not-allowed" : "pointer", opacity: certBusy ? 0.7 : 1 }}>{certBusy ? "Issuing…" : "Approve + Issue"}</button>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Related Event (optional)</label>
+                <select
+                  value={logForm.event_id}
+                  onChange={(e) => setLogForm((f) => ({ ...f, event_id: e.target.value }))}
+                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
+                >
+                  <option value="">No specific event</option>
+                  {events.map((ev) => (
+                    <option key={ev.id} value={ev.id}>{ev.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3">
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Date <span style={{ color: "#DC2626" }}>*</span></label>
+                  <input
+                    type="date"
+                    value={logForm.date}
+                    onChange={(e) => setLogForm((f) => ({ ...f, date: e.target.value }))}
+                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Hours <span style={{ color: "#DC2626" }}>*</span></label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={logForm.hours}
+                    onChange={(e) => setLogForm((f) => ({ ...f, hours: e.target.value }))}
+                    placeholder="e.g. 3"
+                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Status</label>
+                <select
+                  value={logForm.status}
+                  onChange={(e) => setLogForm((f) => ({ ...f, status: e.target.value }))}
+                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
+                >
+                  <option value="Approved">Approved</option>
+                  <option value="Pending">Pending (under review)</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Description (optional)</label>
+                <textarea
+                  value={logForm.description}
+                  onChange={(e) => setLogForm((f) => ({ ...f, description: e.target.value }))}
+                  rows={3}
+                  placeholder="Brief notes about the activity…"
+                  style={{ width: "100%", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                />
+              </div>
+
+              <div className="flex gap-2" style={{ justifyContent: "flex-end", marginTop: 4 }}>
+                <button onClick={() => setShowLogActivity(false)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                <button onClick={handleLogActivity} disabled={logBusy} style={{ height: 36, padding: "0 18px", backgroundColor: logBusy ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: logBusy ? "not-allowed" : "pointer" }}>
+                  {logBusy ? "Saving…" : "Save Activity"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

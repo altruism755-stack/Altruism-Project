@@ -280,6 +280,12 @@ def init_schema():
     except Exception:
         pass
 
+    # Certificate file upload support
+    try:
+        conn.execute("ALTER TABLE certificates ADD COLUMN file_url TEXT")
+    except Exception:
+        pass
+
     # Platform admins table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS platform_admins (

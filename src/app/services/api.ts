@@ -177,6 +177,43 @@ export const api = {
   },
   issueCertificate: (data: any) =>
     request("/certificates", { method: "POST", body: JSON.stringify(data) }),
+  uploadCertificateFile: (certId: number, file: File): Promise<{ file_url: string }> => {
+    const token = getToken();
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${API_BASE}/certificates/${certId}/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async (r) => {
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    });
+  },
+  downloadCertificateFile: async (certId: number, filename?: string): Promise<void> => {
+    const token = getToken();
+    const r = await fetch(`${API_BASE}/certificates/${certId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!r.ok) throw new Error("File not available");
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || `certificate_${certId}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  viewCertificateFile: async (certId: number): Promise<void> => {
+    const token = getToken();
+    const r = await fetch(`${API_BASE}/certificates/${certId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!r.ok) throw new Error("File not available");
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  },
 
   // Organizations
   getOrganizations: () => request("/organizations"),

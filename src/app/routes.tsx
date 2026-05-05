@@ -17,7 +17,6 @@ import { BrowseOrganizations } from "./pages/BrowseOrganizations";
 import { OrgPendingPage } from "./pages/OrgPendingPage";
 import { OrgProfilePage } from "./pages/OrgProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
-import { LogActivityPage } from "./pages/LogActivityPage";
 import { PlatformAdminDashboard } from "./pages/PlatformAdminDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -70,8 +69,7 @@ export const router = createBrowserRouter([
       { path: "/dashboard/org/:orgId", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgDashboard /></ProtectedRoute> },
       { path: "/dashboard/org/:orgId/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgProfile /></ProtectedRoute> },
       { path: "/dashboard/feed", element: <ProtectedRoute allowedRoles={["volunteer"]}><NewsFeed /></ProtectedRoute> },
-      { path: "/dashboard/log-activity", element: <ProtectedRoute allowedRoles={["volunteer"]}><LogActivityPage /></ProtectedRoute> },
-      { path: "/dashboard/notifications", element: <ProtectedRoute allowedRoles={["volunteer"]}><NotificationsPage /></ProtectedRoute> },
+{ path: "/dashboard/notifications", element: <ProtectedRoute allowedRoles={["volunteer"]}><NotificationsPage /></ProtectedRoute> },
 
       // Catch-all
       { path: "*", element: <Navigate to="/" replace /> },

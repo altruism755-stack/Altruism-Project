@@ -49,7 +49,6 @@ export function ProfilePage() {
   const [myOrgs, setMyOrgs] = useState<any[]>([]);
   const [myCertificates, setMyCertificates] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
-  const [pendingActivities, setPendingActivities] = useState<any[]>([]);
   const [pendingApplications, setPendingApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,7 +98,7 @@ export function ProfilePage() {
 
       const orgs: any[] = volRes.organizations || [];
       setMyOrgs(orgs);
-      setMyCertificates(volRes.certificates || []);
+      setMyCertificates((volRes.certificates || []).filter((c: any) => c.file_url));
 
       // Fetch events only from the volunteer's ACTIVE org memberships
       const activeOrgIds = orgs
@@ -117,28 +116,18 @@ export function ProfilePage() {
           allApps.forEach((a: any) => appMap.set(a.event_id, a.status));
 
           const filtered = (evtRes.events || []).filter((e: any) => activeOrgIds.includes(e.org_id));
-          // Attach application status so the calendar can mark applied events
-          setUpcomingEvents(filtered.map((e: any) => ({
-            ...e,
-            applicationStatus: appMap.get(e.id),
-          })));
+          // Only show events the volunteer has been approved for — calendar = confirmed participation only
+          setUpcomingEvents(
+            filtered
+              .map((e: any) => ({ ...e, applicationStatus: appMap.get(e.id) }))
+              .filter((e: any) => e.applicationStatus === "Approved")
+          );
           setPendingApplications(allApps.filter((a: any) => a.status === "Pending"));
         } catch {
           setUpcomingEvents([]);
           setPendingApplications([]);
         }
       }
-
-      const activeOrgIdSet = new Set(activeOrgIds);
-      const allActivities = volRes.activities || [];
-      // Only surface pending activities from orgs where the volunteer is Active.
-      // Activities at Pending-membership orgs are orphaned data and must not drive
-      // workflow cards — that would contradict the volunteer's actual access state.
-      setPendingActivities(
-        allActivities.filter((a: any) =>
-          a.status === "Pending" && (!a.org_id || activeOrgIdSet.has(a.org_id))
-        )
-      );
 
       const skills: string[] = (() => { try { return JSON.parse(volRes.skills || "[]"); } catch { return []; } })();
       const knownSkills = skills.filter((s) => SKILLS_LIST.includes(s));
@@ -501,7 +490,21 @@ export function ProfilePage() {
                       <span style={{ fontSize: 13, fontWeight: 500, color: "#1E293B" }}>{cert.event_name}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "2px 8px" }}>{cert.type}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{cert.org_name} &middot; {cert.issued_date}</div>
+                    <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 6 }}>{cert.org_name} &middot; {cert.issued_date}</div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
+                        style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}`).catch(() => {})}
+                        style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
+                      >
+                        Download
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -549,47 +552,7 @@ export function ProfilePage() {
                   badge: pendingOrgs.length,
                 });
               }
-              if (pendingActivities.length > 0) {
-                actions.push({
-                  priority: "urgent", icon: "📋",
-                  title: "Hours Under Review",
-                  desc: `${pendingActivities.length} activity log${pendingActivities.length > 1 ? "s" : ""} submitted and awaiting supervisor approval.`,
-                  cta: "View Status",
-                  badge: pendingActivities.length,
-                  onClick: () => {
-                    const orgId = pendingActivities[0]?.org_id ?? (activeOrgs.length === 1 ? activeOrgs[0].id : null);
-                    if (orgId) navigate(`/dashboard/org/${orgId}?tab=pending`);
-                  },
-                });
-              }
-              if (pendingApplications.length > 0) {
-                actions.push({
-                  priority: "info", icon: "📅",
-                  title: "Event Applications Pending",
-                  desc: `${pendingApplications.length} event application${pendingApplications.length > 1 ? "s" : ""} awaiting admin review.`,
-                  cta: "View Events",
-                  badge: pendingApplications.length,
-                  href: activeOrgs.length === 1 ? `/dashboard/org/${activeOrgs[0].id}` : "/dashboard/orgs",
-                });
-              }
-              if (activeOrgs.length > 0 && pendingActivities.length === 0 && pendingApplications.length === 0) {
-                actions.push({
-                  priority: "success", icon: "⏱️",
-                  title: "Log Your Hours",
-                  desc: `You're active in ${activeOrgs.length} organization${activeOrgs.length > 1 ? "s" : ""}. Submitted hours count toward your certificates.`,
-                  cta: "Log Activity", href: "/dashboard/log-activity",
-                });
-              }
-              if (myCertificates.length > 0 && actions.length < 2) {
-                actions.push({
-                  priority: "info", icon: "🏆",
-                  title: `${myCertificates.length} Certificate${myCertificates.length > 1 ? "s" : ""} Earned`,
-                  desc: "Your volunteer journey is building up. Keep logging hours to earn more.",
-                  cta: "View Certificates",
-                  onClick: () => document.querySelector("[data-section='certificates']")?.scrollIntoView({ behavior: "smooth" }),
-                });
-              }
-              if (actions.length === 0) return null;
+if (actions.length === 0) return null;
               return <WorkflowPanel actions={actions} style={{ marginBottom: 20 }} />;
             })()}
 
@@ -597,46 +560,24 @@ export function ProfilePage() {
             <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 16px 0" }}>Pending</h3>
 
-              {pendingActivities.length === 0 && pendingApplications.length === 0 ? (
+              {pendingApplications.length === 0 ? (
                 <div style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", padding: "16px 0" }}>No pending items.</div>
               ) : (
-                <>
-                  {pendingActivities.length > 0 && (
-                    <div style={{ marginBottom: pendingApplications.length > 0 ? 16 : 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Activity Hours</div>
-                      {pendingActivities.map((a: any) => {
-                        const sc = statusColors.Pending;
-                        return (
-                          <div key={a.id} className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
-                            <div>
-                              <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.event_name}</div>
-                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{a.date} &middot; {a.hours} hrs</div>
-                            </div>
-                            <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text, borderRadius: 20, padding: "3px 10px" }}>Pending</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {pendingApplications.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Event Applications</div>
-                      {pendingApplications.map((app: any) => {
-                        const sc = statusColors.Pending;
-                        return (
-                          <div key={app.id} className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
-                            <div>
-                              <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.event_name}</div>
-                              <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.org_name} &middot; {app.event_date}</div>
-                            </div>
-                            <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text, borderRadius: 20, padding: "3px 10px" }}>Pending</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Event Applications</div>
+                  {pendingApplications.map((app: any) => {
+                    const sc = statusColors.Pending;
+                    return (
+                      <div key={app.id} className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.event_name}</div>
+                          <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.org_name} &middot; {app.event_date}</div>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text, borderRadius: 20, padding: "3px 10px" }}>Pending</span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 

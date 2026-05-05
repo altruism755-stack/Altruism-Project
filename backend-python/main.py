@@ -82,6 +82,11 @@ uploads_dir = os.path.join(os.path.dirname(__file__), "uploads", "profiles")
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads/profiles", StaticFiles(directory=uploads_dir), name="profile_uploads")
 
+# Serve uploaded certificate files
+certs_dir = os.path.join(os.path.dirname(__file__), "uploads", "certificates")
+os.makedirs(certs_dir, exist_ok=True)
+app.mount("/uploads/certificates", StaticFiles(directory=certs_dir), name="cert_uploads")
+
 
 # Health check — lightweight metadata for frontend connection probes.
 @app.get("/api/health")
