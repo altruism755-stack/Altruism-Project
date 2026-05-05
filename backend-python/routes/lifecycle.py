@@ -46,21 +46,21 @@ def compute_volunteer_lifecycle(
     activities: list,
     certificates: list,
 ) -> dict:
-    """Full lifecycle for one (volunteer, org) pair. Called from volunteers.py."""
-    has_pending = any(a["status"] == "Pending" for a in activities)
+    """Full lifecycle for one (volunteer, org) pair. Called from volunteers.py.
+
+    Hours are logged by supervisors — volunteers have no submission step.
+    The journey is: Apply → Get Accepted → Supervisor Logs Hours → Certificate.
+    """
     has_approved = any(a["status"] == "Approved" for a in activities)
     has_any = len(activities) > 0
     has_cert = len(certificates) > 0
     is_member = member_status == "Active"
-    pending_count = sum(1 for a in activities if a["status"] == "Pending")
 
     # Canonical state
     if not is_member:
         state = "APPLICATION_PENDING"
     elif not has_any:
         state = "APPLICATION_APPROVED"
-    elif has_pending:
-        state = "ACTIVITY_UNDER_REVIEW"
     elif has_approved and not has_cert:
         state = "ACTIVITY_APPROVED"
     elif has_cert:
@@ -81,22 +81,12 @@ def compute_volunteer_lifecycle(
             else "The org admin is reviewing your request.",
         ),
         _step(
-            "Log Hours",
+            "Hours Recorded",
             "done" if has_any else ("active" if is_member else "pending"),
-            "⏱",
-            "Hours submitted." if has_any
-            else "Click to log volunteer hours." if is_member
-            else "Available after membership approval.",
-            "log_hours" if is_member and not has_any else None,
-        ),
-        _step(
-            "Hours Approved",
-            "done" if has_approved else ("active" if has_any else "pending"),
             "✅",
-            "Your hours have been approved." if has_approved
-            else f"{pending_count} submission(s) under review — click to view." if has_any
-            else "Submit hours first.",
-            "view_pending" if has_any and not has_approved else None,
+            "Your supervisor has recorded volunteer hours for you." if has_any
+            else "Your supervisor will log your hours after each activity." if is_member
+            else "Available after membership approval.",
         ),
         _step(
             "Certificate",
@@ -104,30 +94,27 @@ def compute_volunteer_lifecycle(
             "🏆",
             "Certificate earned — click to view." if has_cert
             else "The org can now issue your certificate." if has_approved
-            else "Earned after hours are approved.",
+            else "Issued after your hours are recorded.",
             "view_certificates" if has_cert else None,
         ),
     ]
 
     stuck: dict[str, str] = {
-        "APPLICATION_PENDING":   "Waiting for org admin to approve your membership.",
-        "APPLICATION_APPROVED":  "Log your volunteer hours to advance.",
-        "ACTIVITY_UNDER_REVIEW": f"{pending_count} submission(s) under review by your supervisor.",
-        "ACTIVITY_APPROVED":     "Hours approved — org can now issue your certificate.",
+        "APPLICATION_PENDING":  "Waiting for org admin to approve your membership.",
+        "APPLICATION_APPROVED": "Your supervisor will record your hours after each activity.",
+        "ACTIVITY_APPROVED":    "Hours recorded — org can now issue your certificate.",
     }
 
     next_actions: dict[str, str] = {
-        "APPLICATION_PENDING":   "Wait for the organization to approve your membership.",
-        "APPLICATION_APPROVED":  "Log your volunteer hours to continue.",
-        "ACTIVITY_UNDER_REVIEW": f"{pending_count} submission(s) under review by your supervisor.",
-        "ACTIVITY_APPROVED":     "Your hours are approved. The org can now issue your certificate.",
-        "CERTIFICATE_ISSUED":    "You have earned a certificate!",
-        "ACTIVITY_LOGGED":       "Log new hours or wait for your submissions to be reviewed.",
+        "APPLICATION_PENDING":  "Wait for the organization to approve your membership.",
+        "APPLICATION_APPROVED": "Participate in events — your supervisor will log your hours.",
+        "ACTIVITY_LOGGED":      "Hours have been recorded. Awaiting certificate issuance.",
+        "ACTIVITY_APPROVED":    "Your hours are approved. The org can now issue your certificate.",
+        "CERTIFICATE_ISSUED":   "You have earned a certificate!",
     }
 
     blocking: dict[str, str] = {
-        "APPLICATION_PENDING":   "Membership pending admin review.",
-        "ACTIVITY_UNDER_REVIEW": "Waiting for supervisor approval.",
+        "APPLICATION_PENDING": "Membership pending admin review.",
     }
 
     current = next((s["label"] for s in steps if s["status"] == "active"), steps[-1]["label"])

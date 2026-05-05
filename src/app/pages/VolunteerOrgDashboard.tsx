@@ -147,17 +147,18 @@ export function VolunteerOrgDashboard() {
 
   const lifecycle      = data.lifecycle;
   const lifecycleSteps = resolveStepActions(lifecycle?.steps ?? [], {
-    log_hours:         () => navigate("/dashboard/log-activity"),
-    view_pending:      () => setActiveTab("pending"),
     view_certificates: () => setActiveTab("certificates"),
   });
   const stuckMsg = lifecycle?.stuck_msg ?? undefined;
 
+  // Only filter certs that have a file uploaded
+  const visibleCertificates = certificates.filter((c: any) => c.file_url);
+
   const tabs: { key: TabType; label: string }[] = [
-    { key: "events",       label: `Events (${orgEvents.length})`                                       },
-    { key: "activities",   label: "Activities"                                                          },
-    { key: "certificates", label: "Certificates"                                                        },
-    { key: "pending",      label: `Pending (${pendingActivities.length + pendingApplications.length})` },
+    { key: "events",       label: `Events (${orgEvents.length})`              },
+    { key: "activities",   label: "Activities"                                 },
+    { key: "certificates", label: "Certificates"                               },
+    { key: "pending",      label: `Pending (${pendingApplications.length})`   },
   ];
 
   return (
@@ -177,12 +178,6 @@ export function VolunteerOrgDashboard() {
             <div style={{ fontSize: 13, color: "#94A3B8" }}>{org.category || "Organization"}</div>
           </div>
           <div className="flex gap-2" style={{ flexShrink: 0 }}>
-            {memberStatus === "Active" && (
-              <button onClick={() => navigate("/dashboard/log-activity")}
-                style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                Log Activity
-              </button>
-            )}
             <button onClick={() => navigate(`/dashboard/org/${orgId}/profile`)}
               style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#334155", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               View Profile
@@ -221,14 +216,7 @@ export function VolunteerOrgDashboard() {
         {memberStatus === "Active" && activities.length === 0 && (
           <Banner icon="🎉" color="#16A34A" bg="#F0FDF4" border="#BBF7D0"
             title="You're a member!"
-            body={`Browse upcoming events below or log volunteer hours to track your impact at ${org.name}.`}
-            cta="Log Activity" onCta={() => navigate("/dashboard/log-activity")} />
-        )}
-        {memberStatus === "Active" && activities.length > 0 && pendingActivities.length > 0 && (
-          <Banner icon="📋" color="#2563EB" bg="#EFF6FF" border="#BFDBFE"
-            title={`${pendingActivities.length} activit${pendingActivities.length > 1 ? "ies" : "y"} pending review`}
-            body="Your supervisor will review and approve your submitted hours."
-            cta="View Pending" onCta={() => setActiveTab("pending")} />
+            body={`Browse upcoming events and participate. Your supervisor will record your hours at ${org.name}.`} />
         )}
 
         {/* Apply error */}
@@ -359,9 +347,7 @@ export function VolunteerOrgDashboard() {
           <div className="flex flex-col gap-3">
             {activities.length === 0 ? (
               <EmptyState icon="📋" title="No activities yet"
-                body={`Log your volunteer hours to start tracking your impact at ${org.name}.`}
-                cta={memberStatus === "Active" ? "Log Activity" : undefined}
-                onCta={() => navigate("/dashboard/log-activity")} />
+                body={`Your supervisor will record your volunteer hours here after each activity at ${org.name}.`} />
             ) : (
               activities.map((a: any) => {
                 const sc = statusColors[a.status] || statusColors.Pending;
@@ -388,11 +374,11 @@ export function VolunteerOrgDashboard() {
         {/* ── Certificates Tab ── */}
         {activeTab === "certificates" && (
           <div className="flex flex-col gap-3">
-            {certificates.length === 0 ? (
+            {visibleCertificates.length === 0 ? (
               <EmptyState icon="🏆" title="No certificates yet"
-                body="Certificates are issued by the organization after your activities are approved." />
+                body="Certificates will appear here once the organization uploads them for you." />
             ) : (
-              certificates.map((cert: any) => {
+              visibleCertificates.map((cert: any) => {
                 const tc = certTypeColors[cert.type] || certTypeColors.Participation;
                 return (
                   <div key={cert.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
@@ -405,6 +391,16 @@ export function VolunteerOrgDashboard() {
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "4px 12px" }}>{cert.type}</span>
                     </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
+                        style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
+                      >View</button>
+                      <button
+                        onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}`).catch(() => {})}
+                        style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
+                      >Download</button>
+                    </div>
                   </div>
                 );
               })
@@ -415,50 +411,30 @@ export function VolunteerOrgDashboard() {
         {/* ── Pending Tab ── */}
         {activeTab === "pending" && (
           <div className="flex flex-col gap-3">
-            {pendingActivities.length === 0 && pendingApplications.length === 0 ? (
+            {pendingApplications.length === 0 ? (
               memberStatus === "Pending" ? (
                 <EmptyState icon="⏳" title="Membership pending"
-                  body="Your request to join this organization is under review. Once approved, you'll be able to apply to events and log activities." />
+                  body="Your request to join this organization is under review. Once approved, you'll be able to apply to events." />
               ) : (
                 <EmptyState icon="✅" title="All caught up!"
-                  body="No pending activities or applications for this organization." />
+                  body="No pending event applications for this organization." />
               )
             ) : (
               <>
-                {pendingActivities.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pending Activity Hours</div>
-                    {pendingActivities.map((a: any) => (
-                      <div key={a.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{a.event_name}</div>
-                            <div style={{ fontSize: 12, color: "#94A3B8" }}>{a.date} · {a.hours} hrs</div>
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#FEF3C7", color: "#B45309", borderRadius: 20, padding: "3px 10px" }}>Pending</span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pending Event Applications</div>
+                {pendingApplications.map((app: any) => (
+                  <div key={app.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.event_name}</div>
+                        <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                          {app.event_date}{app.event_time ? ` · ${formatTime(app.event_time)}` : ""}
                         </div>
                       </div>
-                    ))}
-                  </>
-                )}
-                {pendingApplications.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: pendingActivities.length > 0 ? 12 : 0 }}>Pending Event Applications</div>
-                    {pendingApplications.map((app: any) => (
-                      <div key={app.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.event_name}</div>
-                            <div style={{ fontSize: 12, color: "#94A3B8" }}>
-                              {app.event_date}{app.event_time ? ` · ${formatTime(app.event_time)}` : ""}
-                            </div>
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#FEF3C7", color: "#B45309", borderRadius: 20, padding: "3px 10px" }}>Pending</span>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
+                      <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#FEF3C7", color: "#B45309", borderRadius: 20, padding: "3px 10px" }}>Pending</span>
+                    </div>
+                  </div>
+                ))}
               </>
             )}
           </div>
