@@ -162,7 +162,7 @@ export function BrowseOrganizations() {
                       Application Pending
                     </div>
                   )}
-                  {status === "none" && org.student_only && profile?.education_level !== "University Student" && (
+                  {status === "none" && !!org.student_only && profile?.education_level !== "University Student" && (
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9", borderRadius: 6, fontSize: 12, fontWeight: 500, color: "#94A3B8" }}>
                         University Students Only
@@ -187,7 +187,7 @@ export function BrowseOrganizations() {
                     )}
 
                     {/* Join / blocked button */}
-                    {status === "none" && !(org.student_only && profile?.education_level !== "University Student") && (
+                    {status === "none" && !(!!org.student_only && profile?.education_level !== "University Student") && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleJoin(org.id); }}
                         disabled={joining === org.id}

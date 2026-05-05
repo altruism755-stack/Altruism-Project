@@ -17,7 +17,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 export function VolunteerDashboard() {
   const { user, profile } = useAuth();
   const volName = profile?.name || "Volunteer";
-  const volId = user?.id || 0;
+  const volId = profile?.id || 0; // volunteer profile ID, not user.id
 
   const [volunteer, setVolunteer] = useState<any>(null);
   const [myActivities, setMyActivities] = useState<any[]>([]);

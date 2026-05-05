@@ -5,10 +5,7 @@ import { BackButton } from "../components/BackButton";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogoByName } from "../components/OrgLogos";
-import { LifecycleStepper } from "../components/StatusPill";
-import { resolveStepActions } from "../lib/lifecycle";
 
-const BLUE   = "#2563EB";
 const GREEN  = "#16A34A";
 const INDIGO = "#4F46E5";
 
@@ -45,7 +42,7 @@ export function VolunteerOrgDashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const volId = user?.id || 0;
+  const volId = profile?.id || 0; // volunteer profile ID, not user.id
 
   const initialTab = (searchParams.get("tab") as TabType) || "events";
 
@@ -135,7 +132,6 @@ export function VolunteerOrgDashboard() {
   const org                = data.organization;
   const activities         = data.activities         || [];
   const certificates       = data.certificates       || [];
-  const pendingActivities  = data.pending_activities  || [];
   const pendingApplications = data.pending_applications || [];
   const totalHours         = data.total_hours         || 0;
   const completedCount     = data.completed_activities || 0;
@@ -145,20 +141,11 @@ export function VolunteerOrgDashboard() {
   const appliedMap = new Map<number, string>(); // eventId → applicationStatus
   myApplications.forEach((a: any) => appliedMap.set(a.event_id, a.status));
 
-  const lifecycle      = data.lifecycle;
-  const lifecycleSteps = resolveStepActions(lifecycle?.steps ?? [], {
-    view_certificates: () => setActiveTab("certificates"),
-  });
-  const stuckMsg = lifecycle?.stuck_msg ?? undefined;
-
-  // Only filter certs that have a file uploaded
-  const visibleCertificates = certificates.filter((c: any) => c.file_url);
-
   const tabs: { key: TabType; label: string }[] = [
-    { key: "events",       label: `Events (${orgEvents.length})`              },
-    { key: "activities",   label: "Activities"                                 },
-    { key: "certificates", label: "Certificates"                               },
-    { key: "pending",      label: `Pending (${pendingApplications.length})`   },
+    { key: "events",       label: `Events (${orgEvents.length})`                                                          },
+    { key: "activities",   label: "Activities"                                                                             },
+    { key: "certificates", label: "Certificates"                                                                           },
+    { key: "pending",      label: pendingApplications.length > 0 ? `Pending (${pendingApplications.length})` : "Pending"  },
   ];
 
   return (
@@ -186,37 +173,28 @@ export function VolunteerOrgDashboard() {
         </div>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           {([
-            { label: "Total Volunteer Hours", value: totalHours,        gradient: "linear-gradient(135deg,#16A34A,#22C55E)" },
-            { label: "Activities Completed",  value: completedCount,    gradient: "linear-gradient(135deg,#2563EB,#3B82F6)" },
-            { label: "Certificates Earned",   value: certificates.length, gradient: "linear-gradient(135deg,#0891B2,#06B6D4)" },
-          ] as const).map(({ label, value, gradient }) => (
+            { label: "Total Volunteer Hours", value: totalHours,           emptyText: "No hours recorded yet",  gradient: "linear-gradient(135deg,#16A34A,#22C55E)" },
+            { label: "Activities Completed",  value: completedCount,       emptyText: "No activities yet",      gradient: "linear-gradient(135deg,#2563EB,#3B82F6)" },
+            { label: "Certificates Earned",   value: certificates.length,  emptyText: "No certificates yet",    gradient: "linear-gradient(135deg,#0891B2,#06B6D4)" },
+          ]).map(({ label, value, emptyText, gradient }) => (
             <div key={label} style={{ background: gradient, borderRadius: 12, padding: "20px 24px", height: 110, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{label}</div>
-              <div style={{ fontSize: 36, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{value}</div>
+              {value > 0 ? (
+                <div style={{ fontSize: 36, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{value}</div>
+              ) : (
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}>{emptyText}</div>
+              )}
             </div>
           ))}
         </div>
-
-        {/* ── Lifecycle stepper — only shown when backend provides steps ── */}
-        {lifecycleSteps.length > 0 && (
-          <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 20px", marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Your Journey</div>
-            <LifecycleStepper steps={lifecycleSteps} stuckMsg={stuckMsg} />
-          </div>
-        )}
 
         {/* ── Status banners ── */}
         {memberStatus === "Pending" && (
           <Banner icon="⏳" color="#F59E0B" bg="#FFFBEB" border="#FDE68A"
             title="Waiting for Approval"
             body="Your membership request is under review. You'll get a notification once the admin responds." />
-        )}
-        {memberStatus === "Active" && activities.length === 0 && (
-          <Banner icon="🎉" color="#16A34A" bg="#F0FDF4" border="#BBF7D0"
-            title="You're a member!"
-            body={`Browse upcoming events and participate. Your supervisor will record your hours at ${org.name}.`} />
         )}
 
         {/* Apply error */}
@@ -374,11 +352,11 @@ export function VolunteerOrgDashboard() {
         {/* ── Certificates Tab ── */}
         {activeTab === "certificates" && (
           <div className="flex flex-col gap-3">
-            {visibleCertificates.length === 0 ? (
+            {certificates.length === 0 ? (
               <EmptyState icon="🏆" title="No certificates yet"
                 body="Certificates will appear here once the organization uploads them for you." />
             ) : (
-              visibleCertificates.map((cert: any) => {
+              certificates.map((cert: any) => {
                 const tc = certTypeColors[cert.type] || certTypeColors.Participation;
                 return (
                   <div key={cert.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
@@ -391,16 +369,20 @@ export function VolunteerOrgDashboard() {
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "4px 12px" }}>{cert.type}</span>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
-                        style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
-                      >View</button>
-                      <button
-                        onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}`).catch(() => {})}
-                        style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
-                      >Download</button>
-                    </div>
+                    {cert.file_url ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
+                          style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
+                        >View</button>
+                        <button
+                          onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}`).catch(() => {})}
+                          style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
+                        >Download</button>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: "#94A3B8", fontStyle: "italic" }}>File not yet uploaded by the organization</div>
+                    )}
                   </div>
                 );
               })
@@ -416,8 +398,8 @@ export function VolunteerOrgDashboard() {
                 <EmptyState icon="⏳" title="Membership pending"
                   body="Your request to join this organization is under review. Once approved, you'll be able to apply to events." />
               ) : (
-                <EmptyState icon="✅" title="All caught up!"
-                  body="No pending event applications for this organization." />
+                <EmptyState icon="📭" title="No pending applications"
+                  body="You have no pending event applications for this organization." />
               )
             ) : (
               <>

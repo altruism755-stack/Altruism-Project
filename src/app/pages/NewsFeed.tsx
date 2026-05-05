@@ -9,7 +9,7 @@ const GREEN = "#16A34A";
 export function NewsFeed() {
   const { user, profile } = useAuth();
   const volName = profile?.name || "Volunteer";
-  const volId = user?.id || 0;
+  const volId = profile?.id || 0; // volunteer profile ID, not user.id
 
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
