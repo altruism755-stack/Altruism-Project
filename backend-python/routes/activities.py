@@ -44,6 +44,24 @@ def list_activities(
         return {"activities": dict_rows(db.execute(query, params).fetchall())}
 
 
+def _resolve_caller_org_id(db, current_user: dict) -> int:
+    """Return the org_id the calling user is authorised to manage."""
+    if current_user["role"] == "supervisor":
+        sup = dict_row(db.execute(
+            "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+        ).fetchone())
+        if not sup:
+            raise HTTPException(403, "Supervisor profile not found")
+        return sup["org_id"]
+    # org_admin
+    org = dict_row(db.execute(
+        "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+    ).fetchone())
+    if not org:
+        raise HTTPException(403, "Organization not found for this admin")
+    return org["id"]
+
+
 @router.post("", status_code=201)
 def log_activity(body: dict, current_user: dict = Depends(require_roles("supervisor", "org_admin"))):
     with get_db() as db:
@@ -58,9 +76,8 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
             raise HTTPException(404, "Volunteer not found")
 
         date = body.get("date")
-        hours = body.get("hours")
-        if not date or not hours:
-            raise HTTPException(400, "Date and hours are required")
+        if not date:
+            raise HTTPException(400, "Date is required")
 
         event_id = body.get("event_id")
         org_id = body.get("org_id")
@@ -69,9 +86,43 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
             if event:
                 org_id = event["org_id"]
 
-        status = body.get("status", "Pending")
-        if status not in ("Pending", "Approved", "Rejected"):
-            status = "Pending"
+        # Security: caller may only log activities for their own org.
+        caller_org_id = _resolve_caller_org_id(db, current_user)
+        if org_id and int(org_id) != caller_org_id:
+            raise HTTPException(403, "You can only log activities for your own organization")
+        # If org_id wasn't supplied at all, default to the caller's org.
+        if not org_id:
+            org_id = caller_org_id
+
+        # Verify the volunteer is an active member of this org.
+        membership = dict_row(db.execute(
+            "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Active'",
+            (org_id, vol["id"]),
+        ).fetchone())
+        if not membership:
+            raise HTTPException(403, "Volunteer is not an active member of your organization")
+
+        # Fetch org settings.
+        org_row = dict_row(db.execute(
+            "SELECT tracks_hours FROM organizations WHERE id = ?", (org_id,)
+        ).fetchone())
+        tracks_hours = bool((org_row or {}).get("tracks_hours", 1))
+
+        if tracks_hours:
+            raw_hours = body.get("hours")
+            try:
+                hours = float(raw_hours)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "hours must be a valid number")
+            if hours <= 0:
+                raise HTTPException(400, "hours must be greater than 0")
+            status = body.get("status", "Pending")
+            if status not in ("Pending", "Approved", "Rejected"):
+                status = "Pending"
+        else:
+            # Participation-only: ignore any client-supplied hours or status.
+            hours = None
+            status = "Completed"
 
         cur = db.execute(
             "INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status) "
@@ -85,15 +136,18 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
             (cur.lastrowid,),
         ).fetchone())
 
-        # Notify volunteer that an activity has been logged for them
         if vol.get("user_id"):
             event_display = (activity or {}).get("event_name") or "an activity"
+            if tracks_hours:
+                notif_body = f"Your supervisor logged {hours} hr(s) for {event_display}. Status: {status}."
+            else:
+                notif_body = f"Your participation in {event_display} has been recorded."
             create_notification(
                 db,
                 vol["user_id"],
                 "activity_submitted",
                 "Activity Logged for You",
-                f"Your supervisor logged {hours} hr(s) for {event_display}. Status: {status}.",
+                notif_body,
                 "/dashboard/profile",
             )
 
@@ -107,6 +161,26 @@ def approve_activity(
     current_user: dict = Depends(require_roles("supervisor", "org_admin")),
 ):
     with get_db() as db:
+        act = dict_row(db.execute(
+            "SELECT a.volunteer_id, a.hours, a.status, a.org_id, e.name as event_name, v.user_id "
+            "FROM activities a "
+            "LEFT JOIN events e ON a.event_id = e.id "
+            "JOIN volunteers v ON v.id = a.volunteer_id "
+            "WHERE a.id = ?", (activity_id,)
+        ).fetchone())
+
+        if not act:
+            raise HTTPException(404, "Activity not found")
+
+        # Participation-only records are auto-completed; they cannot be approved/rejected.
+        if act.get("status") == "Completed":
+            raise HTTPException(400, "Participation records cannot be approved — they are already completed")
+
+        # Security: caller must belong to the same org as the activity.
+        caller_org_id = _resolve_caller_org_id(db, current_user)
+        if act.get("org_id") and act["org_id"] != caller_org_id:
+            raise HTTPException(403, "You can only review activities from your own organization")
+
         reviewer_id = None
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
@@ -119,23 +193,20 @@ def approve_activity(
             "UPDATE activities SET status = 'Approved', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reviewer_id, activity_id),
         )
-        # Notify volunteer
-        act = dict_row(db.execute(
-            "SELECT a.volunteer_id, a.hours, e.name as event_name, v.user_id "
-            "FROM activities a "
-            "LEFT JOIN events e ON a.event_id = e.id "
-            "JOIN volunteers v ON v.id = a.volunteer_id "
-            "WHERE a.id = ?", (activity_id,)
-        ).fetchone())
-        if act and act.get("user_id"):
-            hrs = act.get("hours", "")
+
+        if act.get("user_id"):
+            hrs = act.get("hours")
             event_display = act.get("event_name") or "your activity"
+            if hrs is not None:
+                notif_msg = f"Your {hrs} hr(s) for {event_display} have been approved. Great work!"
+            else:
+                notif_msg = f"Your participation in {event_display} has been approved. Great work!"
             create_notification(
                 db,
                 act["user_id"],
                 "activity_approved",
                 "Activity Approved",
-                f"Your {hrs} hr(s) for {event_display} have been approved. Great work!",
+                notif_msg,
                 "/dashboard/profile",
             )
         db.commit()
@@ -148,6 +219,26 @@ def reject_activity(
     current_user: dict = Depends(require_roles("supervisor", "org_admin")),
 ):
     with get_db() as db:
+        act = dict_row(db.execute(
+            "SELECT a.hours, a.status, a.org_id, e.name as event_name, v.user_id "
+            "FROM activities a "
+            "LEFT JOIN events e ON a.event_id = e.id "
+            "JOIN volunteers v ON v.id = a.volunteer_id "
+            "WHERE a.id = ?", (activity_id,)
+        ).fetchone())
+
+        if not act:
+            raise HTTPException(404, "Activity not found")
+
+        # Participation-only records cannot be rejected.
+        if act.get("status") == "Completed":
+            raise HTTPException(400, "Participation records cannot be rejected — they are already completed")
+
+        # Security: caller must belong to the same org as the activity.
+        caller_org_id = _resolve_caller_org_id(db, current_user)
+        if act.get("org_id") and act["org_id"] != caller_org_id:
+            raise HTTPException(403, "You can only review activities from your own organization")
+
         reviewer_id = None
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
@@ -160,23 +251,20 @@ def reject_activity(
             "UPDATE activities SET status = 'Rejected', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
             (reviewer_id, activity_id),
         )
-        # Notify volunteer
-        act = dict_row(db.execute(
-            "SELECT a.hours, e.name as event_name, v.user_id "
-            "FROM activities a "
-            "LEFT JOIN events e ON a.event_id = e.id "
-            "JOIN volunteers v ON v.id = a.volunteer_id "
-            "WHERE a.id = ?", (activity_id,)
-        ).fetchone())
-        if act and act.get("user_id"):
-            hrs = act.get("hours", "")
+
+        if act.get("user_id"):
+            hrs = act.get("hours")
             event_display = act.get("event_name") or "your activity"
+            if hrs is not None:
+                notif_msg = f"Your {hrs} hr(s) for {event_display} were not approved. Contact your supervisor for details."
+            else:
+                notif_msg = f"Your participation record for {event_display} was not approved. Contact your supervisor for details."
             create_notification(
                 db,
                 act["user_id"],
                 "activity_rejected",
                 "Activity Not Approved",
-                f"Your {hrs} hr(s) for {event_display} were not approved. Contact your supervisor for details.",
+                notif_msg,
                 "/dashboard/profile",
             )
         db.commit()

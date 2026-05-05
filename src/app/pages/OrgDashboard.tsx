@@ -605,6 +605,8 @@ function OrgAdminsTab({
   // Toast is keyed — same key while visible won't restart the timer unnecessarily.
   const [toast, setToast]               = useState<{ key: string; msg: string } | null>(null);
   const [confirmId, setConfirmId]       = useState<number | null>(null);
+  const [tracksHoursSaving, setTracksHoursSaving] = useState(false);
+  const [tracksHoursLocal, setTracksHoursLocal]   = useState<boolean | null>(null);
 
   // key-based dependency: if a new toast arrives with the same key, the timer resets correctly.
   useEffect(() => {
@@ -650,6 +652,20 @@ function OrgAdminsTab({
     } catch (e: any) {
       setError(e.message || "Failed to remove admin");
       setConfirmId(null);
+    }
+  };
+
+  const handleToggleTracksHours = async (newValue: boolean) => {
+    setTracksHoursSaving(true);
+    setTracksHoursLocal(newValue);
+    try {
+      await api.updateMyOrgProfile({ tracks_hours: newValue });
+      setToast({ key: String(Date.now()), msg: newValue ? "Hour tracking enabled." : "Participation-only mode enabled." });
+    } catch {
+      setTracksHoursLocal(null);
+      setToast({ key: String(Date.now()), msg: "Failed to update setting." });
+    } finally {
+      setTracksHoursSaving(false);
     }
   };
 
@@ -748,6 +764,40 @@ function OrgAdminsTab({
           </div>
         </div>
       )}
+
+      {/* ── Hour tracking setting ──────────────────────────────────────── */}
+      <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: "0 0 4px 0" }}>Volunteer Hour Tracking</h3>
+        <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 16px 0" }}>
+          Choose how volunteer activity is recorded for your organization.
+        </p>
+        <div className="flex gap-3">
+          {[
+            { value: true, label: "Track Hours", desc: "Log hours for each activity" },
+            { value: false, label: "Participation Only", desc: "Record attendance without hours" },
+          ].map(({ value, label, desc }) => {
+            const current = tracksHoursLocal !== null ? tracksHoursLocal : (orgProfile?.tracks_hours !== 0);
+            const selected = current === value;
+            return (
+              <button
+                key={String(value)}
+                disabled={tracksHoursSaving}
+                onClick={() => !selected && handleToggleTracksHours(value)}
+                style={{
+                  flex: 1, padding: "14px 16px", borderRadius: 10, cursor: selected ? "default" : "pointer",
+                  border: `1.5px solid ${selected ? GREEN : "#E2E8F0"}`,
+                  backgroundColor: selected ? "#F0FDF4" : "#fff",
+                  textAlign: "left" as const, opacity: tracksHoursSaving ? 0.6 : 1,
+                  transition: "border-color 140ms, background 140ms",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, color: selected ? "#15803D" : "#1E293B", marginBottom: 2 }}>{label}</div>
+                <div style={{ fontSize: 12, color: "#64748B" }}>{desc}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ── Add form — primary action ───────────────────────────────────── */}
       <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>

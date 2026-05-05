@@ -149,6 +149,7 @@ EDITABLE_FIELDS = {
     "category", "categories",
     "branches",
     "submitter_name", "submitter_role", "additional_notes",
+    "tracks_hours",
 }
 # Fields that require platform-admin review — changes are queued, not applied.
 SENSITIVE_FIELDS = {
@@ -174,6 +175,7 @@ class OrgProfileUpdate(BaseModel):
     submitter_name: Optional[str] = None
     submitter_role: Optional[str] = None
     additional_notes: Optional[str] = None
+    tracks_hours: Optional[bool] = None   # whether the org records volunteer hours
     # Sensitive — accepted but queued for platform-admin review.
     name: Optional[str] = None
     official_email: Optional[str] = None

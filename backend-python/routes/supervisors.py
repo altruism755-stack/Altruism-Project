@@ -94,7 +94,7 @@ def get_my_profile(current_user: dict = Depends(require_roles("supervisor"))):
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
         org = dict_row(db.execute(
-            "SELECT id, name, description, category, color, initials FROM organizations WHERE id = ?",
+            "SELECT id, name, description, category, color, initials, tracks_hours FROM organizations WHERE id = ?",
             (sup["org_id"],),
         ).fetchone())
         return {"supervisor": sup, "organization": org}

@@ -33,7 +33,7 @@ export function SupervisorDashboard() {
 
   // Certificate modal state
   const [certActivity, setCertActivity] = useState<any | null>(null);
-  const [certForm, setCertForm] = useState({ type: "Participation" });
+  const [certForm, setCertForm] = useState({ title: "" });
   const [certBusy, setCertBusy] = useState(false);
   // After issuing, hold the new cert ID so we can attach a file
   const [issuedCertId, setIssuedCertId] = useState<number | null>(null);
@@ -46,6 +46,8 @@ export function SupervisorDashboard() {
   const [logForm, setLogForm] = useState({ volunteer_id: "", event_id: "", date: "", hours: "", description: "", status: "Approved" });
   const [logBusy, setLogBusy] = useState(false);
   const [logError, setLogError] = useState("");
+
+  const tracksHours = org?.tracks_hours !== 0;
 
   const loadAll = useCallback(async () => {
     try {
@@ -100,18 +102,20 @@ export function SupervisorDashboard() {
 
   const handleApproveAndCertify = async () => {
     if (!certActivity) return;
+    if (!certForm.title.trim()) return;
     setCertBusy(true);
     try {
-      await api.approveActivity(certActivity.id);
+      // Only call approve for hour-based activities; participation ones are already Completed.
+      if (certActivity.status !== "Completed") {
+        await api.approveActivity(certActivity.id);
+      }
       const cert = await api.issueCertificate({
         volunteer_id: certActivity.volunteer_id,
         org_id: certActivity.org_id,
         event_id: certActivity.event_id,
-        type: certForm.type,
-        hours: certActivity.hours,
+        certificate_title: certForm.title.trim(),
       });
       setActivities((a) => a.filter((act) => act.id !== certActivity.id));
-      // Transition to file upload step instead of closing
       setIssuedCertId(cert?.id ?? null);
       setCertFile(null);
       setCertUploadError("");
@@ -143,8 +147,12 @@ export function SupervisorDashboard() {
   };
 
   const handleLogActivity = async () => {
-    if (!logForm.volunteer_id || !logForm.date || !logForm.hours) {
-      setLogError("Volunteer, date, and hours are required.");
+    if (!logForm.volunteer_id || !logForm.date) {
+      setLogError("Volunteer and date are required.");
+      return;
+    }
+    if (tracksHours && !logForm.hours) {
+      setLogError("Hours are required for this organization.");
       return;
     }
     setLogBusy(true);
@@ -154,9 +162,9 @@ export function SupervisorDashboard() {
         volunteer_id: Number(logForm.volunteer_id),
         event_id: logForm.event_id ? Number(logForm.event_id) : undefined,
         date: logForm.date,
-        hours: Number(logForm.hours),
+        ...(tracksHours && logForm.hours ? { hours: Number(logForm.hours), status: logForm.status } : {}),
         description: logForm.description,
-        status: logForm.status,
+        org_id: org?.id,
       });
       setShowLogActivity(false);
       setLogForm({ volunteer_id: "", event_id: "", date: "", hours: "", description: "", status: "Approved" });
@@ -441,30 +449,39 @@ export function SupervisorDashboard() {
                   <EmptyState label="No pending activity approvals." />
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {activities.map((a) => (
-                      <div key={a.id} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 16 }}>
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{a.volunteer_name}</div>
-                            <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
-                              {a.event_name ? `Event: ${a.event_name} · ` : ""}{a.hours} hrs · {a.date}
+                    {activities.map((a) => {
+                      const isParticipation = a.status === "Completed";
+                      return (
+                        <div key={a.id} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 16 }}>
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{a.volunteer_name}</div>
+                              <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
+                                {a.event_name ? `Event: ${a.event_name} · ` : ""}
+                                {a.hours != null && a.hours > 0 ? `${a.hours} hrs contributed · ` : "Participated · "}
+                                {a.date}
+                              </div>
+                              {a.description && (
+                                <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{a.description}</div>
+                              )}
                             </div>
-                            {a.description && (
-                              <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{a.description}</div>
-                            )}
-                          </div>
-                          <div className="flex gap-2" style={{ flexShrink: 0 }}>
-                            <button onClick={() => handleApproveActivity(a.id)} style={{ height: 32, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve</button>
-                            <button
-                              onClick={() => { setCertActivity(a); setCertForm({ type: "Participation" }); }}
-                              title="Approve and issue certificate"
-                              style={{ height: 32, padding: "0 14px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                            >+ Certificate</button>
-                            <button onClick={() => handleRejectActivity(a.id)} style={{ height: 32, padding: "0 14px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Reject</button>
+                            <div className="flex gap-2" style={{ flexShrink: 0 }}>
+                              {!isParticipation && (
+                                <button onClick={() => handleApproveActivity(a.id)} style={{ height: 32, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve</button>
+                              )}
+                              <button
+                                onClick={() => { setCertActivity(a); setCertForm({ title: "" }); }}
+                                title="Issue certificate"
+                                style={{ height: 32, padding: "0 14px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                              >+ Certificate</button>
+                              {!isParticipation && (
+                                <button onClick={() => handleRejectActivity(a.id)} style={{ height: 32, padding: "0 14px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Reject</button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -551,34 +568,41 @@ export function SupervisorDashboard() {
         >
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 460, padding: 28 }}>
 
-            {/* Step 1 — Type selection */}
+            {/* Step 1 — Certificate title */}
             {!issuedCertId ? (
               <>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Approve & Issue Certificate</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>
+                  {certActivity.status !== "Completed" ? "Approve & Issue Certificate" : "Issue Certificate"}
+                </div>
                 <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
-                  Approving <strong>{certActivity.hours} hr(s)</strong> for <strong>{certActivity.volunteer_name}</strong> — {certActivity.event_name || "activity"}.
+                  For <strong>{certActivity.volunteer_name}</strong>
+                  {certActivity.event_name ? <> — {certActivity.event_name}</> : null}.
                 </div>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Certificate Type</label>
-                  <div className="flex gap-2">
-                    {(["Participation", "Achievement", "Completion"] as const).map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => setCertForm({ type: t })}
-                        style={{
-                          flex: 1, height: 38, border: "1.5px solid", borderRadius: 8, fontSize: 13, fontWeight: certForm.type === t ? 600 : 400, cursor: "pointer",
-                          borderColor: certForm.type === t ? (t === "Participation" ? "#2563EB" : t === "Achievement" ? "#D97706" : GREEN) : "#E2E8F0",
-                          backgroundColor: certForm.type === t ? (t === "Participation" ? "#EFF6FF" : t === "Achievement" ? "#FFFBEB" : "#F0FDF4") : "#fff",
-                          color: certForm.type === t ? (t === "Participation" ? "#1D4ED8" : t === "Achievement" ? "#B45309" : "#15803D") : "#64748B",
-                        }}
-                      >{t}</button>
-                    ))}
-                  </div>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>
+                    Certificate Title <span style={{ color: "#DC2626" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={certForm.title}
+                    onChange={(e) => setCertForm({ title: e.target.value })}
+                    placeholder="e.g. Volunteer Appreciation Certificate"
+                    autoFocus
+                    style={{ width: "100%", height: 40, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                  />
                 </div>
                 <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
                   <button onClick={() => setCertActivity(null)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                  <button onClick={async () => { await handleApproveActivity(certActivity.id); setCertActivity(null); }} style={{ height: 36, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve Only</button>
-                  <button onClick={handleApproveAndCertify} disabled={certBusy} style={{ height: 36, padding: "0 16px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: certBusy ? "not-allowed" : "pointer", opacity: certBusy ? 0.7 : 1 }}>{certBusy ? "Issuing…" : "Approve + Issue"}</button>
+                  {certActivity.status !== "Completed" && (
+                    <button onClick={async () => { await handleApproveActivity(certActivity.id); setCertActivity(null); }} style={{ height: 36, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve Only</button>
+                  )}
+                  <button
+                    onClick={handleApproveAndCertify}
+                    disabled={certBusy || !certForm.title.trim()}
+                    style={{ height: 36, padding: "0 16px", backgroundColor: (certBusy || !certForm.title.trim()) ? "#94A3B8" : "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (certBusy || !certForm.title.trim()) ? "not-allowed" : "pointer" }}
+                  >
+                    {certBusy ? "Issuing…" : (certActivity.status !== "Completed" ? "Approve + Issue" : "Issue Certificate")}
+                  </button>
                 </div>
               </>
             ) : (
@@ -646,7 +670,11 @@ export function SupervisorDashboard() {
         <div onClick={() => setShowLogActivity(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }}>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Log Activity for Volunteer</div>
-            <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>Record volunteer hours on behalf of a member of {org?.name}.</div>
+            <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+              {tracksHours
+                ? `Record volunteer hours on behalf of a member of ${org?.name}.`
+                : `Record volunteer participation on behalf of a member of ${org?.name}.`}
+            </div>
 
             {logError && (
               <div style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{logError}</div>
@@ -682,7 +710,7 @@ export function SupervisorDashboard() {
               </div>
 
               <div className="flex gap-3">
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: tracksHours ? 1 : "1 1 100%" }}>
                   <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Date <span style={{ color: "#DC2626" }}>*</span></label>
                   <input
                     type="date"
@@ -691,32 +719,36 @@ export function SupervisorDashboard() {
                     style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Hours <span style={{ color: "#DC2626" }}>*</span></label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={logForm.hours}
-                    onChange={(e) => setLogForm((f) => ({ ...f, hours: e.target.value }))}
-                    placeholder="e.g. 3"
-                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
-                  />
-                </div>
+                {tracksHours && (
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Hours <span style={{ color: "#DC2626" }}>*</span></label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={logForm.hours}
+                      onChange={(e) => setLogForm((f) => ({ ...f, hours: e.target.value }))}
+                      placeholder="e.g. 3"
+                      style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Status</label>
-                <select
-                  value={logForm.status}
-                  onChange={(e) => setLogForm((f) => ({ ...f, status: e.target.value }))}
-                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
-                >
-                  <option value="Approved">Approved</option>
-                  <option value="Pending">Pending (under review)</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
-              </div>
+              {tracksHours && (
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Status</label>
+                  <select
+                    value={logForm.status}
+                    onChange={(e) => setLogForm((f) => ({ ...f, status: e.target.value }))}
+                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
+                  >
+                    <option value="Approved">Approved</option>
+                    <option value="Pending">Pending (under review)</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Description (optional)</label>

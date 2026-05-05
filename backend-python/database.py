@@ -280,6 +280,46 @@ def init_schema():
     except Exception:
         pass
 
+    # Whether the org tracks volunteer hours (1) or only participation (0).
+    # Defaults to 1 so all existing orgs keep their current hour-tracking behaviour.
+    try:
+        conn.execute("ALTER TABLE organizations ADD COLUMN tracks_hours INTEGER NOT NULL DEFAULT 1")
+    except Exception:
+        pass
+
+    # Free-form certificate title set by the supervisor at issuance time.
+    # Replaces the old fixed-enum `type` column for display purposes.
+    try:
+        conn.execute("ALTER TABLE certificates ADD COLUMN certificate_title TEXT")
+    except Exception:
+        pass
+
+    # Make activities.hours nullable so participation-only orgs can omit it.
+    # Also expands the status check to include 'Completed' for participation records.
+    # SQLite can't ALTER a column definition, so we use the rename-recreate pattern.
+    schema_row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='activities'"
+    ).fetchone()
+    if schema_row and "hours REAL NOT NULL" in (schema_row[0] or ""):
+        conn.execute("ALTER TABLE activities RENAME TO activities_pre_nullable_hours")
+        conn.execute("""
+            CREATE TABLE activities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                volunteer_id INTEGER REFERENCES volunteers(id),
+                event_id INTEGER REFERENCES events(id),
+                org_id INTEGER REFERENCES organizations(id),
+                date TEXT NOT NULL,
+                hours REAL,
+                description TEXT,
+                status TEXT DEFAULT 'Pending' CHECK(status IN ('Pending','Approved','Rejected','Completed')),
+                reviewed_by INTEGER REFERENCES supervisors(id),
+                created_at TEXT DEFAULT (datetime('now')),
+                reviewed_at TEXT
+            )
+        """)
+        conn.execute("INSERT INTO activities SELECT * FROM activities_pre_nullable_hours")
+        conn.execute("DROP TABLE activities_pre_nullable_hours")
+
     # Certificate file upload support
     try:
         conn.execute("ALTER TABLE certificates ADD COLUMN file_url TEXT")

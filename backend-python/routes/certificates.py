@@ -57,13 +57,15 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
             raise HTTPException(404, "Organization not found")
 
         volunteer_id = body.get("volunteer_id")
-        cert_type = body.get("type")
-        if not volunteer_id or not cert_type:
-            raise HTTPException(400, "volunteer_id and type are required")
+        certificate_title = (body.get("certificate_title") or "").strip()
+        if not volunteer_id:
+            raise HTTPException(400, "volunteer_id is required")
+        if not certificate_title:
+            raise HTTPException(400, "certificate_title is required")
 
         cur = db.execute(
-            "INSERT INTO certificates (volunteer_id, org_id, event_id, type, hours) VALUES (?, ?, ?, ?, ?)",
-            (volunteer_id, org["id"], body.get("event_id"), cert_type, body.get("hours", 0)),
+            "INSERT INTO certificates (volunteer_id, org_id, event_id, certificate_title) VALUES (?, ?, ?, ?)",
+            (volunteer_id, org["id"], body.get("event_id"), certificate_title),
         )
 
         cert = dict_row(db.execute(
@@ -79,14 +81,12 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
         ).fetchone())
         if vol_user and vol_user.get("user_id"):
             org_name = (cert or {}).get("org_name", "the organization")
-            event_name = (cert or {}).get("event_name", "")
-            cert_desc = f"{cert_type} certificate" + (f" for {event_name}" if event_name else "")
             create_notification(
                 db,
                 vol_user["user_id"],
                 "certificate_issued",
                 "Certificate Issued",
-                f"You've received a {cert_desc} from {org_name}. Check your profile!",
+                f"You've received \"{certificate_title}\" from {org_name}. Check your profile!",
                 "/dashboard/profile",
             )
         db.commit()

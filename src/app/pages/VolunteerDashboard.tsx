@@ -10,13 +10,9 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   Pending: { bg: "#FEF3C7", text: "#B45309" },
   Approved: { bg: "#DCFCE7", text: "#15803D" },
   Rejected: { bg: "#FEE2E2", text: "#B91C1C" },
+  Completed: { bg: "#DBEAFE", text: "#1D4ED8" },
 };
 
-const certTypeColors: Record<string, { bg: string; text: string }> = {
-  Participation: { bg: "#DBEAFE", text: "#1D4ED8" },
-  Achievement: { bg: "#FEF3C7", text: "#B45309" },
-  Completion: { bg: "#DCFCE7", text: "#15803D" },
-};
 
 export function VolunteerDashboard() {
   const { user, profile } = useAuth();
@@ -105,14 +101,13 @@ export function VolunteerDashboard() {
                 <div style={{ fontSize: 13, color: "#94A3B8" }}>No certificates yet.</div>
               ) : (
                 myCertificates.map((cert: any, idx: number) => {
-                  const tc = certTypeColors[cert.type] || certTypeColors.Participation;
+                  const title = cert.certificate_title || cert.type || "Certificate";
                   return (
                     <div key={cert.id} className="py-3" style={{ borderBottom: idx < myCertificates.length - 1 ? "1px solid #F1F5F9" : "none" }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{cert.event_name}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "2px 8px" }}>{cert.type}</span>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1E293B", marginBottom: 2 }}>{title}</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>
+                        {cert.org_name}{cert.event_name ? ` · ${cert.event_name}` : ""} · {cert.issued_date}
                       </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>{cert.org_name} · {cert.issued_date} · {cert.hours} hrs</div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
@@ -121,7 +116,7 @@ export function VolunteerDashboard() {
                           View
                         </button>
                         <button
-                          onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}`).catch(() => {})}
+                          onClick={() => api.downloadCertificateFile(cert.id, title).catch(() => {})}
                           style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
                         >
                           Download
@@ -158,6 +153,7 @@ export function VolunteerDashboard() {
             <div className="flex flex-col gap-3">
               {myActivities.map((a: any) => {
                 const sc = statusColors[a.status] || statusColors.Pending;
+                const hasHours = a.hours != null && a.hours > 0;
                 return (
                   <div key={a.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
                     <div className="flex items-start justify-between mb-2">
@@ -166,7 +162,9 @@ export function VolunteerDashboard() {
                         <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>{a.date}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span style={{ backgroundColor: "#DCFCE7", color: GREEN, fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.hours} hrs</span>
+                        <span style={{ backgroundColor: "#DCFCE7", color: GREEN, fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>
+                          {hasHours ? `${a.hours} hrs contributed` : "Participated"}
+                        </span>
                         <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status}</span>
                       </div>
                     </div>
