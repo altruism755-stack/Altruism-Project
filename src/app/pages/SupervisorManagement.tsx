@@ -86,7 +86,7 @@ export function SupervisorManagement() {
               {supervisors.map((s) => (
                 <div key={s.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1fr 1.5fr", padding: "14px 20px", borderBottom: "1px solid #F1F5F9" }}>
                   <div className="flex items-center gap-3">
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>{s.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}</div>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>{(s.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}</div>
                     <span style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{s.name}</span>
                   </div>
                   <div style={{ fontSize: 13, color: "#64748B" }}>{s.email}</div>

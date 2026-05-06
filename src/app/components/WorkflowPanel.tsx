@@ -17,11 +17,11 @@ const PRIORITY_STYLE: Record<ActionPriority, {
   border: string; band: string; bg: string;
   titleColor: string; btnBg: string; btnColor: string;
 }> = {
-  urgent:  { border: "#FDE68A", band: "#F59E0B", bg: "#FFFBEB", titleColor: "#B45309", btnBg: "#F59E0B",  btnColor: "#fff" },
-  normal:  { border: "#BFDBFE", band: "#2563EB", bg: "#EFF6FF", titleColor: "#1D4ED8", btnBg: "#2563EB",  btnColor: "#fff" },
-  info:    { border: "#A5F3FC", band: "#0891B2", bg: "#F0FDFF", titleColor: "#0E7490", btnBg: "#0891B2",  btnColor: "#fff" },
-  success: { border: "#BBF7D0", band: "#16A34A", bg: "#F0FDF4", titleColor: "#15803D", btnBg: "#16A34A",  btnColor: "#fff" },
-  muted:   { border: "#E2E8F0", band: "#94A3B8", bg: "#F8FAFC", titleColor: "#64748B", btnBg: "#64748B",  btnColor: "#fff" },
+  urgent:  { border: "#E2E8F0", band: "#16A34A", bg: "#fff", titleColor: "#1E293B", btnBg: "#16A34A", btnColor: "#fff" },
+  normal:  { border: "#E2E8F0", band: "#16A34A", bg: "#fff", titleColor: "#1E293B", btnBg: "#16A34A", btnColor: "#fff" },
+  info:    { border: "#E2E8F0", band: "#16A34A", bg: "#fff", titleColor: "#1E293B", btnBg: "#16A34A", btnColor: "#fff" },
+  success: { border: "#E2E8F0", band: "#16A34A", bg: "#fff", titleColor: "#1E293B", btnBg: "#16A34A", btnColor: "#fff" },
+  muted:   { border: "#E2E8F0", band: "#94A3B8", bg: "#fff", titleColor: "#64748B", btnBg: "#64748B", btnColor: "#fff" },
 };
 
 function ActionCard({ action }: { action: WorkflowAction }) {

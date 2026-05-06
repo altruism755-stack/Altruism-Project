@@ -82,8 +82,8 @@ export function VolunteerManagement() {
 
   const filtered = (tab === "pending" ? pendingMembers : activeMembers).filter((m) =>
     !search ||
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.email.toLowerCase().includes(search.toLowerCase())
+    (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleApprove = async () => {
@@ -268,7 +268,7 @@ export function VolunteerManagement() {
             </div>
           ) : (
             filtered.map((v) => {
-              const initials = v.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2);
+              const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
               const isLoading = actionLoading === v.id;
 
               if (tab === "pending") {

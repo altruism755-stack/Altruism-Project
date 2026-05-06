@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, useRouteError } from "react-router";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -21,10 +21,15 @@ import { PlatformAdminDashboard } from "./pages/PlatformAdminDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function ErrorPage() {
+  const error = useRouteError() as any;
+  const msg = error?.message || error?.statusText || String(error) || "Unknown error";
+  const stack = error?.stack;
   return (
     <div style={{ padding: 32, fontFamily: "Inter, system-ui, sans-serif" }}>
       <h1 style={{ color: "#DC2626" }}>Page Error</h1>
       <p>Something went wrong loading this page.</p>
+      <pre style={{ background: "#FEF2F2", padding: 16, borderRadius: 8, fontSize: 13, color: "#991B1B", whiteSpace: "pre-wrap", wordBreak: "break-all", marginBottom: 16 }}>{msg}</pre>
+      {stack && <pre style={{ background: "#F1F5F9", padding: 12, borderRadius: 8, fontSize: 11, color: "#64748B", whiteSpace: "pre-wrap", wordBreak: "break-all", marginBottom: 16 }}>{stack}</pre>}
       <a href="/" style={{ color: "#16A34A" }}>Go Home</a>
     </div>
   );

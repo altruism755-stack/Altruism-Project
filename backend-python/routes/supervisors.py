@@ -150,6 +150,17 @@ def approve_request(vol_id: int, body: dict, current_user: dict = Depends(requir
     """Supervisor approves a pending volunteer join request for their org."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
+
+        # Prevent double assignment
+        existing = dict_row(db.execute(
+            "SELECT supervisor_id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            (sup["org_id"], vol_id),
+        ).fetchone())
+        if not existing:
+            raise HTTPException(404, "Pending request not found")
+        if existing.get("supervisor_id") is not None:
+            raise HTTPException(409, "This volunteer has already been assigned to a supervisor")
+
         vol = dict_row(db.execute(
             "SELECT governorate, city FROM volunteers WHERE id = ?", (vol_id,)
         ).fetchone())
@@ -160,10 +171,10 @@ def approve_request(vol_id: int, body: dict, current_user: dict = Depends(requir
             "is_active = 1, joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), "
             "governorate_snapshot = ?, city_snapshot = ? "
             "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
-            (body.get("supervisor_id") or sup["id"], body.get("department", ""),
+            (sup["id"], body.get("department", ""),
              gov_snap, city_snap, sup["org_id"], vol_id),
         )
-        return {"message": "Volunteer approved"}
+        return {"message": "Volunteer assigned to you"}
 
 
 @router.put("/me/requests/{vol_id}/reject")
@@ -172,7 +183,8 @@ def reject_request(vol_id: int, current_user: dict = Depends(require_roles("supe
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
         db.execute(
-            "DELETE FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            "UPDATE org_volunteers SET status = 'Rejected' "
+            "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
             (sup["org_id"], vol_id),
         )
         return {"message": "Request rejected"}

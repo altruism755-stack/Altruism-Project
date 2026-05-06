@@ -767,7 +767,7 @@ def get_org_members(org_id: int, current_user: dict = Depends(get_current_user))
     with get_db() as db:
         volunteers = dict_rows(db.execute(
             "SELECT v.*, ov.department, ov.status as org_status, ov.joined_date, "
-            "ov.join_source, s.name as supervisor_name "
+            "ov.join_source, ov.supervisor_id, s.name as supervisor_name "
             "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
             "LEFT JOIN supervisors s ON ov.supervisor_id = s.id WHERE ov.org_id = ?",
             (org_id,),
@@ -883,7 +883,8 @@ def reject_org_member(
             "SELECT v.user_id FROM volunteers v WHERE v.id = ?", (vol_id,)
         ).fetchone())
         db.execute(
-            "DELETE FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            "UPDATE org_volunteers SET status = 'Rejected' "
+            "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
             (org_id, vol_id),
         )
         # Notify volunteer

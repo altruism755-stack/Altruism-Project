@@ -72,7 +72,7 @@ export function VolunteerDetail() {
           <div style={{ flex: "0 0 30%" }}>
             <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24 }}>
               <div className="flex flex-col items-center" style={{ marginBottom: 20 }}>
-                <div style={{ width: 64, height: 64, borderRadius: "50%", background: `linear-gradient(135deg, ${GREEN}, #22C55E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#fff", marginBottom: 12 }}>{volunteer.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}</div>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: `linear-gradient(135deg, ${GREEN}, #22C55E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#fff", marginBottom: 12 }}>{(volunteer.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}</div>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B" }}>{volunteer.name}</div>
                 <div style={{ fontSize: 13, color: "#64748B" }}>{volunteer.email}</div>
               </div>
@@ -93,9 +93,6 @@ export function VolunteerDetail() {
                 <div style={{ fontSize: 24, fontWeight: 700, color: GREEN }}>{volunteer.totalHours || totalHours}</div>
               </div>
 
-              <div style={{ borderTop: "1px solid #E2E8F0", marginTop: 16, paddingTop: 16 }}>
-                <button style={{ width: "100%", height: 40, backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Send Message</button>
-              </div>
             </div>
           </div>
 

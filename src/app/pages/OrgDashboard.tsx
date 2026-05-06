@@ -28,17 +28,20 @@ const actStatus: Record<string, { bg: string; band: string; text: string; label:
 function VolunteersTab({ orgId, members, supervisors, onRefresh }: {
   orgId: number; members: any[]; supervisors: any[]; onRefresh: () => void;
 }) {
-  const [sub, setSub] = useState<"pending" | "active">("pending");
+  const [sub, setSub] = useState<"pending" | "active" | "rejected">("pending");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [approveTarget, setApproveTarget] = useState<any | null>(null);
   const [assignForm, setAssignForm] = useState({ supervisor_id: "", department: "" });
+  const [selectedMember, setSelectedMember] = useState<any | null>(null);
 
-  const pending = members.filter((m) => m.org_status === "Pending");
-  const active  = members.filter((m) => m.org_status === "Active");
-  const list    = (sub === "pending" ? pending : active).filter((m) =>
-    !search || m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.email.toLowerCase().includes(search.toLowerCase())
+  const pending  = members.filter((m) => m.org_status === "Pending");
+  const active   = members.filter((m) => m.org_status === "Active");
+  const rejected = members.filter((m) => m.org_status === "Rejected");
+  const currentList = sub === "pending" ? pending : sub === "active" ? active : rejected;
+  const list = currentList.filter((m) =>
+    !search || (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const doApprove = async () => {
@@ -107,8 +110,9 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh }: {
       <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
         <div className="flex gap-1" style={{ borderBottom: "2px solid #E2E8F0" }}>
           {([
-            { k: "pending" as const, label: `Pending (${pending.length})` },
-            { k: "active"  as const, label: `Active (${active.length})` },
+            { k: "pending"  as const, label: `Pending (${pending.length})` },
+            { k: "active"   as const, label: `Active (${active.length})` },
+            { k: "rejected" as const, label: `Rejected (${rejected.length})` },
           ]).map((t) => (
             <button key={t.k} onClick={() => setSub(t.k)} style={{
               padding: "8px 18px", background: "none", border: "none", cursor: "pointer",
@@ -127,49 +131,29 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh }: {
       <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
         {/* Header */}
         <div className="grid" style={{
-          gridTemplateColumns: sub === "pending" ? "2fr 2fr 1.2fr 1.2fr 1.5fr" : "2fr 2fr 1.2fr 1.4fr 1.2fr 1.4fr",
+          gridTemplateColumns: sub === "active" ? "2fr 2fr 1.2fr 1.4fr 1.2fr 1.4fr" : "2fr 2fr 1.2fr 1.2fr 1.5fr",
           padding: "11px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0",
         }}>
-          {(sub === "pending"
-            ? ["Volunteer", "Email", "Phone", "Applied", "Actions"]
-            : ["Volunteer", "Email", "Phone", "Supervisor", "Department", "Actions"]
+          {(sub === "active"
+            ? ["Volunteer", "Email", "Phone", "Supervisor", "Department", "Actions"]
+            : ["Volunteer", "Email", "Phone", "Applied", "Actions"]
           ).map((h) => <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>)}
         </div>
 
         {list.length === 0 ? (
           <div className="text-center py-12" style={{ color: "#94A3B8", fontSize: 14 }}>
-            {sub === "pending" ? "No pending requests." : "No active members yet."}
+            {sub === "pending" ? "No pending requests." : sub === "active" ? "No active members yet." : "No rejected requests."}
           </div>
         ) : list.map((v) => {
-          const initials = v.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2);
+          const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
           const loading = busy === v.id;
-          if (sub === "pending") return (
-            <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.2fr 1.5fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9", borderLeft: "3px solid #D97706" }}>
-              <div className="flex items-center gap-3">
-                <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#D97706", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{initials}</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1E293B", display: "flex", alignItems: "center", gap: 6 }}>
-                    {v.name}
-                    {v.join_source === "manual" && (
-                      <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 4, padding: "1px 6px", letterSpacing: "0.03em" }}>Manual</span>
-                    )}
-                  </div>
-                  {v.city && <div style={{ fontSize: 11, color: "#94A3B8" }}>{v.city}</div>}
-                </div>
-              </div>
-              <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
-              <div style={{ fontSize: 13, color: "#64748B" }}>{v.phone || "—"}</div>
-              <div style={{ fontSize: 12, color: "#94A3B8" }}>{v.joined_date || "—"}</div>
-              <div className="flex gap-2">
-                <button onClick={() => { setApproveTarget(v); setAssignForm({ supervisor_id: "", department: "" }); }} disabled={loading}
-                  style={{ height: 30, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Accept</button>
-                <button onClick={() => doReject(v.id, v.name)} disabled={loading}
-                  style={{ height: 30, padding: "0 14px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer" }}>Reject</button>
-              </div>
-            </div>
-          );
-          return (
-            <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.4fr 1.2fr 1.4fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9" }}>
+          const avatarColor = sub === "pending" ? "#D97706" : sub === "rejected" ? "#DC2626" : GREEN;
+          const rowBorderLeft = sub === "pending" ? "3px solid #D97706" : sub === "rejected" ? "3px solid #DC2626" : "none";
+
+          if (sub === "active") return (
+            <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.4fr 1.2fr 1.4fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}
+              onClick={() => setSelectedMember(v)}
+            >
               <div className="flex items-center gap-3">
                 <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: GREEN, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{initials}</div>
                 <div>
@@ -186,14 +170,127 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh }: {
               <div style={{ fontSize: 13, color: "#64748B" }}>{v.phone || "—"}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{v.supervisor_name || "—"}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{v.department || "—"}</div>
-              <button onClick={() => doRemove(v.id, v.name)} disabled={loading}
+              <button onClick={(e) => { e.stopPropagation(); doRemove(v.id, v.name); }} disabled={loading}
                 style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer", width: "fit-content" }}>
                 {loading ? "…" : "Remove"}
               </button>
             </div>
           );
+
+          return (
+            <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.2fr 1.5fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9", borderLeft: rowBorderLeft, cursor: "pointer" }}
+              onClick={() => setSelectedMember(v)}
+            >
+              <div className="flex items-center gap-3">
+                <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{initials}</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1E293B", display: "flex", alignItems: "center", gap: 6 }}>
+                    {v.name}
+                    {v.join_source === "manual" && (
+                      <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 4, padding: "1px 6px", letterSpacing: "0.03em" }}>Manual</span>
+                    )}
+                  </div>
+                  {v.city && <div style={{ fontSize: 11, color: "#94A3B8" }}>{v.city}</div>}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
+              <div style={{ fontSize: 13, color: "#64748B" }}>{v.phone || "—"}</div>
+              <div style={{ fontSize: 12, color: "#94A3B8" }}>{v.joined_date || "—"}</div>
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                {sub === "pending" && <>
+                  <button onClick={() => { setApproveTarget(v); setAssignForm({ supervisor_id: "", department: "" }); }} disabled={loading}
+                    style={{ height: 30, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Accept</button>
+                  <button onClick={() => doReject(v.id, v.name)} disabled={loading}
+                    style={{ height: 30, padding: "0 14px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer" }}>Reject</button>
+                </>}
+                {sub === "rejected" && (
+                  <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 500 }}>Rejected</span>
+                )}
+              </div>
+            </div>
+          );
         })}
       </div>
+
+      {/* Member detail side panel */}
+      {selectedMember && (() => {
+        const v = selectedMember;
+        let skills: string[] = [];
+        let languages: string[] = [];
+        let availability: string[] = [];
+        try { skills = JSON.parse(v.skills || "[]"); } catch {}
+        try { languages = JSON.parse(v.languages || "[]"); } catch {}
+        try { availability = JSON.parse(v.availability || "[]"); } catch {}
+        const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
+        const statusColor = v.org_status === "Active" ? GREEN : v.org_status === "Rejected" ? "#DC2626" : "#D97706";
+        return (
+          <>
+            <div onClick={() => setSelectedMember(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.5)", zIndex: 50 }} />
+            <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 440, backgroundColor: "#fff", zIndex: 51, overflowY: "auto", boxShadow: "-4px 0 32px rgba(0,0,0,0.12)" }}>
+              <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #E2E8F0" }}>
+                <div className="flex items-center gap-3" style={{ marginBottom: 8 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: statusColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{initials}</div>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#1E293B" }}>{v.name}</div>
+                    <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 4, padding: "2px 8px", backgroundColor: v.org_status === "Active" ? "#DCFCE7" : v.org_status === "Rejected" ? "#FEE2E2" : "#FEF3C7", color: statusColor }}>{v.org_status}</span>
+              </div>
+              <div style={{ padding: "20px 24px" }}>
+                {[
+                  ["Phone", v.phone],
+                  ["City", v.city],
+                  ["Governorate", v.governorate],
+                  ["Gender", v.gender],
+                  ["Date of Birth", v.date_of_birth],
+                  ["Nationality", v.nationality],
+                  ["Education", v.education_level],
+                  ["University", v.university_name],
+                  ["Faculty", v.faculty],
+                  ["Field of Study", v.field_of_study],
+                  ["Study Year", v.study_year],
+                  ["Applied", v.joined_date],
+                  ["Supervisor", v.supervisor_name],
+                  ["Department", v.department],
+                  ["Hours/Week", v.hours_per_week ? `${v.hours_per_week} hrs` : null],
+                ].filter(([, val]) => val).map(([label, val]) => (
+                  <div key={label as string} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#64748B", minWidth: 120 }}>{label}</span>
+                    <span style={{ fontSize: 13, color: "#1E293B" }}>{val}</span>
+                  </div>
+                ))}
+                {skills.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>Skills</div>
+                    <div className="flex flex-wrap gap-1">{skills.map((s) => <span key={s} style={{ fontSize: 12, backgroundColor: "#F1F5F9", color: "#475569", borderRadius: 4, padding: "3px 8px" }}>{s}</span>)}</div>
+                  </div>
+                )}
+                {languages.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>Languages</div>
+                    <div className="flex flex-wrap gap-1">{languages.map((l: any, i: number) => { const label = typeof l === "string" ? l : l?.language || ""; const prof = l?.proficiency; return <span key={i} style={{ fontSize: 12, backgroundColor: "#EFF6FF", color: "#1D4ED8", borderRadius: 4, padding: "3px 8px" }}>{label}{prof ? ` · ${prof}` : ""}</span>; })}</div>
+                  </div>
+                )}
+                {availability.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>Availability</div>
+                    <div style={{ fontSize: 13, color: "#1E293B" }}>{availability.join(", ")}</div>
+                  </div>
+                )}
+              </div>
+              {v.org_status === "Pending" && (
+                <div style={{ padding: "16px 24px", borderTop: "1px solid #E2E8F0" }}>
+                  <div className="flex gap-2">
+                    <button onClick={() => { doReject(v.id, v.name); setSelectedMember(null); }} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Reject</button>
+                    <button onClick={() => { setSelectedMember(null); setApproveTarget(v); setAssignForm({ supervisor_id: "", department: "" }); }} style={{ flex: 2, height: 40, backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Accept</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -260,7 +357,7 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
             <div key={s.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1fr 1.2fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9" }}>
               <div className="flex items-center gap-3">
                 <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>
-                  {s.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                  {(s.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{s.name}</span>
               </div>
