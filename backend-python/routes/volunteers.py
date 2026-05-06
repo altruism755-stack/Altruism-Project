@@ -15,6 +15,40 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/api/volunteers", tags=["volunteers"])
 
+FORBIDDEN = "You do not have permission to access this resource"
+
+
+def _resolve_supervisor(db, user_id: int) -> dict:
+    sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user_id,)).fetchone())
+    if not sup:
+        raise HTTPException(403, FORBIDDEN)
+    return sup
+
+
+def _resolve_org_admin(db, user_id: int) -> dict:
+    org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user_id,)).fetchone())
+    if not org:
+        raise HTTPException(403, FORBIDDEN)
+    return org
+
+
+def _assert_supervisor_volunteer(db, supervisor_id: int, volunteer_id: int) -> None:
+    row = db.execute(
+        "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+        (volunteer_id, supervisor_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(403, FORBIDDEN)
+
+
+def _assert_org_volunteer(db, org_id: int, volunteer_id: int) -> None:
+    row = db.execute(
+        "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND org_id = ?",
+        (volunteer_id, org_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(403, FORBIDDEN)
+
 
 @router.get("")
 def list_volunteers(
@@ -34,6 +68,16 @@ def list_volunteers(
             "WHERE 1=1"
         )
         params: list = []
+
+        # Supervisors see only their assigned volunteers; org_admins see their org only.
+        if current_user["role"] == "supervisor":
+            sup = _resolve_supervisor(db, current_user["id"])
+            query += " AND ov.supervisor_id = ?"
+            params.append(sup["id"])
+        else:
+            org = _resolve_org_admin(db, current_user["id"])
+            query += " AND ov.org_id = ?"
+            params.append(org["id"])
 
         if status:
             query += " AND v.status = ?"
@@ -111,12 +155,34 @@ def get_volunteer(volunteer_id: int, current_user: dict = Depends(get_current_us
         vol = dict_row(db.execute("SELECT * FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
+        role = current_user["role"]
+        if role == "volunteer":
+            if vol.get("user_id") != current_user["id"]:
+                raise HTTPException(403, FORBIDDEN)
+        elif role == "supervisor":
+            sup = _resolve_supervisor(db, current_user["id"])
+            _assert_supervisor_volunteer(db, sup["id"], volunteer_id)
+        elif role == "org_admin":
+            org = _resolve_org_admin(db, current_user["id"])
+            _assert_org_volunteer(db, org["id"], volunteer_id)
         return _build_volunteer_response(db, vol)
 
 
 @router.put("/{volunteer_id}")
 def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
+        role = current_user["role"]
+        if role == "volunteer":
+            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            if not vol_check or vol_check["user_id"] != current_user["id"]:
+                raise HTTPException(403, FORBIDDEN)
+        elif role == "supervisor":
+            sup = _resolve_supervisor(db, current_user["id"])
+            _assert_supervisor_volunteer(db, sup["id"], volunteer_id)
+        elif role == "org_admin":
+            org = _resolve_org_admin(db, current_user["id"])
+            _assert_org_volunteer(db, org["id"], volunteer_id)
+
         name = body.get("name")
         phone = body.get("phone")
         city = body.get("city")
@@ -212,6 +278,19 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
 
 @router.put("/{volunteer_id}/profile-picture")
 def upload_profile_picture(volunteer_id: int, body: dict, current_user: dict = Depends(get_current_user)):
+    with get_db() as _db:
+        role = current_user["role"]
+        if role == "volunteer":
+            vol_check = dict_row(_db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            if not vol_check or vol_check["user_id"] != current_user["id"]:
+                raise HTTPException(403, FORBIDDEN)
+        elif role == "supervisor":
+            sup = _resolve_supervisor(_db, current_user["id"])
+            _assert_supervisor_volunteer(_db, sup["id"], volunteer_id)
+        elif role == "org_admin":
+            org = _resolve_org_admin(_db, current_user["id"])
+            _assert_org_volunteer(_db, org["id"], volunteer_id)
+
     image_data = body.get("image")
     if not image_data:
         raise HTTPException(400, "Image data is required")
@@ -262,6 +341,17 @@ def upload_profile_picture(volunteer_id: int, body: dict, current_user: dict = D
 @router.delete("/{volunteer_id}/profile-picture")
 def remove_profile_picture(volunteer_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
+        role = current_user["role"]
+        if role == "volunteer":
+            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            if not vol_check or vol_check["user_id"] != current_user["id"]:
+                raise HTTPException(403, FORBIDDEN)
+        elif role == "supervisor":
+            sup = _resolve_supervisor(db, current_user["id"])
+            _assert_supervisor_volunteer(db, sup["id"], volunteer_id)
+        elif role == "org_admin":
+            org = _resolve_org_admin(db, current_user["id"])
+            _assert_org_volunteer(db, org["id"], volunteer_id)
         vol = dict_row(db.execute("SELECT profile_picture FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
@@ -279,6 +369,22 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
         org = dict_row(db.execute("SELECT * FROM organizations WHERE id = ?", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
+
+        role = current_user["role"]
+        if role == "volunteer":
+            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            if not vol_check or vol_check["user_id"] != current_user["id"]:
+                raise HTTPException(403, FORBIDDEN)
+        elif role == "supervisor":
+            sup = _resolve_supervisor(db, current_user["id"])
+            if sup["org_id"] != org_id:
+                raise HTTPException(403, FORBIDDEN)
+            _assert_supervisor_volunteer(db, sup["id"], volunteer_id)
+        elif role == "org_admin":
+            admin_org = _resolve_org_admin(db, current_user["id"])
+            if admin_org["id"] != org_id:
+                raise HTTPException(403, FORBIDDEN)
+            _assert_org_volunteer(db, admin_org["id"], volunteer_id)
 
         activities = dict_rows(db.execute(
             "SELECT a.*, e.name as event_name, e.date as event_date "

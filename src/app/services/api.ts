@@ -304,10 +304,19 @@ export const api = {
   getOrgEventApplications: (orgId: number) => request(`/event-applications/org/${orgId}`),
   applyToEvent: (eventId: number) =>
     request("/event-applications", { method: "POST", body: JSON.stringify({ event_id: eventId }) }),
+  cancelApplication: (appId: number) =>
+    request(`/event-applications/${appId}`, { method: "DELETE" }),
   approveApplication: (appId: number) =>
     request(`/event-applications/${appId}/approve`, { method: "PUT" }),
   rejectApplication: (appId: number) =>
     request(`/event-applications/${appId}/reject`, { method: "PUT" }),
+
+  // Bulk attendance — supervisor/org_admin marks attendance after event day
+  markBulkAttendance: (eventId: number, data: { volunteer_ids: number[]; date?: string; hours?: number; description?: string }) =>
+    request(`/events/${eventId}/attendance`, { method: "POST", body: JSON.stringify(data) }),
+
+  // Accepted volunteers for an event (approved applications)
+  getEventAttendees: (eventId: number) => request(`/events/${eventId}`),
 
   // Platform admin — organizations
   adminListOrganizations: (status?: string) => {

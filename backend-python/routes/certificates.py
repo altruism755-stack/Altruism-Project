@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles
 from routes.notifications import create_notification
+from routes.audit import log_action
 
 router = APIRouter(prefix="/api/certificates", tags=["certificates"])
 
@@ -21,34 +22,69 @@ def list_certificates(
     current_user: dict = Depends(get_current_user),
 ):
     with get_db() as db:
-        query = (
+        base = (
             "SELECT c.*, o.name as org_name, e.name as event_name, v.name as volunteer_name "
             "FROM certificates c "
             "JOIN organizations o ON c.org_id = o.id "
             "LEFT JOIN events e ON c.event_id = e.id "
-            "JOIN volunteers v ON c.volunteer_id = v.id WHERE 1=1"
+            "JOIN volunteers v ON c.volunteer_id = v.id"
         )
+        extra_join = ""
+        clauses: list[str] = ["1=1"]
         params: list = []
-        if volunteer_id:
-            query += " AND c.volunteer_id = ?"
+
+        role = current_user["role"]
+        if role == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+            ).fetchone())
+            if not sup:
+                raise HTTPException(403, "You do not have permission to access this resource")
+            # Only certs for volunteers assigned to this supervisor, within their org.
+            extra_join = (
+                " JOIN org_volunteers ov ON c.volunteer_id = ov.volunteer_id"
+                " AND ov.supervisor_id = ?"
+            )
+            params.append(sup["id"])
+            clauses.append("c.org_id = ?")
+            params.append(sup["org_id"])
+        elif role == "org_admin":
+            org = dict_row(db.execute(
+                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            ).fetchone())
+            if not org:
+                raise HTTPException(403, "You do not have permission to access this resource")
+            clauses.append("c.org_id = ?")
+            params.append(org["id"])
+        elif role == "volunteer":
+            vol = dict_row(db.execute(
+                "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            ).fetchone())
+            if vol:
+                clauses.append("c.volunteer_id = ?")
+                params.append(vol["id"])
+            clauses.append("c.file_url IS NOT NULL")
+
+        # volunteer_id filter is only allowed for supervisors and org_admins.
+        if volunteer_id and role != "volunteer":
+            clauses.append("c.volunteer_id = ?")
             params.append(volunteer_id)
-        # Volunteers only see certificates with an uploaded file
-        if current_user["role"] == "volunteer":
-            query += " AND c.file_url IS NOT NULL"
-        query += " ORDER BY c.issued_date DESC"
+
+        query = base + extra_join + " WHERE " + " AND ".join(clauses) + " ORDER BY c.issued_date DESC"
         return {"certificates": dict_rows(db.execute(query, params).fetchall())}
 
 
 @router.post("", status_code=201)
 def issue_certificate(body: dict, current_user: dict = Depends(require_roles("org_admin", "supervisor"))):
     with get_db() as db:
+        sup_record = None
         if current_user["role"] == "supervisor":
-            sup = dict_row(db.execute(
-                "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+            sup_record = dict_row(db.execute(
+                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
             ).fetchone())
-            if not sup:
+            if not sup_record:
                 raise HTTPException(404, "Supervisor not found")
-            org = {"id": sup["org_id"]}
+            org = {"id": sup_record["org_id"]}
         else:
             org = dict_row(db.execute(
                 "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
@@ -62,6 +98,15 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
             raise HTTPException(400, "volunteer_id is required")
         if not certificate_title:
             raise HTTPException(400, "certificate_title is required")
+
+        # Supervisors may only issue certificates for their assigned volunteers.
+        if current_user["role"] == "supervisor" and sup_record:
+            assignment = db.execute(
+                "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                (volunteer_id, sup_record["id"]),
+            ).fetchone()
+            if not assignment:
+                raise HTTPException(403, "You do not have permission to access this resource")
 
         cur = db.execute(
             "INSERT INTO certificates (volunteer_id, org_id, event_id, certificate_title) VALUES (?, ?, ?, ?)",
@@ -89,6 +134,10 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
                 f"You've received \"{certificate_title}\" from {org_name}. Check your profile!",
                 "/dashboard/profile",
             )
+        log_action(db, current_user["id"], current_user["role"], "issue_certificate",
+                   "certificate", cur.lastrowid,
+                   {"volunteer_id": volunteer_id, "org_id": org["id"], "title": certificate_title,
+                    "event_id": body.get("event_id")})
         db.commit()
         return cert
 
@@ -110,10 +159,16 @@ async def upload_certificate_file(
 
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != cert["org_id"]:
                 raise HTTPException(403, "Not authorized for this certificate's organization")
+            assignment = db.execute(
+                "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                (cert["volunteer_id"], sup["id"]),
+            ).fetchone()
+            if not assignment:
+                raise HTTPException(403, "You do not have permission to access this resource")
         else:
             org = dict_row(db.execute(
                 "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
@@ -137,6 +192,9 @@ async def upload_certificate_file(
 
         file_url = f"/uploads/certificates/{filename}"
         db.execute("UPDATE certificates SET file_url = ? WHERE id = ?", (file_url, cert_id))
+        log_action(db, current_user["id"], current_user["role"], "upload_certificate",
+                   "certificate", cert_id,
+                   {"volunteer_id": cert["volunteer_id"], "org_id": cert["org_id"], "file_url": file_url})
         db.commit()
         return {"file_url": file_url}
 

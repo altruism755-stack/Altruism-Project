@@ -1,4 +1,5 @@
-"""In-app notifications for org admins."""
+"""In-app notifications."""
+import logging
 from fastapi import APIRouter, Depends
 from typing import Optional
 
@@ -6,6 +7,7 @@ from database import get_db, dict_row, dict_rows
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+logger = logging.getLogger(__name__)
 
 
 def create_notification(
@@ -16,15 +18,15 @@ def create_notification(
     message: str,
     action_url: Optional[str] = None,
 ) -> None:
+    """Insert a notification row inside the caller's transaction. Does NOT commit."""
     if not user_id:
-        raise ValueError(f"Missing user_id for notification: title='{title}'")
-    print("CREATING NOTIFICATION", user_id, title)
+        logger.warning("create_notification called with no user_id (title=%r) — skipped", title)
+        return
     db.execute(
         "INSERT INTO notifications (user_id, type, title, message, action_url) "
         "VALUES (?, ?, ?, ?, ?)",
         (user_id, type, title, message, action_url),
     )
-    db.commit()
 
 
 @router.get("")

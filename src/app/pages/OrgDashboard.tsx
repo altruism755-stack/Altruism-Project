@@ -281,7 +281,7 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
 }
 
 // ─── Activities tab ────────────────────────────────────────────────────────────
-const emptyForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming" };
+const emptyForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming", acceptanceMode: "manual" as "manual" | "auto" };
 
 function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh: () => void; orgId: number }) {
   const [sub, setSub] = useState<"Upcoming" | "Active" | "Completed" | "Applications">("Upcoming");
@@ -294,6 +294,16 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
   const [applications, setApplications] = useState<any[]>([]);
   const [appsLoaded, setAppsLoaded] = useState(false);
   const [appBusy, setAppBusy] = useState<number | null>(null);
+
+  // Bulk attendance modal state
+  const [attendanceEvent, setAttendanceEvent] = useState<any | null>(null);
+  const [attendanceApplicants, setAttendanceApplicants] = useState<any[]>([]);
+  const [attendanceSelected, setAttendanceSelected] = useState<Set<number>>(new Set());
+  const [attendanceHours, setAttendanceHours] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState("");
+  const [attendanceDesc, setAttendanceDesc] = useState("");
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceResult, setAttendanceResult] = useState<{ created: number; skipped: any[] } | null>(null);
 
   const loadApplications = useCallback(async () => {
     if (!orgId) return;
@@ -335,18 +345,50 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
 
   const openEdit = (ev: any) => {
     setEditing(ev);
-    setForm({ name: ev.name, description: ev.description || "", location: ev.location || "", date: ev.date, time: ev.time || "", duration: String(ev.duration || ""), maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "", status: ev.status });
+    setForm({ name: ev.name, description: ev.description || "", location: ev.location || "", date: ev.date, time: ev.time || "", duration: String(ev.duration || ""), maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "", status: ev.status, acceptanceMode: ev.acceptance_mode || "manual" });
     setShowPanel(true);
   };
 
   const doSave = async () => {
     setSaving(true);
-    const data = { name: form.name, description: form.description, location: form.location, date: form.date, time: form.time, duration: Number(form.duration) || undefined, max_volunteers: Number(form.maxVolunteers) || undefined, required_skills: form.requiredSkills, status: form.status };
+    const data = { name: form.name, description: form.description, location: form.location, date: form.date, time: form.time, duration: Number(form.duration) || undefined, max_volunteers: Number(form.maxVolunteers) || undefined, required_skills: form.requiredSkills, status: form.status, acceptance_mode: form.acceptanceMode };
     try {
       if (editing) await api.updateEvent(editing.id, data); else await api.createEvent(data);
       setShowPanel(false); onRefresh();
     } catch (e) { console.error(e); }
     setSaving(false);
+  };
+
+  const openAttendance = async (ev: any) => {
+    setAttendanceEvent(ev);
+    setAttendanceApplicants([]);
+    setAttendanceSelected(new Set());
+    setAttendanceHours("");
+    setAttendanceDate(ev.date || "");
+    setAttendanceDesc("");
+    setAttendanceResult(null);
+    // Load approved applications for this event
+    try {
+      const res = await api.getOrgEventApplications(orgId);
+      const approved = (res.applications || []).filter((a: any) => a.event_id === ev.id && a.status === "Approved");
+      setAttendanceApplicants(approved);
+      setAttendanceSelected(new Set(approved.map((a: any) => a.volunteer_id)));
+    } catch (e) { console.error(e); }
+  };
+
+  const submitAttendance = async () => {
+    if (!attendanceEvent) return;
+    setAttendanceLoading(true);
+    try {
+      const res = await api.markBulkAttendance(attendanceEvent.id, {
+        volunteer_ids: Array.from(attendanceSelected),
+        date: attendanceDate || attendanceEvent.date,
+        hours: attendanceHours ? Number(attendanceHours) : undefined,
+        description: attendanceDesc,
+      });
+      setAttendanceResult(res);
+    } catch (e: any) { console.error(e); }
+    setAttendanceLoading(false);
   };
 
   const doDelete = async (id: number, name: string) => {
@@ -386,6 +428,16 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                     <option value="Completed">Completed</option>
                   </select>
                 </div>
+                <div>
+                  <label style={lStyle}>Acceptance Mode</label>
+                  <select value={form.acceptanceMode} onChange={(e) => setForm((f) => ({ ...f, acceptanceMode: e.target.value as "manual" | "auto" }))} style={iStyle}>
+                    <option value="manual">✋ Manual Approval — you review each application</option>
+                    <option value="auto">⚡ Auto Accept — first come, first served</option>
+                  </select>
+                  <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                    {form.acceptanceMode === "auto" ? "Volunteers are accepted instantly up to capacity." : "You manually approve or reject each application."}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid #E2E8F0", flexShrink: 0 }}>
@@ -394,6 +446,85 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                 {saving ? "Saving…" : editing ? "Save Changes" : "Create"}
               </button>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Bulk Attendance Modal ── */}
+      {attendanceEvent && (
+        <>
+          <div onClick={() => !attendanceLoading && setAttendanceEvent(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 60 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 520, maxHeight: "85vh", backgroundColor: "#fff", borderRadius: 14, zIndex: 61, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #E2E8F0" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#1E293B" }}>Mark Attendance</div>
+              <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>{attendanceEvent.name} · {attendanceEvent.date}</div>
+            </div>
+
+            {attendanceResult ? (
+              <div style={{ padding: 24 }}>
+                <div style={{ textAlign: "center", marginBottom: 16 }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#16A34A" }}>{attendanceResult.created} activit{attendanceResult.created === 1 ? "y" : "ies"} created</div>
+                  {attendanceResult.skipped.length > 0 && (
+                    <div style={{ fontSize: 13, color: "#64748B", marginTop: 6 }}>{attendanceResult.skipped.length} skipped (already recorded or not assigned)</div>
+                  )}
+                </div>
+                <button onClick={() => setAttendanceEvent(null)} style={{ width: "100%", height: 42, backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Done</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+                  {attendanceApplicants.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8", fontSize: 13 }}>No approved applicants found for this event.</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 12, color: "#64748B", marginBottom: 10 }}>
+                        Select volunteers who attended ({attendanceSelected.size} selected):
+                        <button onClick={() => setAttendanceSelected(new Set(attendanceApplicants.map((a: any) => a.volunteer_id)))} style={{ marginLeft: 8, color: GREEN, background: "none", border: "none", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>All</button>
+                        <button onClick={() => setAttendanceSelected(new Set())} style={{ marginLeft: 6, color: "#64748B", background: "none", border: "none", fontSize: 12, cursor: "pointer" }}>None</button>
+                      </div>
+                      {attendanceApplicants.map((app: any) => (
+                        <label key={app.volunteer_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}>
+                          <input type="checkbox" checked={attendanceSelected.has(app.volunteer_id)} onChange={(e) => {
+                            setAttendanceSelected((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(app.volunteer_id); else next.delete(app.volunteer_id);
+                              return next;
+                            });
+                          }} style={{ width: 16, height: 16, accentColor: GREEN }} />
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.volunteer_name}</div>
+                            {app.volunteer_email && <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.volunteer_email}</div>}
+                          </div>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                  <div className="flex flex-col gap-3" style={{ marginTop: 16 }}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label style={{ ...lStyle, fontSize: 12 }}>Date *</label>
+                        <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} style={{ ...iStyle, height: 36 }} />
+                      </div>
+                      <div>
+                        <label style={{ ...lStyle, fontSize: 12 }}>Hours</label>
+                        <input type="number" min="0.5" step="0.5" placeholder="e.g. 3" value={attendanceHours} onChange={(e) => setAttendanceHours(e.target.value)} style={{ ...iStyle, height: 36 }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ ...lStyle, fontSize: 12 }}>Description</label>
+                      <input value={attendanceDesc} onChange={(e) => setAttendanceDesc(e.target.value)} placeholder="Optional note" style={{ ...iStyle, height: 36 }} />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid #E2E8F0" }}>
+                  <button onClick={() => setAttendanceEvent(null)} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={submitAttendance} disabled={attendanceLoading || attendanceSelected.size === 0} style={{ flex: 2, height: 40, backgroundColor: attendanceLoading || attendanceSelected.size === 0 ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    {attendanceLoading ? "Saving…" : `Record ${attendanceSelected.size} Attendee${attendanceSelected.size !== 1 ? "s" : ""}`}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
@@ -517,7 +648,13 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                 <div style={{ padding: 18 }}>
                   <div className="flex items-start justify-between mb-2">
                     <h4 style={{ fontSize: 15, fontWeight: 600, color: "#1E293B", margin: 0, flex: 1, paddingRight: 8 }}>{ev.name}</h4>
-                    <span style={{ backgroundColor: m.bg, color: m.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "2px 8px", flexShrink: 0 }}>{m.label}</span>
+                    <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, borderRadius: 20, padding: "2px 7px", backgroundColor: ev.acceptance_mode === "auto" ? "#EDE9FE" : "#F1F5F9", color: ev.acceptance_mode === "auto" ? "#7C3AED" : "#64748B" }}>
+                        {ev.acceptance_mode === "auto" ? "⚡ Auto" : "✋ Manual"}
+                      </span>
+                      {ev.is_full ? <span style={{ fontSize: 10, fontWeight: 600, borderRadius: 20, padding: "2px 7px", backgroundColor: "#FEE2E2", color: "#B91C1C" }}>Full</span> : null}
+                      <span style={{ backgroundColor: m.bg, color: m.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "2px 8px" }}>{m.label}</span>
+                    </div>
                   </div>
                   {ev.description && <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0", lineHeight: 1.5 }}>{ev.description.slice(0, 90)}{ev.description.length > 90 ? "…" : ""}</p>}
                   <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>
@@ -532,9 +669,12 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                       {skills.map((s: string, i: number) => <span key={i} style={{ fontSize: 10, backgroundColor: "#F1F5F9", color: "#64748B", padding: "2px 6px", borderRadius: 10 }}>{s}</span>)}
                     </div>
                   )}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button onClick={() => openEdit(ev)} style={{ height: 28, padding: "0 12px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Edit</button>
                     <button onClick={() => doDelete(ev.id, ev.name)} style={{ height: 28, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Delete</button>
+                    {ev.status === "Completed" && (
+                      <button onClick={() => openAttendance(ev)} style={{ height: 28, padding: "0 12px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📋 Mark Attendance</button>
+                    )}
                   </div>
                 </div>
               </div>

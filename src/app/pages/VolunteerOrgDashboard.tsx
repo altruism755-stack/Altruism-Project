@@ -53,6 +53,8 @@ export function VolunteerOrgDashboard() {
   const [activeTab,      setActiveTab]      = useState<TabType>(initialTab);
   const [applyingId,     setApplyingId]     = useState<number | null>(null);
   const [applyError,     setApplyError]     = useState<string | null>(null);
+  const [cancellingId,   setCancellingId]   = useState<number | null>(null);
+  const [autoAcceptedId, setAutoAcceptedId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -91,13 +93,30 @@ export function VolunteerOrgDashboard() {
   const handleApply = async (eventId: number) => {
     setApplyingId(eventId);
     setApplyError(null);
+    setAutoAcceptedId(null);
     try {
-      await api.applyToEvent(eventId);
+      const res = await api.applyToEvent(eventId);
       await refreshApplications();
+      if (res?.auto_accepted) {
+        setAutoAcceptedId(eventId);
+        setTimeout(() => setAutoAcceptedId(null), 4000);
+      }
     } catch (e: any) {
       setApplyError(e?.message || "Failed to apply. Please try again.");
     } finally {
       setApplyingId(null);
+    }
+  };
+
+  const handleCancel = async (appId: number) => {
+    setCancellingId(appId);
+    try {
+      await api.cancelApplication(appId);
+      await refreshApplications();
+    } catch (e: any) {
+      setApplyError(e?.message || "Failed to cancel. Please try again.");
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -137,9 +156,9 @@ export function VolunteerOrgDashboard() {
   const completedCount     = data.completed_activities || 0;
   const memberStatus       = data.member_status       || "Pending";
 
-  // Applications lookup
-  const appliedMap = new Map<number, string>(); // eventId → applicationStatus
-  myApplications.forEach((a: any) => appliedMap.set(a.event_id, a.status));
+  // Applications lookup: eventId → { status, appId, acceptance_mode }
+  const appliedMap = new Map<number, { status: string; appId: number; mode?: string }>();
+  myApplications.forEach((a: any) => appliedMap.set(a.event_id, { status: a.status, appId: a.id, mode: a.acceptance_mode }));
 
   const tabs: { key: TabType; label: string }[] = [
     { key: "events",       label: `Events (${orgEvents.length})`                                                          },
@@ -225,14 +244,18 @@ export function VolunteerOrgDashboard() {
                 body={`${org.name} hasn't scheduled any upcoming events yet. Check back later.`} />
             ) : (
               orgEvents.map((evt: any) => {
-                const appStatus = appliedMap.get(evt.id);
-                const isApplied = appStatus !== undefined;
-                const asc = appStatus ? (statusColors[appStatus] || statusColors.Pending) : null;
-                const isFull = evt.max_volunteers > 0 && evt.current_volunteers >= evt.max_volunteers;
-                const spotsLeft = evt.max_volunteers > 0 ? evt.max_volunteers - evt.current_volunteers : null;
-                const fillPct = evt.max_volunteers > 0
+                const appEntry  = appliedMap.get(evt.id);
+                const isApplied = appEntry !== undefined;
+                const appStatus = appEntry?.status;
+                const appId     = appEntry?.appId;
+                const asc       = appStatus ? (statusColors[appStatus] || statusColors.Pending) : null;
+                const isFull    = evt.is_full || (evt.max_volunteers > 0 && evt.current_volunteers >= evt.max_volunteers);
+                const isAutoMode = evt.acceptance_mode === "auto";
+                const spotsLeft  = evt.max_volunteers > 0 ? Math.max(0, evt.max_volunteers - evt.current_volunteers) : null;
+                const fillPct    = evt.max_volunteers > 0
                   ? Math.min(100, Math.round((evt.current_volunteers / evt.max_volunteers) * 100))
                   : 0;
+                const justAutoAccepted = autoAcceptedId === evt.id;
 
                 return (
                   <div key={evt.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
@@ -241,7 +264,13 @@ export function VolunteerOrgDashboard() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
                           <span style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{evt.name}</span>
-                          {isApplied && asc && (
+                          {isAutoMode && (
+                            <span style={{ fontSize: 10, fontWeight: 600, backgroundColor: "#EDE9FE", color: "#7C3AED", borderRadius: 20, padding: "2px 8px" }}>⚡ Instant Accept</span>
+                          )}
+                          {justAutoAccepted && (
+                            <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 20, padding: "2px 10px", animation: "none" }}>🎉 You're in!</span>
+                          )}
+                          {isApplied && asc && !justAutoAccepted && (
                             <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: asc.bg, color: asc.text, borderRadius: 20, padding: "2px 10px" }}>{appStatus}</span>
                           )}
                           {isFull && !isApplied && (
@@ -286,12 +315,31 @@ export function VolunteerOrgDashboard() {
                       </div>
 
                       {/* Right: CTA */}
-                      <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                      <div style={{ flexShrink: 0, paddingTop: 2, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                         {isApplied ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#64748B", fontWeight: 500 }}>
-                            <span style={{ fontSize: 16 }}>{appStatus === "Approved" ? "✅" : appStatus === "Rejected" ? "❌" : "⏳"}</span>
-                            Applied
-                          </div>
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#64748B", fontWeight: 500 }}>
+                              <span style={{ fontSize: 16 }}>
+                                {appStatus === "Approved" ? "✅" : appStatus === "Rejected" ? "❌" : "⏳"}
+                              </span>
+                              {appStatus === "Approved" ? "Confirmed" : appStatus === "Rejected" ? "Rejected" : "Pending"}
+                            </div>
+                            {appStatus !== "Rejected" && appId && (
+                              <button
+                                disabled={cancellingId === appId}
+                                onClick={() => handleCancel(appId)}
+                                style={{
+                                  height: 28, padding: "0 12px",
+                                  backgroundColor: "#fff", color: "#DC2626",
+                                  border: "1px solid #FECACA", borderRadius: 7,
+                                  fontSize: 11, fontWeight: 600,
+                                  cursor: cancellingId === appId ? "not-allowed" : "pointer",
+                                  opacity: cancellingId === appId ? 0.6 : 1,
+                                }}>
+                                {cancellingId === appId ? "…" : "Cancel"}
+                              </button>
+                            )}
+                          </>
                         ) : memberStatus !== "Active" ? (
                           <span style={{ fontSize: 12, color: "#94A3B8" }}>Join org to apply</span>
                         ) : isFull ? (
@@ -302,13 +350,13 @@ export function VolunteerOrgDashboard() {
                             onClick={() => handleApply(evt.id)}
                             style={{
                               height: 36, padding: "0 20px",
-                              backgroundColor: applyingId === evt.id ? "#94A3B8" : INDIGO,
+                              backgroundColor: applyingId === evt.id ? "#94A3B8" : isAutoMode ? "#7C3AED" : INDIGO,
                               color: "#fff", border: "none", borderRadius: 8,
                               fontSize: 13, fontWeight: 600,
                               cursor: applyingId === evt.id ? "not-allowed" : "pointer",
                               transition: "background 150ms",
                             }}>
-                            {applyingId === evt.id ? "Applying…" : "Apply"}
+                            {applyingId === evt.id ? "Applying…" : isAutoMode ? "⚡ Apply & Join" : "Apply"}
                           </button>
                         )}
                       </div>

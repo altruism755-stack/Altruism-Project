@@ -73,6 +73,25 @@ def get_db():
         conn.close()
 
 
+@contextmanager
+def exclusive_db():
+    """BEGIN IMMEDIATE transaction — serializes concurrent writes to prevent race conditions."""
+    conn = get_connection()
+    conn.isolation_level = None  # manual transaction control; conn.commit() becomes a no-op
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        yield conn
+        conn.execute("COMMIT")
+    except Exception:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
 def dict_row(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
@@ -533,6 +552,69 @@ def init_schema():
             conn.execute(ddl)
         except Exception:
             pass
+
+    # ── Event acceptance_mode + capacity tracking ───────────────────────────
+    # acceptance_mode: 'manual' (supervisor approves) | 'auto' (first-come-first-served)
+    try:
+        conn.execute("ALTER TABLE events ADD COLUMN acceptance_mode TEXT DEFAULT 'manual'")
+    except Exception:
+        pass
+    # is_full: set to 1 when approved_count reaches max_volunteers, blocks new applications
+    try:
+        conn.execute("ALTER TABLE events ADD COLUMN is_full INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    # cancelled_at: timestamp when a volunteer withdraws their application
+    try:
+        conn.execute("ALTER TABLE event_applications ADD COLUMN cancelled_at TEXT")
+    except Exception:
+        pass
+    # Index for quickly finding the next pending waitlisted applicant (auto-promote on cancel)
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_applications_event_pending "
+            "ON event_applications(event_id, status, applied_date)"
+        )
+    except Exception:
+        pass
+
+    # Prevent duplicate activities: one record per volunteer+event.
+    # Partial index (WHERE event_id IS NOT NULL) allows multiple ad-hoc activities with no event.
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_activities_unique_vol_event "
+            "ON activities(volunteer_id, event_id) WHERE event_id IS NOT NULL"
+        )
+    except Exception:
+        pass
+
+    # ── Audit log — immutable record of every critical action ───────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id INTEGER REFERENCES users(id),
+            actor_role TEXT,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id INTEGER,
+            metadata TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_logs_actor "
+            "ON audit_logs(actor_id, created_at DESC)"
+        )
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_logs_entity "
+            "ON audit_logs(entity_type, entity_id, created_at DESC)"
+        )
+    except Exception:
+        pass
 
     # ANALYZE lets the query planner pick the right index when multiple cover a query.
     try:

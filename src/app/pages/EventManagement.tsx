@@ -15,6 +15,7 @@ const statusMeta: Record<Tab, { bg: string; band: string; text: string; label: s
 const emptyForm = {
   name: "", description: "", location: "",
   date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming",
+  acceptanceMode: "manual" as "manual" | "auto",
 };
 
 export function EventManagement() {
@@ -60,7 +61,7 @@ export function EventManagement() {
       name: ev.name, description: ev.description || "", location: ev.location || "",
       date: ev.date, time: ev.time || "", duration: String(ev.duration || ""),
       maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "",
-      status: ev.status,
+      status: ev.status, acceptanceMode: ev.acceptance_mode || "manual",
     });
     setShowPanel(true);
   };
@@ -74,6 +75,7 @@ export function EventManagement() {
       max_volunteers: Number(form.maxVolunteers) || undefined,
       required_skills: form.requiredSkills,
       status: form.status,
+      acceptance_mode: form.acceptanceMode,
     };
     try {
       if (editingEvent) {
@@ -181,7 +183,15 @@ export function EventManagement() {
                   <div style={{ padding: 20 }}>
                     <div className="flex items-start justify-between mb-3">
                       <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: 0, flex: 1, paddingRight: 8 }}>{ev.name}</h3>
-                      <span style={{ backgroundColor: meta.bg, color: meta.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px", flexShrink: 0 }}>{meta.label}</span>
+                      <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, borderRadius: 20, padding: "2px 8px", backgroundColor: ev.acceptance_mode === "auto" ? "#EDE9FE" : "#F1F5F9", color: ev.acceptance_mode === "auto" ? "#7C3AED" : "#64748B" }}>
+                          {ev.acceptance_mode === "auto" ? "⚡ Auto" : "✋ Manual"}
+                        </span>
+                        {ev.is_full ? (
+                          <span style={{ fontSize: 10, fontWeight: 600, borderRadius: 20, padding: "2px 8px", backgroundColor: "#FEE2E2", color: "#B91C1C" }}>Full</span>
+                        ) : null}
+                        <span style={{ backgroundColor: meta.bg, color: meta.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{meta.label}</span>
+                      </div>
                     </div>
 
                     {ev.description && (
@@ -296,6 +306,19 @@ export function EventManagement() {
                       <option value="Active">Ongoing</option>
                       <option value="Completed">Completed</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Acceptance Mode</label>
+                    <select value={form.acceptanceMode} onChange={(e) => setForm((f) => ({ ...f, acceptanceMode: e.target.value as "manual" | "auto" }))} style={inputStyle}>
+                      <option value="manual">✋ Manual Approval — you review each application</option>
+                      <option value="auto">⚡ Auto Accept — first come, first served</option>
+                    </select>
+                    <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, marginBottom: 0 }}>
+                      {form.acceptanceMode === "auto"
+                        ? "Volunteers are accepted instantly up to the capacity limit."
+                        : "You manually approve or reject each application."}
+                    </p>
                   </div>
                 </div>
               </div>

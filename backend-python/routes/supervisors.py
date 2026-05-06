@@ -102,7 +102,7 @@ def get_my_profile(current_user: dict = Depends(require_roles("supervisor"))):
 
 @router.get("/me/volunteers")
 def get_my_volunteers(current_user: dict = Depends(require_roles("supervisor"))):
-    """All volunteers in the supervisor's org (not just those directly assigned to them)."""
+    """Volunteers directly assigned to this supervisor."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
 
@@ -113,9 +113,9 @@ def get_my_volunteers(current_user: dict = Depends(require_roles("supervisor")))
             "FROM volunteers v "
             "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
             "LEFT JOIN supervisors s2 ON ov.supervisor_id = s2.id "
-            "WHERE ov.org_id = ? AND ov.status = 'Active' "
+            "WHERE ov.org_id = ? AND ov.supervisor_id = ? AND ov.status = 'Active' "
             "ORDER BY v.name",
-            (sup["org_id"],),
+            (sup["org_id"], sup["id"]),
         ).fetchall())
 
         return {"volunteers": volunteers}
@@ -192,7 +192,7 @@ def get_my_events(current_user: dict = Depends(require_roles("supervisor"))):
 
 @router.get("/me/activities")
 def get_my_activities(current_user: dict = Depends(require_roles("supervisor"))):
-    """Pending activity logs from volunteers in the supervisor's org."""
+    """Pending activity logs for volunteers assigned to this supervisor."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
 
@@ -201,9 +201,10 @@ def get_my_activities(current_user: dict = Depends(require_roles("supervisor")))
             "FROM activities a "
             "LEFT JOIN volunteers v ON a.volunteer_id = v.id "
             "LEFT JOIN events e ON a.event_id = e.id "
+            "JOIN org_volunteers ov ON a.volunteer_id = ov.volunteer_id AND ov.supervisor_id = ? "
             "WHERE a.org_id = ? AND a.status = 'Pending' "
             "ORDER BY a.date DESC",
-            (sup["org_id"],),
+            (sup["id"], sup["org_id"]),
         ).fetchall())
 
         return {"activities": activities}
