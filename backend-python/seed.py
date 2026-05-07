@@ -23,8 +23,16 @@ src/app/data/volunteerFormSchema.ts EXACTLY:
 """
 
 import json
+from dotenv import load_dotenv
+load_dotenv()
 from database import init_schema, get_db
 from auth import hash_password
+
+
+def _executemany(conn, sql, params_list):
+    """psycopg3 connections don't have executemany; use a cursor instead."""
+    with conn.cursor() as cur:
+        cur.executemany(sql, params_list)
 
 
 def seed():
@@ -77,7 +85,7 @@ def seed():
             (30,  "hossamadel@gmail.com",            h("Vol#12345"),    "volunteer"),
             (31,  "mennatarek@gmail.com",            h("Vol#12345"),    "volunteer"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO users (id, email, password, role) VALUES (%s, %s, %s, %s)",
             users,
         )
@@ -101,7 +109,7 @@ def seed():
             "Social Welfare", "#D97706", "#F59E0B", "RS", "1999-01-01",
             "https://resala.org", "+20 2 2516 8888", 1,
             "approved", "NGO", "1999", "Cairo", "info@resala.org",
-            "Sherif Abdel Aziz", "Executive Director", 0,
+            "Sherif Abdel Aziz", "Executive Director", False,
             "501-1000", "Maadi",
             json.dumps(["Cairo", "Alexandria", "Giza", "Mansoura", "Aswan"]),
             json.dumps(["Social Welfare", "Food Security", "Youth Empowerment", "Community Outreach"]),
@@ -112,7 +120,7 @@ def seed():
             "Humanitarian Aid", "#DC2626", "#EF4444", "RC", "1912-03-15",
             "https://egyptianrc.org", "+20 2 2575 0399", 3,
             "approved", "NGO", "1912", "Cairo", "info@egyptianrc.org",
-            "Fatima El-Sayed", "Communications Director", 0,
+            "Fatima El-Sayed", "Communications Director", False,
             "1000+", "Nasr City",
             json.dumps(["Cairo", "Alexandria", "Luxor", "Aswan", "Sharm El Sheikh", "Hurghada"]),
             json.dumps(["Humanitarian Aid", "Disaster Relief", "Healthcare", "Blood Donation"]),
@@ -124,7 +132,7 @@ def seed():
             "Student Entrepreneurship", "#0891B2", "#06B6D4", "EN", "2004-09-01",
             "https://enactus-egypt.org", "+20 2 3760 1234", 4,
             "approved", "Student Activity", "2004", "Giza", "contact@enactus-egypt.org",
-            "Mohamed Farouk", "Country Director", 1,
+            "Mohamed Farouk", "Country Director", True,
             "201-500", "Dokki",
             json.dumps(["Cairo", "Giza", "Alexandria", "Mansoura"]),
             json.dumps(["Student Entrepreneurship", "Education", "Sustainability", "Innovation"]),
@@ -137,7 +145,7 @@ def seed():
             (3, 2, "creator"),
             (4, 3, "creator"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, %s)",
             org_admins,
         )
@@ -151,7 +159,7 @@ def seed():
             (5, 14, "Sara Nabil",        "saranabil@enactus-egypt.org",   "01055667788", "Projects",   3, "Active"),
             (6, 15, "Youssef Gamal",     "youssefgamal@enactus-egypt.org","01556677889", "Mentorship", 3, "Active"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO supervisors (id, user_id, name, email, phone, team, org_id, status) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             supervisors,
@@ -313,7 +321,7 @@ def seed():
              json.dumps(CAUSES_FULL), json.dumps(["Weekday evenings", "Weekends"]),
              0, "", json.dumps([]), ""),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO volunteers ("
             "id, user_id, name, email, phone, city, skills, about_me, status, date_of_birth, governorate, "
             "national_id, gender, nationality, education_level, university_name, faculty, study_year, "
@@ -346,7 +354,7 @@ def seed():
             (3, 11, 5, "Mentorship",  "Active",  "2026-02-12", "self_registration", "referral", 1),
             (3, 12, 6, "Translation", "Active",  "2026-03-08", "self_registration", "campaign", 1),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO org_volunteers "
             "(org_id, volunteer_id, supervisor_id, department, status, joined_date, source, join_source, is_active) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
@@ -386,7 +394,7 @@ def seed():
              "Shubra Community Hall, Cairo", "2026-04-05", "10:00", 5, 20, 18,
              "Teaching / Tutoring, Software Development", "Completed"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO events (id, org_id, name, description, location, date, time, duration, "
             "max_volunteers, current_volunteers, required_skills, status) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
@@ -431,7 +439,7 @@ def seed():
             (27, 10, 7, 3, "Approved", "2026-03-26 11:00:00"),
             (28, 12, 7, 3, "Approved", "2026-03-28 09:30:00"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO event_applications (id, volunteer_id, event_id, org_id, status, applied_date) "
             "VALUES (%s, %s, %s, %s, %s, %s)",
             apps,
@@ -478,9 +486,9 @@ def seed():
             (27, 11, 6, 3, "2026-04-15", 4, "Pitch coaching for student teams preparing bootcamp submissions.", "Approved"),
             (28, 11, 2, 1, "2026-04-28", 3, "Volunteer outreach on campus for Youth Leadership Forum.", "Pending"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO activities (id, volunteer_id, event_id, org_id, date, hours, description, status) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
             activities,
         )
 
@@ -498,7 +506,7 @@ def seed():
             (10,10, 3, 7, "Completion",    5, "2026-04-12"),
             (11,10, 2, 5, "Completion",    8, "2025-12-28"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO certificates (id, volunteer_id, org_id, event_id, type, hours, issued_date) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s)",
             certificates,
@@ -525,7 +533,7 @@ def seed():
              "18 women completed our Shubra workshop on e-commerce and online marketing.",
              "2026-04-08 16:00:00"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO announcements (id, org_id, title, content, created_at) "
             "VALUES (%s, %s, %s, %s, %s)",
             announcements,
@@ -534,17 +542,17 @@ def seed():
         # ──────────── NOTIFICATIONS ────────────
         notifs = [
             (1, "application", "New Event Application",
-             "Yara Hassan applied to 'Youth Leadership Forum'.", 0, "/admin/applications", "2026-04-13 10:01:00"),
+             "Yara Hassan applied to 'Youth Leadership Forum'.", False, "/admin/applications", "2026-04-13 10:01:00"),
             (2, "application", "New Event Application",
-             "Hossam Adel applied to 'Youth Leadership Forum'.", 0, "/admin/applications", "2026-04-14 09:01:00"),
+             "Hossam Adel applied to 'Youth Leadership Forum'.", False, "/admin/applications", "2026-04-14 09:01:00"),
             (1, "membership",  "Pending Volunteer",
-             "Hossam Adel is pending approval as a Resala volunteer.", 0, "/admin/volunteers", "2026-04-01 12:00:00"),
+             "Hossam Adel is pending approval as a Resala volunteer.", False, "/admin/volunteers", "2026-04-01 12:00:00"),
             (3, "application", "New Event Application",
-             "Yara Hassan applied to 'Blood Donation Drive'.", 0, "/admin/applications", "2026-04-13 10:06:00"),
+             "Yara Hassan applied to 'Blood Donation Drive'.", False, "/admin/applications", "2026-04-13 10:06:00"),
             (3, "membership",  "Pending Volunteer",
-             "Menna Tarek is pending approval as a Red Crescent volunteer.", 1, "/admin/volunteers", "2026-04-05 13:00:00"),
+             "Menna Tarek is pending approval as a Red Crescent volunteer.", True, "/admin/volunteers", "2026-04-05 13:00:00"),
         ]
-        db.executemany(
+        _executemany(db,
             "INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s)",
             notifs,
