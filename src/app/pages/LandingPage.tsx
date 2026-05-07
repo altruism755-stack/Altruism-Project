@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { useState } from "react";
 import { ResalaLogo, RedCrescentLogo, EnactusLogo } from "../components/OrgLogos";
 import { Logo } from "../components/Logo";
@@ -100,7 +100,7 @@ export function LandingPage() {
       </nav>
 
       {/* ═══ HERO ═══ */}
-      <section style={{ background: "linear-gradient(160deg, #0F172A 0%, #0D2818 50%, #0F172A 100%)", minHeight: 700, padding: "100px 32px 0", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <section style={{ background: "linear-gradient(160deg, #0F172A 0%, #0D2818 50%, #0F172A 100%)", minHeight: 700, padding: "100px 32px 80px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center" }}>
         {/* Ambient glow effects */}
         <div style={{ position: "absolute", top: -200, left: "50%", transform: "translateX(-50%)", width: 800, height: 800, borderRadius: "50%", background: "radial-gradient(circle, rgba(22,163,74,0.15) 0%, transparent 60%)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: -100, right: -200, width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
@@ -115,12 +115,12 @@ export function LandingPage() {
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <button onClick={() => navigate("/register")} style={{ backgroundColor: C.primary, color: C.white, border: "none", borderRadius: 10, height: 52, padding: "0 32px", fontSize: 16, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 24px rgba(22,163,74,0.35)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = C.primaryHover)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = C.primary)}>Join as a Volunteer</button>
-              <button onClick={() => navigate("/register")} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: C.white, border: "1.5px solid rgba(255,255,255,0.2)", borderRadius: 10, height: 52, padding: "0 32px", fontSize: 16, fontWeight: 600, cursor: "pointer", backdropFilter: "blur(8px)" }}>Register Your Organization</button>
+              <button onClick={() => navigate("/register?role=org")} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: C.white, border: "1.5px solid rgba(255,255,255,0.2)", borderRadius: 10, height: 52, padding: "0 32px", fontSize: 16, fontWeight: 600, cursor: "pointer", backdropFilter: "blur(8px)" }}>Register Your Organization</button>
             </div>
         </div>
 
         {/* Hero illustration */}
-        <img src={heroBg} alt="" style={{ position: "relative", zIndex: 1, marginTop: 32, width: "100vw", maxWidth: "none", opacity: 0.5, maskImage: "linear-gradient(to bottom, black 50%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent 100%)" }} />
+        <img src={heroBg} alt="" style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", zIndex: 1, width: "100vw", maxWidth: "none", opacity: 0.5, maskImage: "linear-gradient(to bottom, black 50%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent 100%)", pointerEvents: "none" }} />
       </section>
 
       {/* ═══ FEATURES ═══ */}
@@ -236,7 +236,7 @@ export function LandingPage() {
                 </div>
                 <h3 style={{ fontSize: 24, fontWeight: 700, color: C.white, marginBottom: 12, lineHeight: 1.3 }}>Are you an organization?</h3>
                 <p style={{ fontSize: 15, color: C.gray400, lineHeight: 1.7, marginBottom: 28, maxWidth: 340 }}>Start managing your volunteer program smarter. Full dashboard, event tools, and reporting — all in one place.</p>
-                <button onClick={() => navigate("/register")} style={{ backgroundColor: "transparent", color: C.white, border: "1.5px solid rgba(255,255,255,0.25)", borderRadius: 10, height: 48, padding: "0 28px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Get Started</button>
+                <button onClick={() => navigate("/register?role=org")} style={{ backgroundColor: "transparent", color: C.white, border: "1.5px solid rgba(255,255,255,0.25)", borderRadius: 10, height: 48, padding: "0 28px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Get Started</button>
               </div>
             </div>
           </div>
@@ -244,37 +244,50 @@ export function LandingPage() {
       </section>
 
       {/* ═══ FOOTER ═══ */}
-      <footer style={{ backgroundColor: C.gray950, borderTop: "1px solid #1E293B", padding: "64px 32px 32px" }}>
+      <footer style={{ backgroundColor: C.gray950, borderTop: "1px solid #1E293B", padding: "40px 32px 28px" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-          <div className="grid" style={{ gridTemplateColumns: "2.5fr 1fr 1fr 1fr", gap: 48, marginBottom: 56 }}>
-            <div>
-              <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 48, marginBottom: 32 }}>
+            {/* Left: brand */}
+            <div style={{ maxWidth: 300 }}>
+              <div style={{ marginBottom: 12 }}>
                 <Logo size={26} color={C.white} tagline taglineColor={C.gray500} taglineSize={11} />
               </div>
-              <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.7, maxWidth: 280 }}>A platform bridging non-profit organizations, student activities, and volunteers together.</p>
+              <p style={{ fontSize: 13, color: C.gray500, lineHeight: 1.7, margin: 0 }}>
+                A platform bridging non-profit organizations, student activities, and volunteers together.
+              </p>
             </div>
-            {[
-              { title: "Platform", links: ["Features", "How It Works", "For Organizations"] },
-              { title: "Resources", links: ["Help Center", "Documentation", "API"] },
-              { title: "Legal", links: ["Privacy Policy", "Terms of Service", "Cookie Policy", "Contact Us"] },
-            ].map((col) => (
-              <div key={col.title}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.white, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>{col.title}</div>
-                {col.links.map((link) => (
-                  <div key={link} style={{ marginBottom: 10 }}>
-                    <a href="#" style={{ fontSize: 14, color: C.gray500, textDecoration: "none" }}>{link}</a>
+
+            {/* Right: legal + contact */}
+            <div style={{ display: "flex", gap: 64, flexShrink: 0 }}>
+              {/* Legal */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.white, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Legal</div>
+                {[
+                  { label: "Privacy Policy", to: "/privacy" },
+                  { label: "Terms of Service", to: "/terms" },
+                  { label: "Cookie Policy", to: "/cookies" },
+                ].map(({ label, to }) => (
+                  <div key={label} style={{ marginBottom: 10 }}>
+                    <Link to={to} style={{ fontSize: 13, color: C.gray500, textDecoration: "none" }}>{label}</Link>
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
-          <div style={{ borderTop: "1px solid #1E293B", paddingTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, color: "#475569" }}>© 2026 Altruism. All rights reserved.</span>
-            <div className="flex items-center gap-6">
-              {["Privacy", "Terms", "Cookies"].map((link) => (
-                <a key={link} href="#" style={{ fontSize: 12, color: "#475569", textDecoration: "none" }}>{link}</a>
-              ))}
+
+              {/* Contact */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.white, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Contact</div>
+                <div style={{ marginBottom: 10 }}>
+                  <a href="mailto:altruism755@gmail.com" style={{ fontSize: 13, color: C.gray500, textDecoration: "none" }}>altruism755@gmail.com</a>
+                </div>
+                <div>
+                  <a href="tel:01208212210" style={{ fontSize: 13, color: C.gray500, textDecoration: "none" }}>01208212210</a>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div style={{ borderTop: "1px solid #1E293B", paddingTop: 20 }}>
+            <span style={{ fontSize: 12, color: "#475569" }}>© 2026 Altruism. All rights reserved.</span>
           </div>
         </div>
       </footer>

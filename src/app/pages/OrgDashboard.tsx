@@ -1382,17 +1382,6 @@ export function OrgDashboard() {
             onSuccess={() => { loadAll(); setShowAddManually(false); }}
           />
         )}
-        {/* Next Best Action */}
-        <WorkflowPanel actions={nextActions} style={{ marginBottom: 20 }} />
-
-        {/* Org Pipeline Lifecycle */}
-        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 20px", marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
-            Volunteer Pipeline
-          </div>
-          <LifecycleStepper steps={orgPipelineSteps} stuckMsg={orgStuckMsg} />
-        </div>
-
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 28 }}>
           {statCards.map((s) => (

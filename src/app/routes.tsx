@@ -1,5 +1,9 @@
-import { createBrowserRouter, Navigate, Outlet, useRouteError } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, useRouteError, useLocation } from "react-router";
+import { useEffect } from "react";
 import { LandingPage } from "./pages/LandingPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { TermsPage } from "./pages/TermsPage";
+import { CookiesPage } from "./pages/CookiesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { OrgDashboard } from "./pages/OrgDashboard";
@@ -35,8 +39,19 @@ function ErrorPage() {
   );
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 function RootLayout() {
-  return <Outlet />;
+  return (
+    <>
+      <ScrollToTop />
+      <Outlet />
+    </>
+  );
 }
 
 export const router = createBrowserRouter([
@@ -45,6 +60,9 @@ export const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [
       { path: "/", element: <LandingPage /> },
+      { path: "/privacy", element: <PrivacyPage /> },
+      { path: "/terms", element: <TermsPage /> },
+      { path: "/cookies", element: <CookiesPage /> },
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
 

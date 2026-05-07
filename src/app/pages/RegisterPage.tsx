@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DatePicker } from "../components/DatePicker";
 import { Logo } from "../components/Logo";
@@ -43,8 +43,9 @@ const STEP2_FIELDS = ["nationalId", "dateOfBirth", "governorate", "phone", "city
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register } = useAuth();
-  const [role, setRole] = useState<Role>("Volunteer");
+  const [role, setRole] = useState<Role>(searchParams.get("role") === "org" ? "Organization" : "Volunteer");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [focused, setFocused] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
