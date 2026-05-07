@@ -16,7 +16,7 @@ interface RequestOptions extends RequestInit {
 const MAX_RETRIES = 3;
 
 function getToken(): string | null {
-  return sessionStorage.getItem("altruism_token");
+  return localStorage.getItem("altruism_token");
 }
 
 function isRetryable(method: string, opts: RequestOptions): boolean {
@@ -95,6 +95,14 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
 
 async function parseResponse(res: Response): Promise<any> {
   if (!res.ok) {
+    if (res.status === 401) {
+      // Expired or invalid token — clear persisted session and force a clean login.
+      localStorage.removeItem("altruism_token");
+      localStorage.removeItem("altruism_user");
+      localStorage.removeItem("altruism_profile");
+      localStorage.removeItem("altruism_org_status");
+      window.location.href = "/login";
+    }
     const body = await res.json().catch(() => ({}));
     const message = body.error || body.message || body.detail || `Request failed: ${res.status}`;
     throw new ApiError(message, res.status, body);
@@ -244,7 +252,7 @@ export const api = {
   exportCSV: () => request("/reports/export-csv"),
 
   exportStarSchema: async (): Promise<{ blob: Blob; filename: string }> => {
-    const token = sessionStorage.getItem("altruism_token");
+    const token = localStorage.getItem("altruism_token");
     const headers: Record<string, string> = {};
     if (token && !token.startsWith("demo-")) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(`${API_BASE}/reports/star-schema`, { headers });
@@ -263,7 +271,7 @@ export const api = {
   exportOrgVolunteersFull: async (
     format: "xlsx" | "csv",
   ): Promise<{ blob: Blob; filename: string; count: number }> => {
-    const token = sessionStorage.getItem("altruism_token");
+    const token = localStorage.getItem("altruism_token");
     const headers: Record<string, string> = {};
     if (token && !token.startsWith("demo-")) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(
@@ -314,6 +322,10 @@ export const api = {
   // Bulk attendance — supervisor/org_admin marks attendance after event day
   markBulkAttendance: (eventId: number, data: { volunteer_ids: number[]; date?: string; hours?: number; description?: string }) =>
     request(`/events/${eventId}/attendance`, { method: "POST", body: JSON.stringify(data) }),
+
+  // Event ratings — volunteer submits 1-5 star rating for a completed event
+  submitEventRating: (eventId: number, rating: number, feedback?: string) =>
+    request("/event-ratings", { method: "POST", body: JSON.stringify({ event_id: eventId, rating, feedback: feedback ?? "" }) }),
 
   // Accepted volunteers for an event (approved applications)
   getEventAttendees: (eventId: number) => request(`/events/${eventId}`),

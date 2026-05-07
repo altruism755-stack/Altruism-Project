@@ -4,6 +4,8 @@ import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogoByName } from "../components/OrgLogos";
+import { Pagination, usePagination } from "../components/Pagination";
+import { MEMBERSHIP_STATUS } from "../types";
 
 const GREEN = "#16A34A";
 
@@ -30,10 +32,10 @@ export function BrowseOrganizations() {
 
         const volOrgs: any[] = volRes.organizations || [];
         const activeIds = new Set<number>(
-          volOrgs.filter((o: any) => o.membership_status === "Active").map((o: any) => o.id)
+          volOrgs.filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active).map((o: any) => o.id)
         );
         const pendingIds = new Set<number>(
-          volOrgs.filter((o: any) => o.membership_status === "Pending").map((o: any) => o.id)
+          volOrgs.filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Pending).map((o: any) => o.id)
         );
         setMyOrgIds(activeIds);
         setPendingOrgIds(pendingIds);
@@ -60,6 +62,10 @@ export function BrowseOrganizations() {
     !search || o.name.toLowerCase().includes(search.toLowerCase()) ||
     (o.category || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const { page, setPage, totalPages, pageItems: pageOrgs, reset: resetPage } = usePagination(filtered, 12);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [search]);
 
   const getMemberStatus = (orgId: number) => {
     if (myOrgIds.has(orgId)) return "active";
@@ -96,7 +102,7 @@ export function BrowseOrganizations() {
 
         {/* Org cards grid */}
         <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
-          {filtered.map((org) => {
+          {pageOrgs.map((org) => {
             const status = getMemberStatus(org.id);
             const accentColor = org.color || GREEN;
             const accentSecondary = org.secondary_color || "#22C55E";
@@ -208,6 +214,8 @@ export function BrowseOrganizations() {
             );
           })}
         </div>
+
+        <Pagination page={page} totalPages={totalPages} onPage={setPage} totalItems={filtered.length} pageSize={12} />
 
         {filtered.length === 0 && (
           <div style={{ textAlign: "center", padding: 48, color: "#94A3B8" }}>

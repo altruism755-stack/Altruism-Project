@@ -35,7 +35,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-type TabType = "events" | "activities" | "certificates" | "pending";
+type TabType = "announcements" | "events" | "activities" | "certificates" | "pending";
 
 export function VolunteerOrgDashboard() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -49,6 +49,7 @@ export function VolunteerOrgDashboard() {
   const [data,           setData]           = useState<any>(null);
   const [orgEvents,      setOrgEvents]      = useState<any[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [announcements,  setAnnouncements]  = useState<any[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [activeTab,      setActiveTab]      = useState<TabType>(initialTab);
   const [applyingId,     setApplyingId]     = useState<number | null>(null);
@@ -56,17 +57,24 @@ export function VolunteerOrgDashboard() {
   const [cancellingId,   setCancellingId]   = useState<number | null>(null);
   const [autoAcceptedId, setAutoAcceptedId] = useState<number | null>(null);
 
+  // Rating state: eventId → { hover, selected, feedback, submitting, submitted }
+  const [ratingState, setRatingState] = useState<Record<number, {
+    hover: number; selected: number; feedback: string; submitting: boolean; submitted: boolean;
+  }>>({});
+
   useEffect(() => {
     const load = async () => {
       try {
-        const [res, evtRes, appsRes] = await Promise.all([
+        const [res, evtRes, appsRes, annRes] = await Promise.all([
           api.getVolunteerOrgDashboard(volId, Number(orgId)),
           api.getEvents({ org_id: String(orgId), status: "Upcoming" }),
           api.getEventApplications(),
+          api.getAnnouncements([Number(orgId)]).catch(() => ({ announcements: [] })),
         ]);
         setData(res);
         setOrgEvents(evtRes.events || []);
         setMyApplications(appsRes.applications || []);
+        setAnnouncements(annRes.announcements || []);
 
         // If ?tab=pending was requested but this org has nothing pending, fall back to events
         if (searchParams.get("tab") === "pending") {
@@ -120,6 +128,21 @@ export function VolunteerOrgDashboard() {
     }
   };
 
+  const setRating = (eventId: number, patch: Partial<{ hover: number; selected: number; feedback: string; submitting: boolean; submitted: boolean }>) =>
+    setRatingState((prev) => ({ ...prev, [eventId]: { hover: 0, selected: 0, feedback: "", submitting: false, submitted: false, ...prev[eventId], ...patch } }));
+
+  const handleSubmitRating = async (eventId: number) => {
+    const rs = ratingState[eventId];
+    if (!rs?.selected) return;
+    setRating(eventId, { submitting: true });
+    try {
+      await api.submitEventRating(eventId, rs.selected, rs.feedback);
+      setRating(eventId, { submitted: true, submitting: false });
+    } catch {
+      setRating(eventId, { submitting: false });
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Navbar role="volunteer" />
@@ -160,11 +183,19 @@ export function VolunteerOrgDashboard() {
   const appliedMap = new Map<number, { status: string; appId: number; mode?: string }>();
   myApplications.forEach((a: any) => appliedMap.set(a.event_id, { status: a.status, appId: a.id, mode: a.acceptance_mode }));
 
+  // Events the volunteer attended (Approved application + Completed event) — eligible for rating
+  const rateableEventIds = new Set<number>(
+    myApplications
+      .filter((a: any) => a.status === "Approved" && a.event_status === "Completed" && a.org_id === Number(orgId))
+      .map((a: any) => a.event_id)
+  );
+
   const tabs: { key: TabType; label: string }[] = [
-    { key: "events",       label: `Events (${orgEvents.length})`                                                          },
-    { key: "activities",   label: "Activities"                                                                             },
-    { key: "certificates", label: "Certificates"                                                                           },
-    { key: "pending",      label: pendingApplications.length > 0 ? `Pending (${pendingApplications.length})` : "Pending"  },
+    { key: "announcements", label: announcements.length > 0 ? `Announcements (${announcements.length})` : "Announcements" },
+    { key: "events",        label: `Events (${orgEvents.length})`                                                          },
+    { key: "activities",    label: "Activities"                                                                             },
+    { key: "certificates",  label: "Certificates"                                                                           },
+    { key: "pending",       label: pendingApplications.length > 0 ? `Pending (${pendingApplications.length})` : "Pending"  },
   ];
 
   return (
@@ -235,6 +266,30 @@ export function VolunteerOrgDashboard() {
             }}>{label}</button>
           ))}
         </div>
+
+        {/* ── Announcements Tab ── */}
+        {activeTab === "announcements" && (
+          <div className="flex flex-col gap-3">
+            {announcements.length === 0 ? (
+              <EmptyState icon="📢" title="No announcements yet"
+                body={`${org.name} hasn't posted any announcements. Check back later.`} />
+            ) : (
+              announcements.map((ann: any) => (
+                <div key={ann.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: ann.content ? 10 : 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{ann.title}</div>
+                    <div style={{ fontSize: 12, color: "#94A3B8", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {new Date(ann.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </div>
+                  </div>
+                  {ann.content && (
+                    <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{ann.content}</div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* ── Events Tab ── */}
         {activeTab === "events" && (
@@ -377,6 +432,8 @@ export function VolunteerOrgDashboard() {
             ) : (
               activities.map((a: any) => {
                 const sc = statusColors[a.status] || statusColors.Pending;
+                const canRate = a.event_id && rateableEventIds.has(a.event_id);
+                const rs = ratingState[a.event_id] ?? { hover: 0, selected: 0, feedback: "", submitting: false, submitted: false };
                 return (
                   <div key={a.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
                     <div className="flex items-start justify-between mb-2">
@@ -385,11 +442,64 @@ export function VolunteerOrgDashboard() {
                         <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>{a.date}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span style={{ backgroundColor: "#DCFCE7", color: GREEN, fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.hours} hrs</span>
+                        {a.hours != null && (
+                          <span style={{ backgroundColor: "#DCFCE7", color: GREEN, fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.hours} hrs</span>
+                        )}
                         <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status}</span>
                       </div>
                     </div>
-                    {a.description && <div style={{ fontSize: 13, color: "#94A3B8" }}>{a.description}</div>}
+                    {a.description && <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: canRate ? 12 : 0 }}>{a.description}</div>}
+                    {canRate && (
+                      rs.submitted ? (
+                        <div style={{ marginTop: 12, padding: "10px 14px", backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 13, color: "#15803D", fontWeight: 500 }}>
+                          ✓ Thanks for your feedback!
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 12, borderTop: "1px solid #F1F5F9", paddingTop: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 8 }}>Rate this event</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                onClick={() => setRating(a.event_id, { selected: star })}
+                                onMouseEnter={() => setRating(a.event_id, { hover: star })}
+                                onMouseLeave={() => setRating(a.event_id, { hover: 0 })}
+                                style={{
+                                  background: "none", border: "none", padding: "0 2px",
+                                  fontSize: 24, cursor: "pointer", lineHeight: 1,
+                                  color: star <= (rs.hover || rs.selected) ? "#F59E0B" : "#E2E8F0",
+                                  transition: "color 100ms",
+                                }}
+                                aria-label={`${star} star${star !== 1 ? "s" : ""}`}
+                              >★</button>
+                            ))}
+                            {rs.selected > 0 && (
+                              <span style={{ fontSize: 12, color: "#64748B", marginLeft: 4 }}>
+                                {["", "Poor", "Fair", "Good", "Very good", "Excellent"][rs.selected]}
+                              </span>
+                            )}
+                          </div>
+                          {rs.selected > 0 && (
+                            <>
+                              <textarea
+                                value={rs.feedback}
+                                onChange={(e) => setRating(a.event_id, { feedback: e.target.value })}
+                                placeholder="Share any feedback (optional)…"
+                                rows={2}
+                                style={{ width: "100%", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 10px", fontSize: 13, outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 8, color: "#1E293B" }}
+                              />
+                              <button
+                                onClick={() => handleSubmitRating(a.event_id)}
+                                disabled={rs.submitting}
+                                style={{ height: 32, padding: "0 16px", backgroundColor: rs.submitting ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: rs.submitting ? "not-allowed" : "pointer" }}
+                              >
+                                {rs.submitting ? "Submitting…" : "Submit Rating"}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )
+                    )}
                   </div>
                 );
               })

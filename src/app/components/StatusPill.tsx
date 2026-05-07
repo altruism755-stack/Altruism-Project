@@ -1,9 +1,14 @@
 /** Unified status badge used across all dashboards. */
 
+import type {
+  EventStatus, ApplicationStatus, OrgMemberStatus,
+  ActivityStatus, SupervisorStatus,
+} from "../types";
+
 type Status =
-  | "Pending" | "Active" | "Approved" | "Rejected" | "Completed"
-  | "Upcoming" | "Ongoing" | "pending" | "active" | "approved"
-  | "rejected" | "completed" | "upcoming";
+  | EventStatus | ApplicationStatus | OrgMemberStatus | ActivityStatus | SupervisorStatus
+  | "Ongoing" | "Inactive" | "Suspended"
+  | Lowercase<EventStatus> | Lowercase<ApplicationStatus>;
 
 const STYLE: Record<string, { bg: string; text: string; dot: string }> = {
   pending:   { bg: "#FEF3C7", text: "#B45309",  dot: "#F59E0B" },

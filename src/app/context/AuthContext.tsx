@@ -34,38 +34,38 @@ const DEMO_USERS: Record<string, { password: string; role: User["role"]; name: s
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const stored = sessionStorage.getItem("altruism_user");
+    const stored = localStorage.getItem("altruism_user");
     return stored ? JSON.parse(stored) : null;
   });
-  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem("altruism_token"));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem("altruism_token"));
   const [profile, setProfile] = useState<any>(() => {
-    const stored = sessionStorage.getItem("altruism_profile");
+    const stored = localStorage.getItem("altruism_profile");
     return stored ? JSON.parse(stored) : null;
   });
   const [orgStatus, setOrgStatus] = useState<"pending" | "approved" | "rejected" | null>(() => {
-    const s = sessionStorage.getItem("altruism_org_status");
+    const s = localStorage.getItem("altruism_org_status");
     return (s as any) || null;
   });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (orgStatus) sessionStorage.setItem("altruism_org_status", orgStatus);
-    else sessionStorage.removeItem("altruism_org_status");
+    if (orgStatus) localStorage.setItem("altruism_org_status", orgStatus);
+    else localStorage.removeItem("altruism_org_status");
   }, [orgStatus]);
 
   useEffect(() => {
-    if (user) sessionStorage.setItem("altruism_user", JSON.stringify(user));
-    else sessionStorage.removeItem("altruism_user");
+    if (user) localStorage.setItem("altruism_user", JSON.stringify(user));
+    else localStorage.removeItem("altruism_user");
   }, [user]);
 
   useEffect(() => {
-    if (token) sessionStorage.setItem("altruism_token", token);
-    else sessionStorage.removeItem("altruism_token");
+    if (token) localStorage.setItem("altruism_token", token);
+    else localStorage.removeItem("altruism_token");
   }, [token]);
 
   useEffect(() => {
-    if (profile) sessionStorage.setItem("altruism_profile", JSON.stringify(profile));
-    else sessionStorage.removeItem("altruism_profile");
+    if (profile) localStorage.setItem("altruism_profile", JSON.stringify(profile));
+    else localStorage.removeItem("altruism_profile");
   }, [profile]);
 
   const login = async (email: string, password: string): Promise<{ ok: boolean; role?: User["role"]; orgStatus?: "pending" | "approved" | "rejected" | null; isPlatformAdmin?: boolean; errorCode?: "invalid_credentials" | "not_activated" | "server_error" }> => {
@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshOrgStatus = async (): Promise<"pending" | "approved" | "rejected" | null> => {
-    const currentToken = sessionStorage.getItem("altruism_token");
+    const currentToken = localStorage.getItem("altruism_token");
     if (!currentToken || currentToken.startsWith("demo-")) return orgStatus;
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
@@ -197,10 +197,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setProfile(null);
     setOrgStatus(null);
-    sessionStorage.removeItem("altruism_user");
-    sessionStorage.removeItem("altruism_token");
-    sessionStorage.removeItem("altruism_profile");
-    sessionStorage.removeItem("altruism_org_status");
+    localStorage.removeItem("altruism_user");
+    localStorage.removeItem("altruism_token");
+    localStorage.removeItem("altruism_profile");
+    localStorage.removeItem("altruism_org_status");
   };
 
   return (

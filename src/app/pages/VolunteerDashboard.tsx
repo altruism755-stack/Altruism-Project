@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
+import { MEMBERSHIP_STATUS } from "../types";
 
 const GREEN = "#16A34A";
 
@@ -13,10 +15,22 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   Completed: { bg: "#DBEAFE", text: "#1D4ED8" },
 };
 
+function relativeDate(isoOrDate: string): string {
+  const d = new Date(isoOrDate);
+  if (isNaN(d.getTime())) return isoOrDate;
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 export function VolunteerDashboard() {
   const { user, profile } = useAuth();
-  const volName = profile?.name || "Volunteer";
+  const navigate = useNavigate();
+  const volName = profile?.name?.split(" ")[0] || "there";
   const volId = profile?.id || 0; // volunteer profile ID, not user.id
 
   const [volunteer, setVolunteer] = useState<any>(null);
@@ -24,6 +38,7 @@ export function VolunteerDashboard() {
   const [myOrgs, setMyOrgs] = useState<any[]>([]);
   const [myCertificates, setMyCertificates] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [whatsNew, setWhatsNew] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -33,10 +48,33 @@ export function VolunteerDashboard() {
         api.getEvents({ status: "Upcoming" }),
       ]);
       setVolunteer(volRes);
-      setMyActivities(volRes.activities || []);
-      setMyOrgs(volRes.organizations || []);
+      const activities = volRes.activities || [];
+      const orgs = volRes.organizations || [];
+      setMyActivities(activities);
+      setMyOrgs(orgs);
       setMyCertificates((volRes.certificates || []).filter((c: any) => c.file_url));
       setUpcomingEvents((evtRes.events || []).slice(0, 3));
+
+      // Build "What's New": events + announcements from active orgs, capped at 5
+      const activeOrgIds: number[] = orgs
+        .filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active)
+        .map((o: any) => o.id);
+
+      if (activeOrgIds.length > 0) {
+        const orgIdSet = new Set(activeOrgIds);
+        const newEvents = (evtRes.events || [])
+          .filter((e: any) => orgIdSet.has(e.org_id))
+          .map((e: any) => ({ ...e, _kind: "event", _sortKey: e.date || "" }));
+
+        const annRes = await api.getAnnouncements(activeOrgIds).catch(() => ({ announcements: [] }));
+        const newAnns = (annRes.announcements || [])
+          .map((a: any) => ({ ...a, _kind: "announcement", _sortKey: a.created_at || "" }));
+
+        const merged = [...newEvents, ...newAnns]
+          .sort((a, b) => b._sortKey.localeCompare(a._sortKey))
+          .slice(0, 5);
+        setWhatsNew(merged);
+      }
     } catch (e) { console.error("Failed to load dashboard:", e); }
     finally { setLoading(false); }
   };
@@ -45,6 +83,27 @@ export function VolunteerDashboard() {
 
   const totalHours = myActivities.filter((a) => a.status === "Approved").reduce((s: number, a: any) => s + (a.hours || 0), 0);
   const totalSubmitted = myActivities.length;
+
+  // Hours logged this calendar month
+  const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const hoursThisMonth = myActivities
+    .filter((a) => a.status === "Approved" && (a.date || "").startsWith(thisMonth))
+    .reduce((s: number, a: any) => s + (a.hours || 0), 0);
+
+  // Days since last approved activity
+  const lastActivityDate = myActivities
+    .filter((a) => a.status === "Approved")
+    .map((a) => a.date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const daysSinceActive = lastActivityDate
+    ? Math.floor((Date.now() - new Date(lastActivityDate).getTime()) / 86_400_000)
+    : null;
+
+  const hasNoOrgs = myOrgs.length === 0;
+  const isLapsed = daysSinceActive !== null && daysSinceActive > 30;
+  const isNewUser = totalSubmitted === 0 && myOrgs.length === 0;
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -58,6 +117,47 @@ export function VolunteerDashboard() {
       <Navbar role="volunteer" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
+
+        {/* Welcome-back greeting */}
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1E293B", margin: "0 0 4px 0" }}>
+            Welcome back, {volName}!
+          </h1>
+          {hoursThisMonth > 0 ? (
+            <p style={{ fontSize: 14, color: "#64748B", margin: 0 }}>
+              You've contributed <strong style={{ color: GREEN }}>{hoursThisMonth} hour{hoursThisMonth !== 1 ? "s" : ""}</strong> this month. Keep it up!
+            </p>
+          ) : isNewUser ? (
+            <p style={{ fontSize: 14, color: "#64748B", margin: 0 }}>
+              Ready to get started? Join an organization and attend your first activity.
+            </p>
+          ) : isLapsed ? (
+            <p style={{ fontSize: 14, color: "#64748B", margin: 0 }}>
+              It's been a while — your last approved activity was {daysSinceActive} days ago. There might be new events waiting for you.
+            </p>
+          ) : (
+            <p style={{ fontSize: 14, color: "#64748B", margin: 0 }}>
+              Here's an overview of your volunteer activity.
+            </p>
+          )}
+        </div>
+
+        {/* Call-to-action banners */}
+        {hasNoOrgs && (
+          <div style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: "14px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1D4ED8", marginBottom: 2 }}>Join an organization to get started</div>
+              <div style={{ fontSize: 13, color: "#3B82F6" }}>Browse organizations and apply for membership to see their events and announcements.</div>
+            </div>
+            <button
+              onClick={() => navigate("/dashboard/orgs")}
+              style={{ flexShrink: 0, height: 36, padding: "0 18px", backgroundColor: "#2563EB", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              Browse Organizations
+            </button>
+          </div>
+        )}
+
         {/* Stat cards */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
@@ -71,6 +171,55 @@ export function VolunteerDashboard() {
             </div>
           ))}
         </div>
+
+        {/* What's New — feed preview from active orgs */}
+        {whatsNew.length > 0 && (
+          <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20, marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: 0 }}>What's New</h2>
+              <a
+                onClick={() => navigate("/dashboard/feed")}
+                style={{ fontSize: 13, color: GREEN, fontWeight: 500, cursor: "pointer", textDecoration: "none" }}
+              >
+                See all →
+              </a>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {whatsNew.map((item, idx) => (
+                <div
+                  key={`${item._kind}-${item.id}`}
+                  onClick={() => {
+                    if (item._kind === "event") navigate(`/dashboard/org/${item.org_id}?tab=events`);
+                    else navigate(`/dashboard/org/${item.org_id}?tab=announcements`);
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 0",
+                    borderBottom: idx < whatsNew.length - 1 ? "1px solid #F1F5F9" : "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{
+                    flexShrink: 0, fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 7px",
+                    backgroundColor: item._kind === "event" ? "#DCFCE7" : "#DBEAFE",
+                    color: item._kind === "event" ? "#15803D" : "#1D4ED8",
+                  }}>
+                    {item._kind === "event" ? "EVENT" : "ANNOUNCEMENT"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 14, color: "#1E293B", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                      {item._kind === "event" ? item.name : item.title}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#94A3B8" }}>{item.org_name}</span>
+                  </div>
+                  <span style={{ flexShrink: 0, fontSize: 12, color: "#94A3B8" }}>
+                    {relativeDate(item._kind === "event" ? item.date : item.created_at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-6">
           {/* Left - My Organizations + Certificates + Upcoming Events */}

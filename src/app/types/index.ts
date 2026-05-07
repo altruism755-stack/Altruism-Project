@@ -11,7 +11,57 @@ export interface User {
 
 export type AcceptanceMode = "manual" | "auto";
 export type EventStatus = "Upcoming" | "Active" | "Completed";
-export type ApplicationStatus = "Pending" | "Approved" | "Rejected";
+export type ApplicationStatus = "Pending" | "Approved" | "Rejected" | "Waitlisted";
+
+/** Status of a volunteer's membership in an org (org_volunteers.status). */
+export type OrgMemberStatus = "Pending" | "Active" | "Rejected";
+
+/** Simplified membership indicator returned on org list endpoints. */
+export type MembershipStatus = "Active" | "Pending";
+
+/** Status of a logged activity/hour submission. "Completed" is used for participation-only logs. */
+export type ActivityStatus = "Pending" | "Approved" | "Rejected" | "Completed";
+
+/** Status of a supervisor record. */
+export type SupervisorStatus = "Active" | "Inactive";
+
+/**
+ * Canonical status constants — import these instead of inline string literals so
+ * TypeScript catches drift if the backend ever renames a value.
+ *
+ * Usage:  import { EVENT_STATUS } from "../types";
+ *         if (e.status === EVENT_STATUS.Active) { ... }
+ */
+export const EVENT_STATUS = {
+  Upcoming:  "Upcoming",
+  Active:    "Active",
+  Completed: "Completed",
+} as const satisfies Record<string, EventStatus>;
+
+export const APP_STATUS = {
+  Pending:    "Pending",
+  Approved:   "Approved",
+  Rejected:   "Rejected",
+  Waitlisted: "Waitlisted",
+} as const satisfies Record<string, ApplicationStatus>;
+
+export const MEMBER_STATUS = {
+  Pending:  "Pending",
+  Active:   "Active",
+  Rejected: "Rejected",
+} as const satisfies Record<string, OrgMemberStatus>;
+
+export const ACTIVITY_STATUS = {
+  Pending:   "Pending",
+  Approved:  "Approved",
+  Rejected:  "Rejected",
+  Completed: "Completed",
+} as const satisfies Record<string, ActivityStatus>;
+
+export const MEMBERSHIP_STATUS = {
+  Active:  "Active",
+  Pending: "Pending",
+} as const satisfies Record<string, MembershipStatus>;
 
 export interface Event {
   id: number;

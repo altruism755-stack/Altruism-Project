@@ -80,7 +80,7 @@ const SECTIONS: Section[] = [
   {
     id: "details", title: "Organization Details",
     subtitle: "Categories and branches are updated instantly. Changes to size and founded year are reviewed before going live.",
-    approvalRequired: false,
+    approvalRequired: true,
     fields: ["categories", "orgSize", "foundedYear", "branches"],
   },
 ];

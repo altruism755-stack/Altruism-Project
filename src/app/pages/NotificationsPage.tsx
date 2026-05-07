@@ -15,7 +15,7 @@ interface Notification {
   created_at: string;
 }
 
-type FilterTab = "all" | "unread" | "approvals" | "volunteers";
+type FilterTab = "all" | "unread" | "approvals" | "announcements";
 
 const APPROVAL_TYPES = new Set([
   "org_approved", "org_rejected",
@@ -39,7 +39,9 @@ const TYPE_COLOR: Record<string, string> = {
   event_application: "#2563EB",
   application_approved: "#16A34A",
   application_rejected: "#DC2626",
+  application_pending: "#D97706",
   certificate_issued: "#0891B2",
+  announcement: "#7C3AED",
 };
 
 const TYPE_ICON: Record<string, string> = {
@@ -56,7 +58,9 @@ const TYPE_ICON: Record<string, string> = {
   event_application: "📅",
   application_approved: "✓",
   application_rejected: "✕",
+  application_pending: "⏳",
   certificate_issued: "🏆",
+  announcement: "📣",
 };
 
 function relativeTime(isoStr: string): string {
@@ -75,7 +79,7 @@ const TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "approvals", label: "Approvals" },
-  { key: "volunteers", label: "Volunteers" },
+  { key: "announcements", label: "Announcements" },
 ];
 
 export function NotificationsPage() {
@@ -104,7 +108,7 @@ export function NotificationsPage() {
   const displayed = notifications.filter((n) => {
     if (activeTab === "unread") return !n.is_read;
     if (activeTab === "approvals") return APPROVAL_TYPES.has(n.type);
-    if (activeTab === "volunteers") return n.type === "volunteer_joined";
+    if (activeTab === "announcements") return n.type === "announcement";
     return true;
   });
 

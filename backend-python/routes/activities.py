@@ -105,12 +105,10 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
         if not date:
             raise HTTPException(400, "Date is required")
 
-        event_id = body.get("event_id")
-        if not event_id:
-            raise HTTPException(400, "event_id is required")
+        event_id = body.get("event_id") or None
 
         org_id = body.get("org_id")
-        if not org_id:
+        if not org_id and event_id:
             event = dict_row(db.execute("SELECT org_id FROM events WHERE id = %s", (event_id,)).fetchone())
             if event:
                 org_id = event["org_id"]
@@ -140,18 +138,19 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         # Prevent recording attendance before the event date (UTC-based comparison).
-        event_row = dict_row(db.execute(
-            "SELECT date FROM events WHERE id = %s", (event_id,)
-        ).fetchone())
-        if not event_row:
-            raise HTTPException(404, "Event not found")
-        if event_row.get("date"):
-            today_utc = datetime.datetime.utcnow().date()
-            event_date = event_row["date"]
-            if not isinstance(event_date, datetime.date):
-                event_date = datetime.date.fromisoformat(str(event_date))
-            if event_date > today_utc:
-                raise HTTPException(400, "Attendance can only be recorded after the event date")
+        if event_id:
+            event_row = dict_row(db.execute(
+                "SELECT date FROM events WHERE id = %s", (event_id,)
+            ).fetchone())
+            if not event_row:
+                raise HTTPException(404, "Event not found")
+            if event_row.get("date"):
+                today_utc = datetime.datetime.utcnow().date()
+                event_date = event_row["date"]
+                if not isinstance(event_date, datetime.date):
+                    event_date = datetime.date.fromisoformat(str(event_date))
+                if event_date > today_utc:
+                    raise HTTPException(400, "Attendance can only be recorded after the event date")
 
         # Fetch org settings.
         org_row = dict_row(db.execute(

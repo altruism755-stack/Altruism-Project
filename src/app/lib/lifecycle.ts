@@ -62,7 +62,7 @@ export function resolveStepActions(
 // No backend endpoint for per-event steps — computed directly from event fields.
 
 export function buildEventMiniSteps(event: {
-  status: string;
+  status: import("../types").EventStatus;
   current_volunteers: number;
   onViewActivities: () => void;
 }): Pick<LifecycleStep, "label" | "status" | "tooltip" | "onClick">[] {

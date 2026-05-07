@@ -7,6 +7,8 @@ import { OrgLogoByName } from "../components/OrgLogos";
 import { WorkflowPanel, type WorkflowAction } from "../components/WorkflowPanel";
 import { StatusPill, LifecycleStepper } from "../components/StatusPill";
 import { resolveStepActions, type BackendLifecycle } from "../lib/lifecycle";
+import { Pagination, usePagination } from "../components/Pagination";
+import { EVENT_STATUS, MEMBER_STATUS, APP_STATUS } from "../types";
 
 const GREEN = "#16A34A";
 
@@ -36,17 +38,25 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
   const [assignForm, setAssignForm] = useState({ supervisor_id: "", department: "" });
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
 
-  const pending  = members.filter((m) => m.org_status === "Pending");
-  const active   = members.filter((m) => m.org_status === "Active");
-  const rejected = members.filter((m) => m.org_status === "Rejected");
+  const pending  = members.filter((m) => m.org_status === MEMBER_STATUS.Pending);
+  const active   = members.filter((m) => m.org_status === MEMBER_STATUS.Active);
+  const rejected = members.filter((m) => m.org_status === MEMBER_STATUS.Rejected);
   const currentList = sub === "pending" ? pending : sub === "active" ? active : rejected;
   const list = currentList.filter((m) =>
     !search || (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
     (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const { page: volPage, setPage: setVolPage, totalPages: volTotalPages, pageItems: pageList, reset: resetVolPage } = usePagination(list);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetVolPage(); }, [sub, search]);
+
   const doApprove = async () => {
     if (!approveTarget) return;
+    if (supervisors.length > 0 && !assignForm.supervisor_id) {
+      alert("Please assign a supervisor before approving this volunteer.");
+      return;
+    }
     setBusy(approveTarget.id);
     try {
       await api.approveOrgMember(orgId, approveTarget.id, {
@@ -82,15 +92,20 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
           <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 440, backgroundColor: "#fff", borderRadius: 16, zIndex: 51, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", margin: "0 0 6px 0" }}>Accept Volunteer</h3>
             <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 20px 0" }}>
-              Accept <strong>{approveTarget.name}</strong> and optionally assign a supervisor and department.
+              Accept <strong>{approveTarget.name}</strong> and assign a supervisor{supervisors.length > 0 ? "" : " (optional)"} and department.
             </p>
             <div className="flex flex-col gap-4">
               <div>
-                <label style={lStyle}>Supervisor (optional)</label>
-                <select value={assignForm.supervisor_id} onChange={(e) => setAssignForm((f) => ({ ...f, supervisor_id: e.target.value }))} style={iStyle}>
-                  <option value="">— No supervisor —</option>
+                <label style={lStyle}>
+                  Supervisor {supervisors.length > 0 ? <span style={{ color: "#DC2626" }}>*</span> : "(optional)"}
+                </label>
+                <select value={assignForm.supervisor_id} onChange={(e) => setAssignForm((f) => ({ ...f, supervisor_id: e.target.value }))} style={{ ...iStyle, borderColor: supervisors.length > 0 && !assignForm.supervisor_id ? "#FCA5A5" : "#E2E8F0" }}>
+                  <option value="">— Select a supervisor —</option>
                   {supervisors.map((s) => <option key={s.id} value={s.id}>{s.name}{s.team ? ` · ${s.team}` : ""}</option>)}
                 </select>
+                {supervisors.length > 0 && !assignForm.supervisor_id && (
+                  <p style={{ fontSize: 11, color: "#DC2626", marginTop: 4 }}>Required — approved volunteers must be assigned to a supervisor.</p>
+                )}
               </div>
               <div>
                 <label style={lStyle}>Department (optional)</label>
@@ -99,7 +114,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
             </div>
             <div className="flex gap-3" style={{ marginTop: 24 }}>
               <button onClick={() => setApproveTarget(null)} style={{ flex: 1, height: 42, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
-              <button onClick={doApprove} disabled={busy === approveTarget.id} style={{ flex: 1, height: 42, backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={doApprove} disabled={busy === approveTarget.id || (supervisors.length > 0 && !assignForm.supervisor_id)} style={{ flex: 1, height: 42, backgroundColor: (supervisors.length > 0 && !assignForm.supervisor_id) ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: (supervisors.length > 0 && !assignForm.supervisor_id) ? "not-allowed" : "pointer" }}>
                 {busy === approveTarget.id ? "Accepting…" : "Accept"}
               </button>
             </div>
@@ -145,7 +160,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
           <div className="text-center py-12" style={{ color: "#94A3B8", fontSize: 14 }}>
             {sub === "pending" ? "No pending requests." : sub === "active" ? "No active members yet." : "No rejected requests."}
           </div>
-        ) : list.map((v) => {
+        ) : pageList.map((v) => {
           const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
           const loading = busy === v.id;
           const avatarColor = sub === "pending" ? "#D97706" : sub === "rejected" ? "#DC2626" : GREEN;
@@ -212,6 +227,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
           );
         })}
       </div>
+      <Pagination page={volPage} totalPages={volTotalPages} onPage={setVolPage} totalItems={list.length} />
 
       {/* Member detail side panel */}
       {selectedMember && (() => {
@@ -223,7 +239,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
         try { languages = JSON.parse(v.languages || "[]"); } catch {}
         try { availability = JSON.parse(v.availability || "[]"); } catch {}
         const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
-        const statusColor = v.org_status === "Active" ? GREEN : v.org_status === "Rejected" ? "#DC2626" : "#D97706";
+        const statusColor = v.org_status === MEMBER_STATUS.Active ? GREEN : v.org_status === MEMBER_STATUS.Rejected ? "#DC2626" : "#D97706";
         return (
           <>
             <div onClick={() => setSelectedMember(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.5)", zIndex: 50 }} />
@@ -236,7 +252,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
                     <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 4, padding: "2px 8px", backgroundColor: v.org_status === "Active" ? "#DCFCE7" : v.org_status === "Rejected" ? "#FEE2E2" : "#FEF3C7", color: statusColor }}>{v.org_status}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 4, padding: "2px 8px", backgroundColor: v.org_status === MEMBER_STATUS.Active ? "#DCFCE7" : v.org_status === MEMBER_STATUS.Rejected ? "#FEE2E2" : "#FEF3C7", color: statusColor }}>{v.org_status}</span>
               </div>
               <div style={{ padding: "20px 24px" }}>
                 {[
@@ -280,7 +296,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
                   </div>
                 )}
               </div>
-              {v.org_status === "Pending" && (
+              {v.org_status === MEMBER_STATUS.Pending && (
                 <div style={{ padding: "16px 24px", borderTop: "1px solid #E2E8F0" }}>
                   <div className="flex gap-2">
                     <button onClick={() => { doReject(v.id, v.name); setSelectedMember(null); }} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Reject</button>
@@ -416,7 +432,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     if (sub === "Applications" && !appsLoaded) loadApplications();
   }, [sub, appsLoaded, loadApplications]);
 
-  const pendingApps = applications.filter((a) => a.status === "Pending");
+  const pendingApps = applications.filter((a) => a.status === APP_STATUS.Pending);
 
   const doApproveApp = async (id: number) => {
     setAppBusy(id);
@@ -437,7 +453,10 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
   };
 
   const byStatus = events.filter((e) => e.status === sub);
-  const counts = { Upcoming: events.filter((e) => e.status === "Upcoming").length, Active: events.filter((e) => e.status === "Active").length, Completed: events.filter((e) => e.status === "Completed").length };
+  const counts = { Upcoming: events.filter((e) => e.status === EVENT_STATUS.Upcoming).length, Active: events.filter((e) => e.status === EVENT_STATUS.Active).length, Completed: events.filter((e) => e.status === EVENT_STATUS.Completed).length };
+  const { page: evPage, setPage: setEvPage, totalPages: evTotalPages, pageItems: pageEvents, reset: resetEvPage } = usePagination(byStatus, 12);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetEvPage(); }, [sub]);
 
   const openCreate = () => { setEditing(null); setForm({ ...emptyForm, status: sub === "Active" ? "Active" : "Upcoming" }); setShowPanel(true); };
 
@@ -468,7 +487,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     // Load approved applications for this event
     try {
       const res = await api.getOrgEventApplications(orgId);
-      const approved = (res.applications || []).filter((a: any) => a.event_id === ev.id && a.status === "Approved");
+      const approved = (res.applications || []).filter((a: any) => a.event_id === ev.id && a.status === APP_STATUS.Approved);
       setAttendanceApplicants(approved);
       setAttendanceSelected(new Set(approved.map((a: any) => a.volunteer_id)));
     } catch (e) { console.error(e); }
@@ -736,8 +755,9 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
           {sub !== "Completed" && <button onClick={openCreate} style={{ marginTop: 12, height: 36, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Create Activity</button>}
         </div>
       ) : sub !== "Applications" && (
+        <>
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
-          {byStatus.map((ev) => {
+          {pageEvents.map((ev) => {
             const m = actStatus[ev.status as "Upcoming" | "Active" | "Completed"] || actStatus.Completed;
             const skills = (ev.required_skills || "").split(",").map((s: string) => s.trim()).filter(Boolean);
             return (
@@ -770,7 +790,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => openEdit(ev)} style={{ height: 28, padding: "0 12px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Edit</button>
                     <button onClick={() => doDelete(ev.id, ev.name)} style={{ height: 28, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Delete</button>
-                    {ev.status === "Completed" && (
+                    {ev.status === EVENT_STATUS.Completed && (
                       <button onClick={() => openAttendance(ev)} style={{ height: 28, padding: "0 12px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📋 Mark Attendance</button>
                     )}
                   </div>
@@ -779,6 +799,8 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
             );
           })}
         </div>
+        <Pagination page={evPage} totalPages={evTotalPages} onPage={setEvPage} totalItems={byStatus.length} pageSize={12} />
+        </>
       )}
     </div>
   );
@@ -1014,7 +1036,7 @@ function OrgAdminsTab({
             { value: true, label: "Track Hours", desc: "Log hours for each activity" },
             { value: false, label: "Participation Only", desc: "Record attendance without hours" },
           ].map(({ value, label, desc }) => {
-            const current = tracksHoursLocal !== null ? tracksHoursLocal : (orgProfile?.tracks_hours !== 0);
+            const current = tracksHoursLocal !== null ? tracksHoursLocal : (orgProfile != null && orgProfile.tracks_hours !== false && orgProfile.tracks_hours !== 0);
             const selected = current === value;
             return (
               <button
@@ -1130,6 +1152,8 @@ function AddVolunteerManuallyModal({ orgId, onClose, onSuccess }: {
   const [form, setForm] = useState({ name: "", email: "", phone: "", city: "", skills: "", notes: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const validate = () => {
     if (!form.name.trim()) return "Full name is required";
@@ -1144,14 +1168,61 @@ function AddVolunteerManuallyModal({ orgId, onClose, onSuccess }: {
     if (err) { setError(err); return; }
     setLoading(true); setError("");
     try {
-      await api.addVolunteerManually(orgId, form);
-      onSuccess();
+      const res = await api.addVolunteerManually(orgId, form);
+      if (res?.invite_token) {
+        const baseUrl = window.location.origin;
+        setInviteLink(`${baseUrl}/accept-invite?token=${res.invite_token}`);
+      } else {
+        onSuccess();
+      }
     } catch (e: any) {
       setError(e.message || "Failed to add volunteer. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleCopy = () => {
+    if (!inviteLink) return;
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  if (inviteLink) {
+    return (
+      <>
+        <div onClick={() => { onSuccess(); }} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 50 }} />
+        <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 520, backgroundColor: "#fff", borderRadius: 16, zIndex: 51, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", padding: 32 }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", margin: "0 0 8px 0" }}>Volunteer Added</h3>
+            <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>
+              This volunteer is new to the platform. Share the link below so they can set their password and access their account.
+            </p>
+          </div>
+          <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 14px", marginBottom: 12, wordBreak: "break-all", fontSize: 12, color: "#475569", fontFamily: "monospace" }}>
+            {inviteLink}
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={handleCopy}
+              style={{ flex: 1, height: 40, backgroundColor: copied ? "#DCFCE7" : "#F1F5F9", color: copied ? "#15803D" : "#1E293B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+            >
+              {copied ? "Copied!" : "Copy Link"}
+            </button>
+            <button
+              onClick={() => { onSuccess(); }}
+              style={{ flex: 1, height: 40, backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -1255,9 +1326,9 @@ export function OrgDashboard() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const pending  = members.filter((m) => m.org_status === "Pending");
-  const active   = members.filter((m) => m.org_status === "Active");
-  const activeEv = events.filter((e) => e.status === "Active" || e.status === "Upcoming");
+  const pending  = members.filter((m) => m.org_status === MEMBER_STATUS.Pending);
+  const active   = members.filter((m) => m.org_status === MEMBER_STATUS.Active);
+  const activeEv = events.filter((e) => e.status === EVENT_STATUS.Active || e.status === EVENT_STATUS.Upcoming);
 
   const pendingActivityCount = stats?.pendingActivities ?? 0;
 

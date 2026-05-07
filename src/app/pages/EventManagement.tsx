@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { Pagination, usePagination } from "../components/Pagination";
+import { EVENT_STATUS, type EventStatus } from "../types";
 
 const GREEN = "#16A34A";
-type Tab = "Upcoming" | "Active" | "Completed";
+type Tab = EventStatus;
 
 const statusMeta: Record<Tab, { bg: string; band: string; text: string; label: string }> = {
   Upcoming:  { bg: "#DCFCE7", band: GREEN,     text: "#15803D", label: "Upcoming"  },
@@ -40,18 +42,20 @@ export function EventManagement() {
   };
 
   useEffect(() => { fetchEvents(); }, [orgId]);
+  useEffect(() => { resetEvPage(); }, [tab]);
 
   const byTab = allEvents.filter((e) => e.status === tab);
+  const { page: evPage, setPage: setEvPage, totalPages: evTotalPages, pageItems: pageEvents, reset: resetEvPage } = usePagination(byTab, 12);
 
   const counts = {
-    Upcoming:  allEvents.filter((e) => e.status === "Upcoming").length,
-    Active:    allEvents.filter((e) => e.status === "Active").length,
-    Completed: allEvents.filter((e) => e.status === "Completed").length,
+    Upcoming:  allEvents.filter((e) => e.status === EVENT_STATUS.Upcoming).length,
+    Active:    allEvents.filter((e) => e.status === EVENT_STATUS.Active).length,
+    Completed: allEvents.filter((e) => e.status === EVENT_STATUS.Completed).length,
   };
 
   const openCreate = () => {
     setEditingEvent(null);
-    setForm({ ...emptyForm, status: tab === "Active" ? "Active" : "Upcoming" });
+    setForm({ ...emptyForm, status: tab === EVENT_STATUS.Active ? EVENT_STATUS.Active : EVENT_STATUS.Upcoming });
     setShowPanel(true);
   };
 
@@ -163,18 +167,19 @@ export function EventManagement() {
         {byTab.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16" style={{ backgroundColor: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", color: "#94A3B8" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>
-              {tab === "Upcoming" ? "📅" : tab === "Active" ? "⚡" : "✅"}
+              {tab === EVENT_STATUS.Upcoming ? "📅" : tab === EVENT_STATUS.Active ? "⚡" : "✅"}
             </div>
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>No {statusMeta[tab].label.toLowerCase()} activities</div>
-            {tab !== "Completed" && (
+            {tab !== EVENT_STATUS.Completed && (
               <button onClick={openCreate} style={{ marginTop: 12, height: 38, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 Create Activity
               </button>
             )}
           </div>
         ) : (
+          <>
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
-            {byTab.map((ev) => {
+            {pageEvents.map((ev) => {
               const meta = statusMeta[ev.status as Tab] || statusMeta.Completed;
               const skills = (ev.required_skills || "").split(",").map((s: string) => s.trim()).filter(Boolean);
               return (
@@ -236,6 +241,8 @@ export function EventManagement() {
               );
             })}
           </div>
+          <Pagination page={evPage} totalPages={evTotalPages} onPage={setEvPage} totalItems={byTab.length} pageSize={12} />
+          </>
         )}
 
         {/* Side panel */}

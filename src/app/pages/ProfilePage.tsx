@@ -25,19 +25,112 @@ import {
 } from "../data/volunteerFormSchema";
 
 
+import { APP_STATUS, MEMBER_STATUS, MEMBERSHIP_STATUS } from "../types";
+
 const GREEN = "#16A34A";
 const RED = "#DC2626";
+const APP_STATUS_ORDER = ["Pending", "Waitlisted", "Approved", "Rejected"] as const;
+type AppStatus = (typeof APP_STATUS_ORDER)[number];
+
+const APP_STATUS_CONFIG: Record<AppStatus, { bg: string; text: string; label: string }> = {
+  Pending:   { bg: "#FEF3C7", text: "#B45309", label: "Pending" },
+  Waitlisted:{ bg: "#E0F2FE", text: "#0369A1", label: "Waitlisted" },
+  Approved:  { bg: "#DCFCE7", text: "#15803D", label: "Approved" },
+  Rejected:  { bg: "#FEE2E2", text: "#B91C1C", label: "Rejected" },
+};
+
+function ApplicationsTracker({
+  applications,
+  cancellingAppId,
+  onCancel,
+}: {
+  applications: any[];
+  cancellingAppId: number | null;
+  onCancel: (appId: number) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Sort: active statuses first (Pending → Waitlisted → Approved), then Rejected last; within each by date desc
+  const sorted = [...applications].sort((a, b) => {
+    const ai = APP_STATUS_ORDER.indexOf(a.status as AppStatus);
+    const bi = APP_STATUS_ORDER.indexOf(b.status as AppStatus);
+    if (ai !== bi) return ai - bi;
+    return new Date(b.applied_date).getTime() - new Date(a.applied_date).getTime();
+  });
+
+  const activeCount = applications.filter((a) => a.status !== APP_STATUS.Rejected).length;
+
+  return (
+    <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: collapsed ? 0 : 16 }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: 0 }}>Event Applications</h3>
+          {activeCount > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: "#FEF3C7", color: "#B45309", borderRadius: 20, padding: "2px 8px" }}>{activeCount}</span>
+          )}
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform 200ms", flexShrink: 0 }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {!collapsed && (
+        <>
+          {sorted.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", padding: "16px 0" }}>
+              No event applications yet.{" "}
+              <span style={{ color: GREEN }}>Browse your organizations to find events →</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {sorted.map((app: any, idx: number) => {
+                const cfg = APP_STATUS_CONFIG[app.status as AppStatus] ?? APP_STATUS_CONFIG.Pending;
+                const canCancel = app.status === APP_STATUS.Pending || app.status === "Waitlisted" || app.status === APP_STATUS.Approved;
+                const isCancelling = cancellingAppId === app.id;
+                return (
+                  <div key={app.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: idx < sorted.length - 1 ? "1px solid #F1F5F9" : "none", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{app.event_name}</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                        {app.org_name}
+                        {app.event_date ? ` · ${app.event_date}` : ""}
+                        {app.applied_date ? ` · Applied ${app.applied_date.split("T")[0]}` : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: cfg.bg, color: cfg.text, borderRadius: 20, padding: "3px 10px", whiteSpace: "nowrap" }}>{cfg.label}</span>
+                      {canCancel && (
+                        <button
+                          onClick={() => onCancel(app.id)}
+                          disabled={cancellingAppId !== null}
+                          title="Withdraw application"
+                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 500, backgroundColor: "#fff", color: "#94A3B8", border: "1px solid #E2E8F0", borderRadius: 6, cursor: cancellingAppId !== null ? "not-allowed" : "pointer", opacity: cancellingAppId !== null ? 0.5 : 1, whiteSpace: "nowrap" }}
+                        >
+                          {isCancelling ? "Cancelling…" : "Withdraw"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const certTypeColors: Record<string, { bg: string; text: string }> = {
   Participation: { bg: "#DBEAFE", text: "#1D4ED8" },
   Achievement: { bg: "#FEF3C7", text: "#B45309" },
   Completion: { bg: "#DCFCE7", text: "#15803D" },
 };
 
-const statusColors: Record<string, { bg: string; text: string }> = {
-  Pending: { bg: "#FEF3C7", text: "#B45309" },
-  Approved: { bg: "#DCFCE7", text: "#15803D" },
-  Rejected: { bg: "#FEE2E2", text: "#B91C1C" },
-};
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -49,7 +142,8 @@ export function ProfilePage() {
   const [myOrgs, setMyOrgs] = useState<any[]>([]);
   const [myCertificates, setMyCertificates] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
-  const [pendingApplications, setPendingApplications] = useState<any[]>([]);
+  const [allApplications, setAllApplications] = useState<any[]>([]);
+  const [cancellingAppId, setCancellingAppId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -102,7 +196,7 @@ export function ProfilePage() {
 
       // Fetch events only from the volunteer's ACTIVE org memberships
       const activeOrgIds = orgs
-        .filter((o: any) => o.membership_status === "Active")
+        .filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active)
         .map((o: any) => o.id);
 
       if (activeOrgIds.length > 0) {
@@ -120,9 +214,9 @@ export function ProfilePage() {
           setUpcomingEvents(
             filtered
               .map((e: any) => ({ ...e, applicationStatus: appMap.get(e.id) }))
-              .filter((e: any) => e.applicationStatus === "Approved")
+              .filter((e: any) => e.applicationStatus === APP_STATUS.Approved)
           );
-          setPendingApplications(allApps.filter((a: any) => a.status === "Pending"));
+          setAllApplications(allApps);
         } catch {
           setUpcomingEvents([]);
           setPendingApplications([]);
@@ -443,10 +537,10 @@ export function ProfilePage() {
               {/* My Organizations */}
               <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#1E293B", marginBottom: 12 }}>
-                  My Organizations ({myOrgs.filter((o: any) => o.membership_status === "Active").length} active)
+                  My Organizations ({myOrgs.filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active).length} active)
                 </div>
                 {myOrgs.map((org: any, idx: number) => {
-                  const isActive = org.membership_status === "Active";
+                  const isActive = org.membership_status === MEMBERSHIP_STATUS.Active;
                   return (
                     <div
                       key={org.id}
@@ -531,8 +625,8 @@ export function ProfilePage() {
           <div style={{ flex: 1 }}>
             {/* Next Best Action */}
             {(() => {
-              const activeOrgs = myOrgs.filter((o: any) => o.membership_status === "Active");
-              const pendingOrgs = myOrgs.filter((o: any) => o.membership_status === "Pending");
+              const activeOrgs = myOrgs.filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active);
+              const pendingOrgs = myOrgs.filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Pending);
               const actions: WorkflowAction[] = [];
 
               if (myOrgs.length === 0) {
@@ -547,30 +641,27 @@ if (actions.length === 0) return null;
               return <WorkflowPanel actions={actions} style={{ marginBottom: 20 }} />;
             })()}
 
-            {/* Pending Section */}
-            <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 600, color: "#1E293B", margin: "0 0 16px 0" }}>Pending</h3>
-
-              {pendingApplications.length === 0 ? (
-                <div style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", padding: "16px 0" }}>No pending items.</div>
-              ) : (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Event Applications</div>
-                  {pendingApplications.map((app: any) => {
-                    const sc = statusColors.Pending;
-                    return (
-                      <div key={app.id} className="flex items-center justify-between" style={{ padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: "#1E293B" }}>{app.event_name}</div>
-                          <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.org_name} &middot; {app.event_date}</div>
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: sc.bg, color: sc.text, borderRadius: 20, padding: "3px 10px" }}>Pending</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Event Applications tracker */}
+            <ApplicationsTracker
+              applications={allApplications}
+              cancellingAppId={cancellingAppId}
+              onCancel={async (appId) => {
+                setCancellingAppId(appId);
+                try {
+                  await api.cancelApplication(appId);
+                  setAllApplications((prev) => prev.filter((a) => a.id !== appId));
+                  setUpcomingEvents((prev) => {
+                    const cancelled = allApplications.find((a) => a.id === appId);
+                    if (!cancelled) return prev;
+                    return prev.filter((e) => e.id !== cancelled.event_id);
+                  });
+                } catch (e: any) {
+                  alert(e?.message || "Failed to cancel application.");
+                } finally {
+                  setCancellingAppId(null);
+                }
+              }}
+            />
 
             {/* Edit form - only shown when editing */}
             {editing && (

@@ -3,6 +3,7 @@ import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
+import { MEMBERSHIP_STATUS } from "../types";
 
 const GREEN = "#16A34A";
 
@@ -25,7 +26,7 @@ export function NewsFeed() {
         // First, fetch volunteer profile to know which orgs they belong to (Active only)
         const volRes = await api.getVolunteer(volId);
         const activeOrgs: any[] = (volRes.organizations || []).filter(
-          (o: any) => o.membership_status === "Active"
+          (o: any) => o.membership_status === MEMBERSHIP_STATUS.Active
         );
         const orgIds = activeOrgs.map((o: any) => o.id);
         setMyOrgIds(orgIds);

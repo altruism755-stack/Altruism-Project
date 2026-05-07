@@ -3,6 +3,7 @@ from typing import Optional
 
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles
+from routes.notifications import create_notification
 
 router = APIRouter(prefix="/api/announcements", tags=["announcements"])
 
@@ -99,6 +100,39 @@ def create_announcement(body: dict, current_user: dict = Depends(require_roles("
             "JOIN organizations o ON a.org_id = o.id WHERE a.id = %s",
             (row["id"],),
         ).fetchone())
+
+        # Notify every active member (volunteers + supervisor) of this org
+        # within the same transaction so notifications are never orphaned.
+        org_name = announcement["org_name"]
+        action_url = f"/dashboard/org/{org['id']}?tab=announcements"
+
+        member_user_ids = [
+            r["user_id"] for r in db.execute(
+                """
+                SELECT v.user_id
+                FROM org_volunteers ov
+                JOIN volunteers v ON v.id = ov.volunteer_id
+                WHERE ov.org_id = %s AND ov.status = 'Active'
+                """,
+                (org["id"],),
+            ).fetchall()
+        ]
+        supervisor_row = db.execute(
+            "SELECT user_id FROM supervisors WHERE org_id = %s", (org["id"],)
+        ).fetchone()
+        if supervisor_row:
+            member_user_ids.append(supervisor_row["user_id"])
+
+        for uid in member_user_ids:
+            create_notification(
+                db,
+                user_id=uid,
+                type="announcement",
+                title=f"New announcement from {org_name}",
+                message=title,
+                action_url=action_url,
+            )
+
         return announcement
 
 

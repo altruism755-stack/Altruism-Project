@@ -632,6 +632,50 @@ def init_schema():
                 f"ALTER TABLE {table} ALTER COLUMN {col} SET NOT NULL"
             )
 
+        # Trigger: keep events.current_volunteers equal to the live approved count.
+        # Fires after any INSERT, UPDATE, or DELETE on event_applications so the
+        # counter is always correct regardless of which code path mutates the table.
+        conn.execute("""
+            CREATE OR REPLACE FUNCTION trg_sync_current_volunteers()
+            RETURNS TRIGGER LANGUAGE plpgsql AS $$
+            DECLARE
+                _event_id INTEGER;
+            BEGIN
+                -- Determine which event_id was affected
+                IF TG_OP = 'DELETE' THEN
+                    _event_id := OLD.event_id;
+                ELSE
+                    _event_id := NEW.event_id;
+                END IF;
+
+                UPDATE events
+                SET current_volunteers = (
+                    SELECT COUNT(*)
+                    FROM event_applications
+                    WHERE event_id = _event_id
+                      AND status = 'Approved'
+                      AND cancelled_at IS NULL
+                )
+                WHERE id = _event_id;
+
+                RETURN NULL;
+            END $$
+        """)
+
+        conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_trigger
+                    WHERE tgname = 'trg_event_applications_sync_volunteers'
+                ) THEN
+                    CREATE TRIGGER trg_event_applications_sync_volunteers
+                    AFTER INSERT OR UPDATE OR DELETE ON event_applications
+                    FOR EACH ROW EXECUTE FUNCTION trg_sync_current_volunteers();
+                END IF;
+            END $$
+        """)
+
         conn.execute("ANALYZE")
         conn.commit()
     except Exception:

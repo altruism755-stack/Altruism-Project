@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { MEMBERSHIP_STATUS } from "../types";
 
 const GREEN = "#16A34A";
 
@@ -31,7 +32,7 @@ export function LogActivityPage() {
         ]);
         const activeOrgIds = new Set(
           (volRes.organizations || [])
-            .filter((o: any) => o.membership_status === "Active")
+            .filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active)
             .map((o: any) => o.id)
         );
         setHasActiveOrg(activeOrgIds.size > 0);

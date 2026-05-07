@@ -3,6 +3,7 @@ import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
+import { Pagination, usePagination } from "../components/Pagination";
 
 const GREEN = "#16A34A";
 
@@ -76,6 +77,7 @@ export function VolunteerManagement() {
   };
 
   useEffect(() => { if (orgId) fetchData(); }, [orgId]);
+  useEffect(() => { resetPage(); }, [tab, search]);
 
   const pendingMembers = members.filter((m) => m.org_status === "Pending");
   const activeMembers = members.filter((m) => m.org_status === "Active");
@@ -85,6 +87,8 @@ export function VolunteerManagement() {
     (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
     (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const { page, setPage, totalPages, pageItems: pageFiltered, reset: resetPage } = usePagination(filtered);
 
   const handleApprove = async () => {
     if (!approveTarget) return;
@@ -245,7 +249,7 @@ export function VolunteerManagement() {
         </div>
 
         {/* Table */}
-        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", marginBottom: 0 }}>
           {/* Header row */}
           <div className="grid" style={{
             gridTemplateColumns: tab === "pending" ? "2fr 2fr 1.2fr 1.2fr 1.6fr" : "2fr 2fr 1.2fr 1.4fr 1.2fr 1.6fr",
@@ -267,7 +271,7 @@ export function VolunteerManagement() {
               </div>
             </div>
           ) : (
-            filtered.map((v) => {
+            pageFiltered.map((v) => {
               const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
               const isLoading = actionLoading === v.id;
 
@@ -335,6 +339,7 @@ export function VolunteerManagement() {
             })
           )}
         </div>
+        <Pagination page={page} totalPages={totalPages} onPage={setPage} totalItems={filtered.length} />
       </div>
     </div>
   );

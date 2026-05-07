@@ -10,6 +10,8 @@ export function SupervisorManagement() {
   const [form, setForm] = useState({ name: "", email: "", team: "" });
   const [supervisors, setSupervisors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchSupervisors = async () => {
     try {
@@ -25,10 +27,22 @@ export function SupervisorManagement() {
     e.preventDefault();
     if (!form.name || !form.email) return;
     try {
-      await api.createSupervisor({ name: form.name, email: form.email, team: form.team });
+      const res = await api.createSupervisor({ name: form.name, email: form.email, team: form.team });
       setForm({ name: "", email: "", team: "" });
       fetchSupervisors();
+      if (res?.invite_token) {
+        const baseUrl = window.location.origin;
+        setInviteLink(`${baseUrl}/accept-invite?token=${res.invite_token}`);
+      }
     } catch (err) { console.error("Failed to create supervisor:", err); }
+  };
+
+  const handleCopy = () => {
+    if (!inviteLink) return;
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleRemove = async (id: number) => {
@@ -56,7 +70,7 @@ export function SupervisorManagement() {
           <div style={{ flex: "0 0 38%" }}>
             <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24 }}>
               <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", marginBottom: 20, margin: "0 0 8px 0" }}>Add Supervisor</h3>
-              <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 20px 0", lineHeight: 1.5 }}>Register a new supervisor for your organization. They will receive their official email credentials to log in and manage volunteers.</p>
+              <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 20px 0", lineHeight: 1.5 }}>Register a new supervisor for your organization. You will receive an invite link to share with them so they can set their password and log in.</p>
               <form onSubmit={handleInvite} className="flex flex-col gap-4">
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Full Name</label>
@@ -70,9 +84,32 @@ export function SupervisorManagement() {
                   <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Department / Team</label>
                   <input value={form.team} onChange={(e) => setForm((f) => ({ ...f, team: e.target.value }))} style={{ width: "100%", height: 42, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
                 </div>
-                <button type="submit" style={{ width: "100%", height: 42, backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Send Invitation</button>
+                <button type="submit" style={{ width: "100%", height: 42, backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Add Supervisor</button>
               </form>
             </div>
+            {inviteLink && (
+              <div style={{ backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: 20, marginTop: 16 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#15803D", margin: "0 0 6px 0" }}>Invite link generated</p>
+                <p style={{ fontSize: 12, color: "#166534", margin: "0 0 10px 0" }}>Copy this link and share it with the supervisor so they can set their password.</p>
+                <div style={{ backgroundColor: "#fff", border: "1px solid #BBF7D0", borderRadius: 8, padding: "8px 12px", wordBreak: "break-all", fontSize: 11, color: "#475569", fontFamily: "monospace", marginBottom: 10 }}>
+                  {inviteLink}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={handleCopy}
+                    style={{ flex: 1, height: 36, backgroundColor: copied ? "#DCFCE7" : "#16A34A", color: copied ? "#15803D" : "#fff", border: copied ? "1px solid #86EFAC" : "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    {copied ? "Copied!" : "Copy Link"}
+                  </button>
+                  <button
+                    onClick={() => setInviteLink(null)}
+                    style={{ height: 36, padding: "0 14px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right - Table */}

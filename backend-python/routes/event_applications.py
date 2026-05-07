@@ -22,15 +22,6 @@ def _get_approved_count(db, event_id: int) -> int:
     return row["cnt"] if row else 0
 
 
-def _sync_current_volunteers(db, event_id: int) -> None:
-    """Keep current_volunteers in sync with live approved count. No is_full flag."""
-    approved = _get_approved_count(db, event_id)
-    db.execute(
-        "UPDATE events SET current_volunteers = %s WHERE id = %s",
-        (approved, event_id),
-    )
-
-
 def _auto_promote_next(db, event_id: int) -> None:
     """
     FIFO waitlist promotion for auto-accept events.
@@ -65,7 +56,6 @@ def _auto_promote_next(db, event_id: int) -> None:
         "UPDATE event_applications SET status = 'Approved' WHERE id = %s",
         (next_app["id"],),
     )
-    _sync_current_volunteers(db, event_id)
     logger.info("[EVENT %d] Volunteer %d promoted from waitlist", event_id, next_app["volunteer_id"])
     log_action(db, None, "system", "auto_promote", "event_application", next_app["id"],
                {"event_id": event_id, "volunteer_id": next_app["volunteer_id"]})
@@ -159,7 +149,7 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
 
         # Student-only eligibility check
         org = dict_row(db.execute(
-            "SELECT student_only FROM organizations WHERE id = %s", (event["org_id"],)
+            "SELECT name, student_only FROM organizations WHERE id = %s", (event["org_id"],)
         ).fetchone())
         if org and org.get("student_only"):
             volunteer = dict_row(db.execute(
@@ -168,7 +158,7 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
             if not volunteer or volunteer.get("education_level") != "University Student":
                 raise HTTPException(
                     403,
-                    "Sorry, Enactus opportunities are only available for current university students.",
+                    f"Sorry, {org['name']} is only open to current university students.",
                 )
 
         # Prevent duplicate active applications
@@ -214,7 +204,6 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                     (vol["id"], event_id, event["org_id"]),
                 ).fetchone()
                 app_id = row["id"]
-                _sync_current_volunteers(db, event_id)
                 logger.info("[EVENT %d] Volunteer %d applied and auto-approved", event_id, vol["id"])
                 log_action(db, current_user["id"], current_user["role"], "apply_event",
                            "event_application", app_id,
@@ -329,7 +318,6 @@ def cancel_application(app_id: int, current_user: dict = Depends(require_roles("
                    {"event_id": event_id, "volunteer_id": vol["id"], "was_approved": was_approved})
 
         if was_approved:
-            _sync_current_volunteers(db, event_id)
             # Auto-promote only for auto-accept events. Manual events leave the freed slot
             # visible to the org admin who decides which waitlisted volunteer to promote.
             if app.get("acceptance_mode") == "auto":
@@ -441,7 +429,6 @@ def approve_application(app_id: int, current_user: dict = Depends(require_roles(
                 raise HTTPException(409, "Event is at full capacity — cannot approve more volunteers")
 
         db.execute("UPDATE event_applications SET status = 'Approved' WHERE id = %s", (app_id,))
-        _sync_current_volunteers(db, app["event_id"])
         logger.info("[EVENT %d] Volunteer %d manually approved", app["event_id"], app["volunteer_id"])
         log_action(db, current_user["id"], current_user["role"], "approve_application",
                    "event_application", app_id,
@@ -548,7 +535,6 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
 
         # If an Approved application is rejected, free the spot and fill it.
         if was_approved:
-            _sync_current_volunteers(db, app["event_id"])
             if app.get("acceptance_mode") == "auto":
                 _auto_promote_next(db, app["event_id"])
             else:

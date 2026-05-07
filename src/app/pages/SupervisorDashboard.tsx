@@ -6,6 +6,8 @@ import { useAuth } from "../context/AuthContext";
 import { WorkflowPanel, type WorkflowAction } from "../components/WorkflowPanel";
 import { LifecycleStepper, MiniLifecycleStepper } from "../components/StatusPill";
 import { resolveStepActions, buildEventMiniSteps, type BackendLifecycle } from "../lib/lifecycle";
+import { EVENT_STATUS, ACTIVITY_STATUS } from "../types";
+import { Pagination, usePagination } from "../components/Pagination";
 
 const GREEN = "#16A34A";
 
@@ -52,7 +54,16 @@ export function SupervisorDashboard() {
   const [activityForm, setActivityForm] = useState(emptyActivityForm);
   const [activitySaving, setActivitySaving] = useState(false);
 
-  const tracksHours = org?.tracks_hours !== 0;
+  const tracksHours = org != null && org.tracks_hours !== false && org.tracks_hours !== 0;
+
+  const { page: volsPage, setPage: setVolsPage, totalPages: volsTotalPages, pageItems: pageVolunteers, reset: resetVolsPage } = usePagination(volunteers);
+  const { page: pendPage, setPage: setPendPage, totalPages: pendTotalPages, pageItems: pagePending, reset: resetPendPage } = usePagination(pending);
+  const { page: actsPage, setPage: setActsPage, totalPages: actsTotalPages, pageItems: pageActivities, reset: resetActsPage } = usePagination(activities);
+  const { page: evtsPage, setPage: setEvtsPage, totalPages: evtsTotalPages, pageItems: pageEvents, reset: resetEvtsPage } = usePagination(events, 12);
+  useEffect(() => {
+    resetVolsPage(); resetPendPage(); resetActsPage(); resetEvtsPage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   const loadAll = useCallback(async () => {
     try {
@@ -110,7 +121,7 @@ export function SupervisorDashboard() {
     setCertBusy(true);
     try {
       // Only call approve for hour-based activities; participation ones are already Completed.
-      if (certActivity.status !== "Completed") {
+      if (certActivity.status !== ACTIVITY_STATUS.Completed) {
         await api.approveActivity(certActivity.id);
       }
       const cert = await api.issueCertificate({
@@ -204,7 +215,7 @@ export function SupervisorDashboard() {
     }
   };
 
-  const upcomingEvents = events.filter((e) => e.status === "Upcoming" || e.status === "Active");
+  const upcomingEvents = events.filter((e) => e.status === EVENT_STATUS.Upcoming || e.status === EVENT_STATUS.Active);
 
   // Next Best Action cards
   const nextActions: WorkflowAction[] = [];
@@ -235,7 +246,7 @@ export function SupervisorDashboard() {
       priority: "normal",
       icon: "📅",
       title: "Upcoming Events",
-      desc: `${upcomingEvents.length} event${upcomingEvents.length > 1 ? "s" : ""} scheduled. Ensure volunteers are prepared and will log hours after.`,
+      desc: `${upcomingEvents.length} event${upcomingEvents.length > 1 ? "s" : ""} scheduled. Ensure volunteers are prepared${tracksHours ? " and will log hours after" : ""}.`,
       cta: "View Events",
       onClick: () => setTab("events"),
     });
@@ -255,7 +266,7 @@ export function SupervisorDashboard() {
       priority: "success",
       icon: "✅",
       title: "All caught up!",
-      desc: "No pending actions. Volunteers will submit hours after upcoming events.",
+      desc: tracksHours ? "No pending actions. Volunteers will submit hours after upcoming events." : "No pending actions. Log volunteer participation after upcoming events.",
       cta: "View Events",
       onClick: () => setTab("events"),
     });
@@ -359,8 +370,9 @@ export function SupervisorDashboard() {
                 {volunteers.length === 0 ? (
                   <EmptyState label="No active volunteers yet. Accept pending requests to onboard your first volunteers." />
                 ) : (
+                  <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-                    {volunteers.map((v) => (
+                    {pageVolunteers.map((v) => (
                       <div
                         key={v.id}
                         onClick={() => navigate(`/supervisor/volunteer/${v.id}`)}
@@ -388,6 +400,8 @@ export function SupervisorDashboard() {
                       </div>
                     ))}
                   </div>
+                  <Pagination page={volsPage} totalPages={volsTotalPages} onPage={setVolsPage} totalItems={volunteers.length} />
+                  </>
                 )}
               </div>
             )}
@@ -407,8 +421,9 @@ export function SupervisorDashboard() {
                 {pending.length === 0 ? (
                   <EmptyState label="No pending requests." />
                 ) : (
+                  <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-                    {pending.map((v) => {
+                    {pagePending.map((v) => {
                       let skills: string[] = [];
                       try { skills = JSON.parse(v.skills || "[]"); } catch {}
                       const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
@@ -442,6 +457,8 @@ export function SupervisorDashboard() {
                       );
                     })}
                   </div>
+                  <Pagination page={pendPage} totalPages={pendTotalPages} onPage={setPendPage} totalItems={pending.length} />
+                  </>
                 )}
 
                 {/* Volunteer detail modal */}
@@ -567,9 +584,10 @@ export function SupervisorDashboard() {
                 {activities.length === 0 ? (
                   <EmptyState label="No pending activity approvals." />
                 ) : (
+                  <>
                   <div className="flex flex-col gap-3">
-                    {activities.map((a) => {
-                      const isParticipation = a.status === "Completed";
+                    {pageActivities.map((a) => {
+                      const isParticipation = a.status === ACTIVITY_STATUS.Completed;
                       return (
                         <div key={a.id} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 16 }}>
                           <div className="flex items-start justify-between gap-4">
@@ -602,6 +620,8 @@ export function SupervisorDashboard() {
                       );
                     })}
                   </div>
+                  <Pagination page={actsPage} totalPages={actsTotalPages} onPage={setActsPage} totalItems={activities.length} />
+                  </>
                 )}
               </div>
             )}
@@ -623,8 +643,9 @@ export function SupervisorDashboard() {
                 {events.length === 0 ? (
                   <EmptyState label="No events found for your organization." />
                 ) : (
+                  <>
                   <div className="flex flex-col gap-3">
-                    {events.map((e) => {
+                    {pageEvents.map((e) => {
                       const statusStyle: Record<string, { bg: string; color: string; band: string }> = {
                         Upcoming: { bg: "#DBEAFE", color: "#1D4ED8", band: "#2563EB" },
                         Active:   { bg: "#DCFCE7", color: "#15803D", band: GREEN },
@@ -680,6 +701,8 @@ export function SupervisorDashboard() {
                       );
                     })}
                   </div>
+                  <Pagination page={evtsPage} totalPages={evtsTotalPages} onPage={setEvtsPage} totalItems={events.length} pageSize={12} />
+                  </>
                 )}
               </div>
             )}
@@ -699,7 +722,7 @@ export function SupervisorDashboard() {
             {!issuedCertId ? (
               <>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>
-                  {certActivity.status !== "Completed" ? "Approve & Issue Certificate" : "Issue Certificate"}
+                  {certActivity.status !== ACTIVITY_STATUS.Completed ? "Approve & Issue Certificate" : "Issue Certificate"}
                 </div>
                 <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
                   For <strong>{certActivity.volunteer_name}</strong>
@@ -720,7 +743,7 @@ export function SupervisorDashboard() {
                 </div>
                 <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
                   <button onClick={() => setCertActivity(null)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                  {certActivity.status !== "Completed" && (
+                  {certActivity.status !== ACTIVITY_STATUS.Completed && (
                     <button onClick={async () => { await handleApproveActivity(certActivity.id); setCertActivity(null); }} style={{ height: 36, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Approve Only</button>
                   )}
                   <button
@@ -728,7 +751,7 @@ export function SupervisorDashboard() {
                     disabled={certBusy || !certForm.title.trim()}
                     style={{ height: 36, padding: "0 16px", backgroundColor: (certBusy || !certForm.title.trim()) ? "#94A3B8" : "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (certBusy || !certForm.title.trim()) ? "not-allowed" : "pointer" }}
                   >
-                    {certBusy ? "Issuing…" : (certActivity.status !== "Completed" ? "Approve + Issue" : "Issue Certificate")}
+                    {certBusy ? "Issuing…" : (certActivity.status !== ACTIVITY_STATUS.Completed ? "Approve + Issue" : "Issue Certificate")}
                   </button>
                 </div>
               </>

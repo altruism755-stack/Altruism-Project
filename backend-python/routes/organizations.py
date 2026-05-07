@@ -66,8 +66,6 @@ class AddVolunteerManuallyBody(BaseModel):
 
 
 def _make_invite_link(token: str) -> str:
-    """Phase 1: returns a link for manual distribution.
-    Phase 2: call your email service here and keep this as the single integration point."""
     return f"{_APP_BASE_URL}/accept-invite?token={token}"
 
 
@@ -820,7 +818,7 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
         if org.get("student_only") and vol.get("education_level") != "University Student":
             raise HTTPException(
                 403,
-                "Sorry, Enactus opportunities are only available for current university students.",
+                f"Sorry, {org['name']} is only open to current university students.",
             )
 
         _now = _utcnow()
@@ -855,6 +853,18 @@ def approve_org_member(
 ):
     with get_db() as db:
         _assert_org_access(db, org_id, current_user["id"])
+
+        supervisor_id = body.get("supervisor_id")
+        # Require a supervisor assignment when the org has active supervisors,
+        # otherwise approved volunteers end up invisible to all supervisor queues.
+        if supervisor_id is None:
+            has_supervisors = db.execute(
+                "SELECT 1 FROM supervisors WHERE org_id = %s AND status = 'Active' LIMIT 1",
+                (org_id,),
+            ).fetchone()
+            if has_supervisors:
+                raise HTTPException(400, "A supervisor must be assigned before approving this volunteer")
+
         vol = dict_row(db.execute(
             "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
             "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = %s", (vol_id,)
@@ -867,7 +877,7 @@ def approve_org_member(
             "approved_at = NOW(), "
             "governorate_snapshot = %s, city_snapshot = %s "
             "WHERE org_id = %s AND volunteer_id = %s",
-            (_is_active("Active"), body.get("supervisor_id"), body.get("department"),
+            (_is_active("Active"), supervisor_id, body.get("department"),
              gov_snap, city_snap, org_id, vol_id),
         )
         # Notify volunteer
@@ -1194,7 +1204,7 @@ def add_volunteer_manually(
     new_invite_token: str | None = None
 
     with get_db() as db:
-        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = %s", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT id, student_only FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
@@ -1202,8 +1212,14 @@ def add_volunteer_manually(
 
         if user:
             volunteer = dict_row(db.execute(
-                "SELECT id FROM volunteers WHERE user_id = %s", (user["id"],)
+                "SELECT id, education_level FROM volunteers WHERE user_id = %s", (user["id"],)
             ).fetchone())
+            if volunteer and org.get("student_only") and volunteer.get("education_level") != "University Student":
+                raise HTTPException(
+                    403,
+                    "This organization only accepts university students. "
+                    "This volunteer's profile does not meet that requirement.",
+                )
             if not volunteer:
                 row = db.execute(
                     "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
