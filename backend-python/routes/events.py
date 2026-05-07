@@ -49,9 +49,23 @@ def list_events(
                 raise HTTPException(403, FORBIDDEN)
             org_id = caller_org
 
+        # current_volunteers is computed live from event_applications so it is
+        # always accurate even if the trigger-maintained column is stale. is_full
+        # is derived here so the frontend doesn't have to recompute it.
         query = (
-            "SELECT e.*, o.name as org_name, o.student_only as org_student_only, "
-            "o.initials as org_initials, o.color as org_color FROM events e "
+            "SELECT e.id, e.org_id, e.name, e.description, e.location, e.date, e.time, "
+            "e.duration, e.max_volunteers, e.required_skills, e.status, "
+            "e.acceptance_mode, e.created_at, "
+            "o.name as org_name, o.student_only as org_student_only, "
+            "o.initials as org_initials, o.color as org_color, "
+            "(SELECT COUNT(*) FROM event_applications ea "
+            " WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            ") AS current_volunteers, "
+            "CASE WHEN e.max_volunteers > 0 AND "
+            "  (SELECT COUNT(*) FROM event_applications ea "
+            "   WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            "  ) >= e.max_volunteers THEN TRUE ELSE FALSE END AS is_full "
+            "FROM events e "
             "LEFT JOIN organizations o ON e.org_id = o.id WHERE 1=1"
         )
         params: list = []
@@ -72,7 +86,18 @@ def list_events(
 def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         event = dict_row(db.execute(
-            "SELECT e.*, o.name as org_name FROM events e "
+            "SELECT e.id, e.org_id, e.name, e.description, e.location, e.date, e.time, "
+            "e.duration, e.max_volunteers, e.required_skills, e.status, "
+            "e.acceptance_mode, e.created_at, "
+            "o.name as org_name, "
+            "(SELECT COUNT(*) FROM event_applications ea "
+            " WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            ") AS current_volunteers, "
+            "CASE WHEN e.max_volunteers > 0 AND "
+            "  (SELECT COUNT(*) FROM event_applications ea "
+            "   WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            "  ) >= e.max_volunteers THEN TRUE ELSE FALSE END AS is_full "
+            "FROM events e "
             "LEFT JOIN organizations o ON e.org_id = o.id WHERE e.id = %s",
             (event_id,),
         ).fetchone())

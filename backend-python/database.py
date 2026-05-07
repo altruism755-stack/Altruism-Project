@@ -676,6 +676,22 @@ def init_schema():
             END $$
         """)
 
+        # Backfill: reconcile any drift between the stored counter and the live
+        # count. Safe to run on every startup — only updates rows where the value
+        # is actually wrong, so it's a no-op on a healthy database.
+        conn.execute("""
+            UPDATE events e
+            SET current_volunteers = live.cnt
+            FROM (
+                SELECT event_id,
+                       COUNT(*) FILTER (WHERE status = 'Approved' AND cancelled_at IS NULL) AS cnt
+                FROM event_applications
+                GROUP BY event_id
+            ) live
+            WHERE live.event_id = e.id
+              AND e.current_volunteers IS DISTINCT FROM live.cnt
+        """)
+
         conn.execute("ANALYZE")
         conn.commit()
     except Exception:
