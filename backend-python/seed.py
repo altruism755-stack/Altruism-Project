@@ -78,11 +78,11 @@ def seed():
             (31,  "mennatarek@gmail.com",            h("Vol#12345"),    "volunteer"),
         ]
         db.executemany(
-            "INSERT INTO users (id, email, password, role) VALUES (?, ?, ?, ?)",
+            "INSERT INTO users (id, email, password, role) VALUES (%s, %s, %s, %s)",
             users,
         )
 
-        db.execute("INSERT INTO platform_admins (user_id) VALUES (?)", (100,))
+        db.execute("INSERT INTO platform_admins (user_id) VALUES (%s)", (100,))
 
         # ──────────── ORGANIZATIONS ────────────
         org_cols = (
@@ -91,7 +91,7 @@ def seed():
             "official_email, submitter_name, submitter_role, student_only, "
             "org_size, hq_city, branches, categories"
         )
-        ph = ", ".join(["?"] * 23)
+        ph = ", ".join(["%s"] * 23)
         insert_org = f"INSERT INTO organizations ({org_cols}) VALUES ({ph})"
 
         db.execute(insert_org, (
@@ -138,7 +138,7 @@ def seed():
             (4, 3, "creator"),
         ]
         db.executemany(
-            "INSERT INTO org_admins (user_id, org_id, role) VALUES (?, ?, ?)",
+            "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, %s)",
             org_admins,
         )
 
@@ -153,7 +153,7 @@ def seed():
         ]
         db.executemany(
             "INSERT INTO supervisors (id, user_id, name, email, phone, team, org_id, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             supervisors,
         )
 
@@ -319,7 +319,7 @@ def seed():
             "national_id, gender, nationality, education_level, university_name, faculty, study_year, "
             "field_of_study, department, hours_per_week, languages, cause_areas, availability, "
             "prior_experience, prior_org, experiences, health_notes"
-            ") VALUES (" + ", ".join(["?"] * 28) + ")",
+            ") VALUES (" + ", ".join(["%s"] * 28) + ")",
             volunteers,
         )
 
@@ -349,7 +349,7 @@ def seed():
         db.executemany(
             "INSERT INTO org_volunteers "
             "(org_id, volunteer_id, supervisor_id, department, status, joined_date, source, join_source, is_active) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
             org_vols,
         )
 
@@ -389,7 +389,7 @@ def seed():
         db.executemany(
             "INSERT INTO events (id, org_id, name, description, location, date, time, duration, "
             "max_volunteers, current_volunteers, required_skills, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             events,
         )
 
@@ -433,7 +433,7 @@ def seed():
         ]
         db.executemany(
             "INSERT INTO event_applications (id, volunteer_id, event_id, org_id, status, applied_date) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s)",
             apps,
         )
 
@@ -480,7 +480,7 @@ def seed():
         ]
         db.executemany(
             "INSERT INTO activities (id, volunteer_id, event_id, org_id, date, hours, description, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             activities,
         )
 
@@ -500,7 +500,7 @@ def seed():
         ]
         db.executemany(
             "INSERT INTO certificates (id, volunteer_id, org_id, event_id, type, hours, issued_date) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
             certificates,
         )
 
@@ -527,7 +527,7 @@ def seed():
         ]
         db.executemany(
             "INSERT INTO announcements (id, org_id, title, content, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s)",
             announcements,
         )
 
@@ -546,7 +546,7 @@ def seed():
         ]
         db.executemany(
             "INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
             notifs,
         )
 

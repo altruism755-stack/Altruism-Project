@@ -24,7 +24,7 @@ def create_notification(
         return
     db.execute(
         "INSERT INTO notifications (user_id, type, title, message, action_url) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "VALUES (%s, %s, %s, %s, %s)",
         (user_id, type, title, message, action_url),
     )
 
@@ -37,20 +37,20 @@ def list_notifications(
     current_user: dict = Depends(get_current_user),
 ):
     with get_db() as db:
-        conditions = ["user_id = ?"]
+        conditions = ["user_id = %s"]
         params: list = [current_user["id"]]
         if unread_only:
-            conditions.append("is_read = 0")
+            conditions.append("is_read = FALSE")
         if type:
-            conditions.append("type = ?")
+            conditions.append("type = %s")
             params.append(type)
         where = " AND ".join(conditions)
         rows = dict_rows(db.execute(
-            f"SELECT * FROM notifications WHERE {where} ORDER BY created_at DESC LIMIT ?",
+            f"SELECT * FROM notifications WHERE {where} ORDER BY created_at DESC LIMIT %s",
             (*params, limit),
         ).fetchall())
         unread_count = db.execute(
-            "SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND is_read = 0",
+            "SELECT COUNT(*) c FROM notifications WHERE user_id = %s AND is_read = FALSE",
             (current_user["id"],),
         ).fetchone()["c"]
         return {"notifications": rows, "unread_count": unread_count, "total": len(rows)}
@@ -60,7 +60,7 @@ def list_notifications(
 def get_unread_count(current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         count = db.execute(
-            "SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND is_read = 0",
+            "SELECT COUNT(*) c FROM notifications WHERE user_id = %s AND is_read = FALSE",
             (current_user["id"],),
         ).fetchone()["c"]
         return {"unread_count": count}
@@ -72,7 +72,7 @@ def get_unread_count(current_user: dict = Depends(get_current_user)):
 def mark_all_read(current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         db.execute(
-            "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0",
+            "UPDATE notifications SET is_read = TRUE WHERE user_id = %s AND is_read = FALSE",
             (current_user["id"],),
         )
         return {"message": "All notifications marked as read"}
@@ -85,14 +85,14 @@ def mark_notification_read(
 ):
     with get_db() as db:
         row = dict_row(db.execute(
-            "SELECT id FROM notifications WHERE id = ? AND user_id = ?",
+            "SELECT id FROM notifications WHERE id = %s AND user_id = %s",
             (notification_id, current_user["id"]),
         ).fetchone())
         if not row:
             from fastapi import HTTPException
             raise HTTPException(404, "Notification not found")
         db.execute(
-            "UPDATE notifications SET is_read = 1 WHERE id = ?",
+            "UPDATE notifications SET is_read = TRUE WHERE id = %s",
             (notification_id,),
         )
         return {"message": "Notification marked as read"}

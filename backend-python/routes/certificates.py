@@ -36,38 +36,38 @@ def list_certificates(
         role = current_user["role"]
         if role == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup:
                 raise HTTPException(403, "You do not have permission to access this resource")
             # Only certs for volunteers assigned to this supervisor, within their org.
             extra_join = (
                 " JOIN org_volunteers ov ON c.volunteer_id = ov.volunteer_id"
-                " AND ov.supervisor_id = ?"
+                " AND ov.supervisor_id = %s"
             )
             params.append(sup["id"])
-            clauses.append("c.org_id = ?")
+            clauses.append("c.org_id = %s")
             params.append(sup["org_id"])
         elif role == "org_admin":
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if not org:
                 raise HTTPException(403, "You do not have permission to access this resource")
-            clauses.append("c.org_id = ?")
+            clauses.append("c.org_id = %s")
             params.append(org["id"])
         elif role == "volunteer":
             vol = dict_row(db.execute(
-                "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+                "SELECT id FROM volunteers WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if vol:
-                clauses.append("c.volunteer_id = ?")
+                clauses.append("c.volunteer_id = %s")
                 params.append(vol["id"])
             clauses.append("c.file_url IS NOT NULL")
 
         # volunteer_id filter is only allowed for supervisors and org_admins.
         if volunteer_id and role != "volunteer":
-            clauses.append("c.volunteer_id = ?")
+            clauses.append("c.volunteer_id = %s")
             params.append(volunteer_id)
 
         query = base + extra_join + " WHERE " + " AND ".join(clauses) + " ORDER BY c.issued_date DESC"
@@ -80,14 +80,14 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
         sup_record = None
         if current_user["role"] == "supervisor":
             sup_record = dict_row(db.execute(
-                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup_record:
                 raise HTTPException(404, "Supervisor not found")
             org = {"id": sup_record["org_id"]}
         else:
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -102,27 +102,27 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
         # Supervisors may only issue certificates for their assigned volunteers.
         if current_user["role"] == "supervisor" and sup_record:
             assignment = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
                 (volunteer_id, sup_record["id"]),
             ).fetchone()
             if not assignment:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
-        cur = db.execute(
-            "INSERT INTO certificates (volunteer_id, org_id, event_id, certificate_title) VALUES (?, ?, ?, ?)",
+        row = db.execute(
+            "INSERT INTO certificates (volunteer_id, org_id, event_id, certificate_title) VALUES (%s, %s, %s, %s) RETURNING id",
             (volunteer_id, org["id"], body.get("event_id"), certificate_title),
-        )
+        ).fetchone()
 
         cert = dict_row(db.execute(
             "SELECT c.*, o.name as org_name, e.name as event_name "
             "FROM certificates c "
             "JOIN organizations o ON c.org_id = o.id "
-            "LEFT JOIN events e ON c.event_id = e.id WHERE c.id = ?",
-            (cur.lastrowid,),
+            "LEFT JOIN events e ON c.event_id = e.id WHERE c.id = %s",
+            (row["id"],),
         ).fetchone())
 
         vol_user = dict_row(db.execute(
-            "SELECT v.user_id FROM volunteers v WHERE v.id = ?", (volunteer_id,)
+            "SELECT v.user_id FROM volunteers v WHERE v.id = %s", (volunteer_id,)
         ).fetchone())
         if vol_user and vol_user.get("user_id"):
             org_name = (cert or {}).get("org_name", "the organization")
@@ -135,7 +135,7 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
                 "/dashboard/profile",
             )
         log_action(db, current_user["id"], current_user["role"], "issue_certificate",
-                   "certificate", cur.lastrowid,
+                   "certificate", row["id"],
                    {"volunteer_id": volunteer_id, "org_id": org["id"], "title": certificate_title,
                     "event_id": body.get("event_id")})
         db.commit()
@@ -153,25 +153,25 @@ async def upload_certificate_file(
         raise HTTPException(400, "Only PDF and image files (.pdf, .png, .jpg, .jpeg) are allowed")
 
     with get_db() as db:
-        cert = dict_row(db.execute("SELECT * FROM certificates WHERE id = ?", (cert_id,)).fetchone())
+        cert = dict_row(db.execute("SELECT * FROM certificates WHERE id = %s", (cert_id,)).fetchone())
         if not cert:
             raise HTTPException(404, "Certificate not found")
 
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != cert["org_id"]:
                 raise HTTPException(403, "Not authorized for this certificate's organization")
             assignment = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
                 (cert["volunteer_id"], sup["id"]),
             ).fetchone()
             if not assignment:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if not org or org["id"] != cert["org_id"]:
                 raise HTTPException(403, "Not authorized for this certificate's organization")
@@ -191,7 +191,7 @@ async def upload_certificate_file(
             f.write(content)
 
         file_url = f"/uploads/certificates/{filename}"
-        db.execute("UPDATE certificates SET file_url = ? WHERE id = ?", (file_url, cert_id))
+        db.execute("UPDATE certificates SET file_url = %s WHERE id = %s", (file_url, cert_id))
         log_action(db, current_user["id"], current_user["role"], "upload_certificate",
                    "certificate", cert_id,
                    {"volunteer_id": cert["volunteer_id"], "org_id": cert["org_id"], "file_url": file_url})
@@ -204,7 +204,7 @@ def download_certificate_file(cert_id: int, current_user: dict = Depends(get_cur
     with get_db() as db:
         cert = dict_row(db.execute(
             "SELECT c.*, v.user_id as vol_user_id FROM certificates c "
-            "JOIN volunteers v ON v.id = c.volunteer_id WHERE c.id = ?",
+            "JOIN volunteers v ON v.id = c.volunteer_id WHERE c.id = %s",
             (cert_id,),
         ).fetchone())
         if not cert:
@@ -216,13 +216,13 @@ def download_certificate_file(cert_id: int, current_user: dict = Depends(get_cur
                 raise HTTPException(403, "Access denied")
         elif role == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != cert["org_id"]:
                 raise HTTPException(403, "Access denied")
         elif role == "org_admin":
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if not org or org["id"] != cert["org_id"]:
                 raise HTTPException(403, "Access denied")

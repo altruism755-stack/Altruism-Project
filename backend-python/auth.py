@@ -66,7 +66,7 @@ def require_platform_admin(current_user: dict = Depends(get_current_user)) -> di
     from database import get_db
     with get_db() as db:
         row = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = ?", (current_user["id"],)
+            "SELECT user_id FROM platform_admins WHERE user_id = %s", (current_user["id"],)
         ).fetchone()
         if not row:
             raise HTTPException(
@@ -83,7 +83,7 @@ def require_approved_org_admin(current_user: dict = Depends(get_current_user)) -
     from database import get_db
     with get_db() as db:
         row = db.execute(
-            "SELECT status FROM organizations WHERE admin_user_id = ?",
+            "SELECT status FROM organizations WHERE admin_user_id = %s",
             (current_user["id"],),
         ).fetchone()
         if not row:

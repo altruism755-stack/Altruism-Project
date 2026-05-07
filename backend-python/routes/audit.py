@@ -23,7 +23,7 @@ def log_action(
     try:
         db.execute(
             "INSERT INTO audit_logs (actor_id, actor_role, action, entity_type, entity_id, metadata) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s)",
             (
                 actor_id,
                 actor_role,
@@ -53,20 +53,20 @@ def list_audit_logs(
         clauses = ["1=1"]
         params: list = []
         if entity_type:
-            clauses.append("entity_type = ?")
+            clauses.append("entity_type = %s")
             params.append(entity_type)
         if entity_id is not None:
-            clauses.append("entity_id = ?")
+            clauses.append("entity_id = %s")
             params.append(entity_id)
         if actor_id is not None:
-            clauses.append("actor_id = ?")
+            clauses.append("actor_id = %s")
             params.append(actor_id)
         if action:
-            clauses.append("action = ?")
+            clauses.append("action = %s")
             params.append(action)
         params.append(min(limit, 500))
         rows = dict_rows(db.execute(
-            f"SELECT * FROM audit_logs WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT ?",
+            f"SELECT * FROM audit_logs WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT %s",
             params,
         ).fetchall())
         return {"audit_logs": rows, "total": len(rows)}

@@ -29,34 +29,34 @@ def list_activities(
         if role == "supervisor":
             # Auto-scope: only activities for this supervisor's assigned volunteers.
             sup = dict_row(db.execute(
-                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup:
                 raise HTTPException(403, "You do not have permission to access this resource")
             join_parts.append(
-                "INNER JOIN org_volunteers ov ON ov.volunteer_id = a.volunteer_id AND ov.supervisor_id = ?"
+                "INNER JOIN org_volunteers ov ON ov.volunteer_id = a.volunteer_id AND ov.supervisor_id = %s"
             )
             join_params.append(sup["id"])
-            where_clauses.append("a.org_id = ?")
+            where_clauses.append("a.org_id = %s")
             where_params.append(sup["org_id"])
         elif role == "org_admin":
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if org:
-                where_clauses.append("a.org_id = ?")
+                where_clauses.append("a.org_id = %s")
                 where_params.append(org["id"])
 
         if volunteer_id:
-            where_clauses.append("a.volunteer_id = ?")
+            where_clauses.append("a.volunteer_id = %s")
             where_params.append(volunteer_id)
         if status and status != "All":
-            where_clauses.append("a.status = ?")
+            where_clauses.append("a.status = %s")
             where_params.append(status)
         # supervisor_id filter only honoured for org_admin; supervisors are already auto-scoped.
         if supervisor_id and role != "supervisor":
             join_parts.append(
-                "INNER JOIN org_volunteers ov_s ON ov_s.volunteer_id = a.volunteer_id AND ov_s.supervisor_id = ?"
+                "INNER JOIN org_volunteers ov_s ON ov_s.volunteer_id = a.volunteer_id AND ov_s.supervisor_id = %s"
             )
             join_params.append(supervisor_id)
 
@@ -80,14 +80,14 @@ def _resolve_caller_org_id(db, current_user: dict) -> int:
     """Return the org_id the calling user is authorised to manage."""
     if current_user["role"] == "supervisor":
         sup = dict_row(db.execute(
-            "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+            "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not sup:
             raise HTTPException(403, "Supervisor profile not found")
         return sup["org_id"]
     # org_admin
     org = dict_row(db.execute(
-        "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+        "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
     ).fetchone())
     if not org:
         raise HTTPException(403, "Organization not found for this admin")
@@ -102,7 +102,7 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
             raise HTTPException(400, "volunteer_id is required")
 
         vol = dict_row(db.execute(
-            "SELECT id, name, user_id FROM volunteers WHERE id = ?", (volunteer_id,)
+            "SELECT id, name, user_id FROM volunteers WHERE id = %s", (volunteer_id,)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
@@ -117,7 +117,7 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
 
         org_id = body.get("org_id")
         if not org_id:
-            event = dict_row(db.execute("SELECT org_id FROM events WHERE id = ?", (event_id,)).fetchone())
+            event = dict_row(db.execute("SELECT org_id FROM events WHERE id = %s", (event_id,)).fetchone())
             if event:
                 org_id = event["org_id"]
 
@@ -131,7 +131,7 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
 
         # Verify the volunteer is an active member of this org.
         membership = dict_row(db.execute(
-            "SELECT id, supervisor_id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Active'",
+            "SELECT id, supervisor_id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s AND status = 'Active'",
             (org_id, vol["id"]),
         ).fetchone())
         if not membership:
@@ -140,14 +140,14 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
         # Supervisors may only log activities for their assigned volunteers.
         if current_user["role"] == "supervisor":
             sup_record = dict_row(db.execute(
-                "SELECT id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup_record or membership.get("supervisor_id") != sup_record["id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         # Prevent recording attendance before the event date (UTC-based comparison).
         event_row = dict_row(db.execute(
-            "SELECT date FROM events WHERE id = ?", (event_id,)
+            "SELECT date FROM events WHERE id = %s", (event_id,)
         ).fetchone())
         if not event_row:
             raise HTTPException(404, "Event not found")
@@ -158,7 +158,7 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
 
         # Fetch org settings.
         org_row = dict_row(db.execute(
-            "SELECT tracks_hours FROM organizations WHERE id = ?", (org_id,)
+            "SELECT tracks_hours FROM organizations WHERE id = %s", (org_id,)
         ).fetchone())
         tracks_hours = bool((org_row or {}).get("tracks_hours", 1))
 
@@ -180,19 +180,19 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
 
         # Upsert: update existing activity if one already exists for this volunteer+event.
         existing_act = dict_row(db.execute(
-            "SELECT id FROM activities WHERE volunteer_id = ? AND event_id = ?",
+            "SELECT id FROM activities WHERE volunteer_id = %s AND event_id = %s",
             (vol["id"], event_id),
         ).fetchone()) if event_id else None
 
         if existing_act:
             db.execute(
-                "UPDATE activities SET date = ?, hours = ?, description = ?, status = ?, "
-                "reviewed_by = NULL, reviewed_at = NULL WHERE id = ?",
+                "UPDATE activities SET date = %s, hours = %s, description = %s, status = %s, "
+                "reviewed_by = NULL, reviewed_at = NULL WHERE id = %s",
                 (date, hours, body.get("description", ""), status, existing_act["id"]),
             )
             activity = dict_row(db.execute(
                 "SELECT a.*, e.name as event_name FROM activities a "
-                "LEFT JOIN events e ON a.event_id = e.id WHERE a.id = ?",
+                "LEFT JOIN events e ON a.event_id = e.id WHERE a.id = %s",
                 (existing_act["id"],),
             ).fetchone())
             logger.info("[EVENT %d] Activity updated for volunteer %d", event_id, vol["id"])
@@ -200,19 +200,19 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
                        "activity", existing_act["id"],
                        {"volunteer_id": vol["id"], "event_id": event_id, "hours": hours, "upsert": True})
         else:
-            cur = db.execute(
+            row = db.execute(
                 "INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
                 (vol["id"], event_id, org_id, date, hours, body.get("description", ""), status),
-            )
+            ).fetchone()
             activity = dict_row(db.execute(
                 "SELECT a.*, e.name as event_name FROM activities a "
-                "LEFT JOIN events e ON a.event_id = e.id WHERE a.id = ?",
-                (cur.lastrowid,),
+                "LEFT JOIN events e ON a.event_id = e.id WHERE a.id = %s",
+                (row["id"],),
             ).fetchone())
             logger.info("[EVENT %d] Activity created for volunteer %d", event_id, vol["id"])
             log_action(db, current_user["id"], current_user["role"], "log_activity",
-                       "activity", cur.lastrowid,
+                       "activity", row["id"],
                        {"volunteer_id": vol["id"], "event_id": event_id, "hours": hours})
 
         if vol.get("user_id"):
@@ -245,7 +245,7 @@ def approve_activity(
             "FROM activities a "
             "LEFT JOIN events e ON a.event_id = e.id "
             "JOIN volunteers v ON v.id = a.volunteer_id "
-            "WHERE a.id = ?", (activity_id,)
+            "WHERE a.id = %s", (activity_id,)
         ).fetchone())
 
         if not act:
@@ -263,20 +263,20 @@ def approve_activity(
         reviewer_id = None
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if sup:
                 reviewer_id = sup["id"]
             # Supervisors may only approve activities for their assigned volunteers.
             assignment = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
                 (act["volunteer_id"], reviewer_id),
             ).fetchone()
             if not assignment:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         db.execute(
-            "UPDATE activities SET status = 'Approved', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
+            "UPDATE activities SET status = 'Approved', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
             (reviewer_id, activity_id),
         )
         log_action(db, current_user["id"], current_user["role"], "approve_activity",
@@ -313,7 +313,7 @@ def reject_activity(
             "FROM activities a "
             "LEFT JOIN events e ON a.event_id = e.id "
             "JOIN volunteers v ON v.id = a.volunteer_id "
-            "WHERE a.id = ?", (activity_id,)
+            "WHERE a.id = %s", (activity_id,)
         ).fetchone())
 
         if not act:
@@ -331,20 +331,20 @@ def reject_activity(
         reviewer_id = None
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if sup:
                 reviewer_id = sup["id"]
             # Supervisors may only reject activities for their assigned volunteers.
             assignment = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
                 (act["volunteer_id"], reviewer_id),
             ).fetchone()
             if not assignment:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         db.execute(
-            "UPDATE activities SET status = 'Rejected', reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?",
+            "UPDATE activities SET status = 'Rejected', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
             (reviewer_id, activity_id),
         )
         log_action(db, current_user["id"], current_user["role"], "reject_activity",

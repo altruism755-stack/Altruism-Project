@@ -79,7 +79,7 @@ def register(body: RegisterBody):
         raise HTTPException(400, "Email, password, and role are required")
 
     with get_db() as db:
-        existing = db.execute("SELECT id FROM users WHERE email = ?", (body.email,)).fetchone()
+        existing = db.execute("SELECT id FROM users WHERE email = %s", (body.email,)).fetchone()
         if existing:
             raise HTTPException(409, "Email already registered")
 
@@ -91,18 +91,18 @@ def register(body: RegisterBody):
                 if 1 <= n <= 4:
                     raise HTTPException(422, "Please select exactly 5 interests, or leave it empty.")
 
-            cur = db.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, ?, 'volunteer')",
+            row = db.execute(
+                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'volunteer') RETURNING id",
                 (body.email, hashed),
-            )
-            user_id = cur.lastrowid
+            ).fetchone()
+            user_id = row["id"]
             db.execute(
                 "INSERT INTO volunteers (user_id, name, email, phone, city, skills, "
                 "date_of_birth, governorate, national_id, gender, health_notes, availability, "
                 "hours_per_week, languages, education_level, prior_experience, prior_org, "
                 "experiences, cause_areas, nationality, university_name, faculty, study_year, "
                 "field_of_study, department, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active')",
                 (user_id, body.name or "", body.email, body.phone or None, body.city or None,
                  json.dumps(body.skills or []),
                  body.dateOfBirth or None, body.governorate or None, body.nationalId or None,
@@ -116,7 +116,7 @@ def register(body: RegisterBody):
                  body.faculty or None, body.studyYear or None, body.fieldOfStudy or None,
                  body.department or None),
             )
-            vol = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user_id,)).fetchone())
+            vol = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = %s", (user_id,)).fetchone())
 
             # Save optional profile picture
             if body.profilePicture and vol:
@@ -131,7 +131,7 @@ def register(body: RegisterBody):
                         filepath = os.path.join(UPLOAD_DIR, filename)
                         with open(filepath, "wb") as f:
                             f.write(decoded)
-                        db.execute("UPDATE volunteers SET profile_picture = ? WHERE id = ?", (filename, vol["id"]))
+                        db.execute("UPDATE volunteers SET profile_picture = %s WHERE id = %s", (filename, vol["id"]))
                         vol["profile_picture"] = filename
                 except Exception:
                     pass  # image save failure is non-fatal
@@ -143,11 +143,11 @@ def register(body: RegisterBody):
             if not body.orgName:
                 raise HTTPException(400, "Organization name is required")
 
-            cur = db.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, ?, 'org_admin')",
+            row = db.execute(
+                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'org_admin') RETURNING id",
                 (body.email, hashed),
-            )
-            user_id = cur.lastrowid
+            ).fetchone()
+            user_id = row["id"]
             initials = "".join(w[0] for w in (body.orgName or "").split() if w)[:2].upper()
             # Resolve category vs categories: prefer the canonical multi-select
             # list when provided; otherwise fall back to the legacy comma-string.
@@ -162,7 +162,7 @@ def register(body: RegisterBody):
                     status, org_type, org_size, official_email, founded_year, location, hq_city,
                     branches, social_links, logo_url, documents_url,
                     submitter_name, submitter_role, additional_notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (
                     body.orgName, body.description or "",
                     cats_string, json.dumps(cats_list),
@@ -178,12 +178,12 @@ def register(body: RegisterBody):
                     body.additionalNotes or "",
                 ),
             )
-            org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user_id,)).fetchone())
+            org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user_id,)).fetchone())
             # Invariant: creator is always an org admin from day one.
-            # INSERT OR IGNORE is safe against the UNIQUE(user_id, org_id) constraint.
+            # ON CONFLICT DO NOTHING is safe against the UNIQUE(user_id, org_id) constraint.
             if org:
                 db.execute(
-                    "INSERT OR IGNORE INTO org_admins (user_id, org_id, role) VALUES (?, ?, 'creator')",
+                    "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, 'creator') ON CONFLICT DO NOTHING",
                     (user_id, org["id"]),
                 )
             token = generate_token({"id": user_id, "email": body.email, "role": "org_admin"})
@@ -203,7 +203,7 @@ def login(body: LoginBody):
         raise HTTPException(400, "Email and password are required")
 
     with get_db() as db:
-        user = dict_row(db.execute("SELECT * FROM users WHERE email = ?", (body.email,)).fetchone())
+        user = dict_row(db.execute("SELECT * FROM users WHERE email = %s", (body.email,)).fetchone())
         if not user:
             raise HTTPException(401, "Invalid email or password")
         if not user.get("password"):
@@ -216,17 +216,17 @@ def login(body: LoginBody):
         org_status = None
 
         if user["role"] == "volunteer":
-            profile = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user["id"],)).fetchone())
+            profile = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = %s", (user["id"],)).fetchone())
         elif user["role"] == "supervisor":
-            profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user["id"],)).fetchone())
+            profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user["id"],)).fetchone())
         elif user["role"] == "org_admin":
-            profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user["id"],)).fetchone())
+            profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user["id"],)).fetchone())
             if profile:
                 org_status = profile.get("status") or "approved"
 
         # Check if this user is also a platform admin
         pa_row = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = ?", (user["id"],)
+            "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
         ).fetchone()
         is_platform_admin = pa_row is not None
 
@@ -245,21 +245,21 @@ def login(body: LoginBody):
 def me(current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         user = dict_row(db.execute(
-            "SELECT id, email, role, created_at FROM users WHERE id = ?", (current_user["id"],)
+            "SELECT id, email, role, created_at FROM users WHERE id = %s", (current_user["id"],)
         ).fetchone())
         if not user:
             raise HTTPException(404, "User not found")
 
         profile = None
         if user["role"] == "volunteer":
-            profile = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = ?", (user["id"],)).fetchone())
+            profile = dict_row(db.execute("SELECT * FROM volunteers WHERE user_id = %s", (user["id"],)).fetchone())
         elif user["role"] == "supervisor":
-            profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user["id"],)).fetchone())
+            profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user["id"],)).fetchone())
         elif user["role"] == "org_admin":
-            profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user["id"],)).fetchone())
+            profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user["id"],)).fetchone())
 
         pa_row = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = ?", (user["id"],)
+            "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
         ).fetchone()
         user["is_platform_admin"] = pa_row is not None
 
@@ -276,7 +276,7 @@ def accept_invite(body: AcceptInviteBody):
 
     with get_db() as db:
         user = dict_row(db.execute(
-            "SELECT id, email, role, invite_token, invite_expires_at FROM users WHERE invite_token = ?",
+            "SELECT id, email, role, invite_token, invite_expires_at FROM users WHERE invite_token = %s",
             (body.token,),
         ).fetchone())
         if not user:
@@ -285,7 +285,7 @@ def accept_invite(body: AcceptInviteBody):
         expires_at = user.get("invite_expires_at")
         if expires_at:
             try:
-                exp_dt = datetime.fromisoformat(expires_at)
+                exp_dt = expires_at if hasattr(expires_at, "tzinfo") else datetime.fromisoformat(str(expires_at))
                 if exp_dt.tzinfo is None:
                     exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 if datetime.now(timezone.utc) > exp_dt:
@@ -295,20 +295,20 @@ def accept_invite(body: AcceptInviteBody):
 
         hashed = hash_password(body.password)
         db.execute(
-            "UPDATE users SET password = ?, invite_token = NULL, invite_expires_at = NULL WHERE id = ?",
+            "UPDATE users SET password = %s, invite_token = NULL, invite_expires_at = NULL WHERE id = %s",
             (hashed, user["id"]),
         )
         # Activate the volunteer profile
         db.execute(
-            "UPDATE volunteers SET status = 'Active' WHERE user_id = ?", (user["id"],)
+            "UPDATE volunteers SET status = 'Active' WHERE user_id = %s", (user["id"],)
         )
         # Activate their pending org memberships that came from this invite
         vol_row = db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (user["id"],)
+            "SELECT id FROM volunteers WHERE user_id = %s", (user["id"],)
         ).fetchone()
         if vol_row:
             db.execute(
-                "UPDATE org_volunteers SET status = 'Active' WHERE volunteer_id = ? AND source = 'invite'",
+                "UPDATE org_volunteers SET status = 'Active' WHERE volunteer_id = %s AND source = 'invite'",
                 (vol_row["id"],),
             )
 

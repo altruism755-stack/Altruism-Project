@@ -19,14 +19,14 @@ FORBIDDEN = "You do not have permission to access this resource"
 
 
 def _resolve_supervisor(db, user_id: int) -> dict:
-    sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user_id,)).fetchone())
+    sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
     if not sup:
         raise HTTPException(403, FORBIDDEN)
     return sup
 
 
 def _resolve_org_admin(db, user_id: int) -> dict:
-    org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = ?", (user_id,)).fetchone())
+    org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user_id,)).fetchone())
     if not org:
         raise HTTPException(403, FORBIDDEN)
     return org
@@ -34,7 +34,7 @@ def _resolve_org_admin(db, user_id: int) -> dict:
 
 def _assert_supervisor_volunteer(db, supervisor_id: int, volunteer_id: int) -> None:
     row = db.execute(
-        "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+        "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
         (volunteer_id, supervisor_id),
     ).fetchone()
     if not row:
@@ -43,7 +43,7 @@ def _assert_supervisor_volunteer(db, supervisor_id: int, volunteer_id: int) -> N
 
 def _assert_org_volunteer(db, org_id: int, volunteer_id: int) -> None:
     row = db.execute(
-        "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND org_id = ?",
+        "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s",
         (volunteer_id, org_id),
     ).fetchone()
     if not row:
@@ -72,21 +72,21 @@ def list_volunteers(
         # Supervisors see only their assigned volunteers; org_admins see their org only.
         if current_user["role"] == "supervisor":
             sup = _resolve_supervisor(db, current_user["id"])
-            query += " AND ov.supervisor_id = ?"
+            query += " AND ov.supervisor_id = %s"
             params.append(sup["id"])
         else:
             org = _resolve_org_admin(db, current_user["id"])
-            query += " AND ov.org_id = ?"
+            query += " AND ov.org_id = %s"
             params.append(org["id"])
 
         if status:
-            query += " AND v.status = ?"
+            query += " AND v.status = %s"
             params.append(status)
         if supervisor:
-            query += " AND s.name = ?"
+            query += " AND s.name = %s"
             params.append(supervisor)
         if search:
-            query += " AND (v.name LIKE ? OR v.email LIKE ?)"
+            query += " AND (v.name ILIKE %s OR v.email ILIKE %s)"
             params.extend([f"%{search}%", f"%{search}%"])
 
         # Count query
@@ -94,7 +94,7 @@ def list_volunteers(
         total = db.execute(count_query, params).fetchone()["total"]
 
         offset = (page - 1) * limit
-        query += " LIMIT ? OFFSET ?"
+        query += " LIMIT %s OFFSET %s"
         params.extend([limit, offset])
 
         volunteers = dict_rows(db.execute(query, params).fetchall())
@@ -112,7 +112,7 @@ def get_my_volunteer_profile(current_user: dict = Depends(require_roles("volunte
     """Return the current volunteer's own full profile, scoped by their user_id."""
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT * FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT * FROM volunteers WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer profile not found")
@@ -124,14 +124,14 @@ def _build_volunteer_response(db, vol: dict) -> dict:
         "SELECT a.*, e.name as event_name, o.name as org_name FROM activities a "
         "LEFT JOIN events e ON a.event_id = e.id "
         "LEFT JOIN organizations o ON a.org_id = o.id "
-        "WHERE a.volunteer_id = ? ORDER BY a.date DESC",
+        "WHERE a.volunteer_id = %s ORDER BY a.date DESC",
         (vol["id"],),
     ).fetchall())
 
     orgs = dict_rows(db.execute(
         "SELECT o.*, ov.status as membership_status, ov.department, ov.joined_date "
         "FROM organizations o "
-        "JOIN org_volunteers ov ON o.id = ov.org_id WHERE ov.volunteer_id = ? "
+        "JOIN org_volunteers ov ON o.id = ov.org_id WHERE ov.volunteer_id = %s "
         "ORDER BY ov.status DESC, ov.joined_date DESC",
         (vol["id"],),
     ).fetchall())
@@ -141,7 +141,7 @@ def _build_volunteer_response(db, vol: dict) -> dict:
         "FROM certificates c "
         "JOIN organizations o ON c.org_id = o.id "
         "LEFT JOIN events e ON c.event_id = e.id "
-        "WHERE c.volunteer_id = ?",
+        "WHERE c.volunteer_id = %s",
         (vol["id"],),
     ).fetchall())
 
@@ -152,7 +152,7 @@ def _build_volunteer_response(db, vol: dict) -> dict:
 @router.get("/{volunteer_id}")
 def get_volunteer(volunteer_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
-        vol = dict_row(db.execute("SELECT * FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+        vol = dict_row(db.execute("SELECT * FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
         role = current_user["role"]
@@ -173,7 +173,7 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
     with get_db() as db:
         role = current_user["role"]
         if role == "volunteer":
-            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if not vol_check or vol_check["user_id"] != current_user["id"]:
                 raise HTTPException(403, FORBIDDEN)
         elif role == "supervisor":
@@ -213,28 +213,28 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
 
         db.execute(
             "UPDATE volunteers SET "
-            "nationality = COALESCE(?, nationality), "
-            "national_id = COALESCE(?, national_id), "
-            "name = COALESCE(?, name), phone = COALESCE(?, phone), "
-            "city = COALESCE(?, city), skills = COALESCE(?, skills), "
-            "date_of_birth = COALESCE(?, date_of_birth), "
-            "governorate = COALESCE(?, governorate), "
-            "gender = COALESCE(?, gender), "
-            "health_notes = COALESCE(?, health_notes), "
-            "availability = COALESCE(?, availability), "
-            "hours_per_week = COALESCE(?, hours_per_week), "
-            "languages = COALESCE(?, languages), "
-            "education_level = COALESCE(?, education_level), "
-            "prior_experience = COALESCE(?, prior_experience), "
-            "prior_org = COALESCE(?, prior_org), "
-            "experiences = COALESCE(?, experiences), "
-            "cause_areas = COALESCE(?, cause_areas), "
-            "university_name = COALESCE(?, university_name), "
-            "faculty = COALESCE(?, faculty), "
-            "study_year = COALESCE(?, study_year), "
-            "field_of_study = COALESCE(?, field_of_study), "
-            "department = COALESCE(?, department) "
-            "WHERE id = ?",
+            "nationality = COALESCE(%s, nationality), "
+            "national_id = COALESCE(%s, national_id), "
+            "name = COALESCE(%s, name), phone = COALESCE(%s, phone), "
+            "city = COALESCE(%s, city), skills = COALESCE(%s, skills), "
+            "date_of_birth = COALESCE(%s, date_of_birth), "
+            "governorate = COALESCE(%s, governorate), "
+            "gender = COALESCE(%s, gender), "
+            "health_notes = COALESCE(%s, health_notes), "
+            "availability = COALESCE(%s, availability), "
+            "hours_per_week = COALESCE(%s, hours_per_week), "
+            "languages = COALESCE(%s, languages), "
+            "education_level = COALESCE(%s, education_level), "
+            "prior_experience = COALESCE(%s, prior_experience), "
+            "prior_org = COALESCE(%s, prior_org), "
+            "experiences = COALESCE(%s, experiences), "
+            "cause_areas = COALESCE(%s, cause_areas), "
+            "university_name = COALESCE(%s, university_name), "
+            "faculty = COALESCE(%s, faculty), "
+            "study_year = COALESCE(%s, study_year), "
+            "field_of_study = COALESCE(%s, field_of_study), "
+            "department = COALESCE(%s, department) "
+            "WHERE id = %s",
             (nationality, national_id,
              name, phone, city, json.dumps(skills) if skills is not None else None,
              date_of_birth, governorate,
@@ -255,24 +255,24 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         # Handle email update
         new_email = body.get("email")
         if new_email:
-            vol = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            vol = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if vol:
-                db.execute("UPDATE users SET email = ? WHERE id = ?", (new_email, vol["user_id"]))
-                db.execute("UPDATE volunteers SET email = ? WHERE id = ?", (new_email, volunteer_id))
+                db.execute("UPDATE users SET email = %s WHERE id = %s", (new_email, vol["user_id"]))
+                db.execute("UPDATE volunteers SET email = %s WHERE id = %s", (new_email, volunteer_id))
 
         # Handle password change
         new_password = body.get("new_password")
         current_password = body.get("current_password")
         if new_password and current_password:
-            vol = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            vol = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if vol:
-                user = dict_row(db.execute("SELECT * FROM users WHERE id = ?", (vol["user_id"],)).fetchone())
+                user = dict_row(db.execute("SELECT * FROM users WHERE id = %s", (vol["user_id"],)).fetchone())
                 if not user or not verify_password(current_password, user["password"]):
                     raise HTTPException(400, "Current password is incorrect")
                 hashed = hash_password(new_password)
-                db.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, vol["user_id"]))
+                db.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, vol["user_id"]))
 
-        updated = dict_row(db.execute("SELECT * FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+        updated = dict_row(db.execute("SELECT * FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
         return updated
 
 
@@ -281,7 +281,7 @@ def upload_profile_picture(volunteer_id: int, body: dict, current_user: dict = D
     with get_db() as _db:
         role = current_user["role"]
         if role == "volunteer":
-            vol_check = dict_row(_db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            vol_check = dict_row(_db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if not vol_check or vol_check["user_id"] != current_user["id"]:
                 raise HTTPException(403, FORBIDDEN)
         elif role == "supervisor":
@@ -329,12 +329,12 @@ def upload_profile_picture(volunteer_id: int, body: dict, current_user: dict = D
 
     with get_db() as db:
         # Delete old picture file if exists
-        old = db.execute("SELECT profile_picture FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone()
+        old = db.execute("SELECT profile_picture FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone()
         if old and old["profile_picture"]:
             old_path = os.path.join(UPLOAD_DIR, old["profile_picture"])
             if os.path.exists(old_path):
                 os.remove(old_path)
-        db.execute("UPDATE volunteers SET profile_picture = ? WHERE id = ?", (filename, volunteer_id))
+        db.execute("UPDATE volunteers SET profile_picture = %s WHERE id = %s", (filename, volunteer_id))
         return {"profile_picture": filename}
 
 
@@ -343,7 +343,7 @@ def remove_profile_picture(volunteer_id: int, current_user: dict = Depends(get_c
     with get_db() as db:
         role = current_user["role"]
         if role == "volunteer":
-            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if not vol_check or vol_check["user_id"] != current_user["id"]:
                 raise HTTPException(403, FORBIDDEN)
         elif role == "supervisor":
@@ -352,27 +352,27 @@ def remove_profile_picture(volunteer_id: int, current_user: dict = Depends(get_c
         elif role == "org_admin":
             org = _resolve_org_admin(db, current_user["id"])
             _assert_org_volunteer(db, org["id"], volunteer_id)
-        vol = dict_row(db.execute("SELECT profile_picture FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+        vol = dict_row(db.execute("SELECT profile_picture FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
         if vol["profile_picture"]:
             filepath = os.path.join(UPLOAD_DIR, vol["profile_picture"])
             if os.path.exists(filepath):
                 os.remove(filepath)
-        db.execute("UPDATE volunteers SET profile_picture = NULL WHERE id = ?", (volunteer_id,))
+        db.execute("UPDATE volunteers SET profile_picture = NULL WHERE id = %s", (volunteer_id,))
         return {"message": "Profile picture removed"}
 
 
 @router.get("/{volunteer_id}/org/{org_id}")
 def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
-        org = dict_row(db.execute("SELECT * FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT * FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
         role = current_user["role"]
         if role == "volunteer":
-            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+            vol_check = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if not vol_check or vol_check["user_id"] != current_user["id"]:
                 raise HTTPException(403, FORBIDDEN)
         elif role == "supervisor":
@@ -390,7 +390,7 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "SELECT a.*, e.name as event_name, e.date as event_date "
             "FROM activities a "
             "LEFT JOIN events e ON a.event_id = e.id "
-            "WHERE a.volunteer_id = ? AND a.org_id = ? ORDER BY a.date DESC",
+            "WHERE a.volunteer_id = %s AND a.org_id = %s ORDER BY a.date DESC",
             (volunteer_id, org_id),
         ).fetchall())
 
@@ -398,19 +398,17 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "SELECT c.*, e.name as event_name "
             "FROM certificates c "
             "LEFT JOIN events e ON c.event_id = e.id "
-            "WHERE c.volunteer_id = ? AND c.org_id = ?",
+            "WHERE c.volunteer_id = %s AND c.org_id = %s",
             (volunteer_id, org_id),
         ).fetchall())
 
         membership = dict_row(db.execute(
-            "SELECT status, joined_date, approved_at FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            "SELECT status, joined_date, approved_at FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
             (org_id, volunteer_id),
         ).fetchone())
         member_status = (membership or {}).get("status", "Pending")
 
         # Single source of truth: member_status gates all activity/certificate data.
-        # A non-Active member must not see or contribute activity data — this prevents
-        # the contradiction where a Pending volunteer appears to have logged hours.
         if member_status == "Active":
             pending_activities  = [a for a in activities if a["status"] == "Pending"]
             approved_activities = [a for a in activities if a["status"] == "Approved"]
@@ -428,7 +426,7 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "SELECT ea.*, e.name as event_name, e.date as event_date "
             "FROM event_applications ea "
             "JOIN events e ON ea.event_id = e.id "
-            "WHERE ea.volunteer_id = ? AND ea.org_id = ? AND ea.status = 'Pending'",
+            "WHERE ea.volunteer_id = %s AND ea.org_id = %s AND ea.status = 'Pending'",
             (volunteer_id, org_id),
         ).fetchall())
 
@@ -460,5 +458,5 @@ def update_volunteer_status(
         raise HTTPException(400, "Invalid status")
 
     with get_db() as db:
-        db.execute("UPDATE volunteers SET status = ? WHERE id = ?", (status_val, volunteer_id))
+        db.execute("UPDATE volunteers SET status = %s WHERE id = %s", (status_val, volunteer_id))
         return {"message": "Status updated"}

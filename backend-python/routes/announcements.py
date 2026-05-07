@@ -16,7 +16,7 @@ def list_announcements(
         if org_ids:
             ids = [int(i) for i in org_ids.split(",") if i.strip().isdigit()]
             if ids:
-                placeholders = ",".join("?" * len(ids))
+                placeholders = ",".join(["%s"] * len(ids))
                 announcements = dict_rows(db.execute(
                     f"SELECT a.*, o.name as org_name, o.initials as org_initials, o.color as org_color "
                     f"FROM announcements a JOIN organizations o ON a.org_id = o.id "
@@ -43,19 +43,19 @@ def create_announcement(body: dict, current_user: dict = Depends(require_roles("
 
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
-        cur = db.execute(
-            "INSERT INTO announcements (org_id, title, content) VALUES (?, ?, ?)",
+        row = db.execute(
+            "INSERT INTO announcements (org_id, title, content) VALUES (%s, %s, %s) RETURNING id",
             (org["id"], title, content),
-        )
+        ).fetchone()
         announcement = dict_row(db.execute(
             "SELECT a.*, o.name as org_name FROM announcements a "
-            "JOIN organizations o ON a.org_id = o.id WHERE a.id = ?",
-            (cur.lastrowid,),
+            "JOIN organizations o ON a.org_id = o.id WHERE a.id = %s",
+            (row["id"],),
         ).fetchone())
         return announcement
 
@@ -63,5 +63,5 @@ def create_announcement(body: dict, current_user: dict = Depends(require_roles("
 @router.delete("/{ann_id}")
 def delete_announcement(ann_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        db.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
+        db.execute("DELETE FROM announcements WHERE id = %s", (ann_id,))
         return {"message": "Announcement deleted"}

@@ -130,24 +130,24 @@ def _seed_platform_admin():
     conn = get_connection()
     try:
         existing = conn.execute(
-            "SELECT id FROM users WHERE email = ?", (admin_email,)
+            "SELECT id FROM users WHERE email = %s", (admin_email,)
         ).fetchone()
         if not existing:
             hashed = hash_password(admin_password)
-            cur = conn.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, ?, 'volunteer')",
+            row = conn.execute(
+                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'volunteer') RETURNING id",
                 (admin_email, hashed),
-            )
-            user_id = cur.lastrowid
+            ).fetchone()
+            user_id = row["id"]
             conn.execute(
-                "INSERT OR IGNORE INTO platform_admins (user_id) VALUES (?)", (user_id,)
+                "INSERT INTO platform_admins (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user_id,)
             )
             conn.commit()
             print(f"[seed] Created platform admin: {admin_email}")
         else:
             # Ensure the user is in platform_admins even if seeded before
             conn.execute(
-                "INSERT OR IGNORE INTO platform_admins (user_id) VALUES (?)", (existing["id"],)
+                "INSERT INTO platform_admins (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (existing["id"],)
             )
             conn.commit()
     finally:

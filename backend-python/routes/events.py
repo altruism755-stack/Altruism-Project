@@ -32,7 +32,7 @@ def list_events(
         # Scope org to caller's org for supervisors and org_admins.
         if role == "supervisor":
             sup = db.execute(
-                "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone()
             if not sup:
                 raise HTTPException(403, FORBIDDEN)
@@ -42,7 +42,7 @@ def list_events(
             org_id = caller_org
         elif role == "org_admin":
             org = db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone()
             if not org:
                 raise HTTPException(403, FORBIDDEN)
@@ -59,10 +59,10 @@ def list_events(
         params: list = []
 
         if status and status != "All":
-            query += " AND e.status = ?"
+            query += " AND e.status = %s"
             params.append(status)
         if org_id:
-            query += " AND e.org_id = ?"
+            query += " AND e.org_id = %s"
             params.append(org_id)
 
         query += " ORDER BY e.date DESC"
@@ -74,7 +74,7 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         event = dict_row(db.execute(
             "SELECT e.*, o.name as org_name FROM events e "
-            "LEFT JOIN organizations o ON e.org_id = o.id WHERE e.id = ?",
+            "LEFT JOIN organizations o ON e.org_id = o.id WHERE e.id = %s",
             (event_id,),
         ).fetchone())
         if not event:
@@ -83,7 +83,7 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
         role = current_user["role"]
         if role == "supervisor":
             sup = db.execute(
-                "SELECT org_id, id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT org_id, id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone()
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
@@ -94,14 +94,14 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
                 "a.id as activity_id, a.status as activity_status, a.hours "
                 "FROM event_applications ea "
                 "JOIN volunteers v ON ea.volunteer_id = v.id "
-                "JOIN org_volunteers ov ON v.id = ov.volunteer_id AND ov.supervisor_id = ? "
+                "JOIN org_volunteers ov ON v.id = ov.volunteer_id AND ov.supervisor_id = %s "
                 "LEFT JOIN activities a ON a.volunteer_id = v.id AND a.event_id = ea.event_id "
-                "WHERE ea.event_id = ? AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
+                "WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
                 (sup_id, event_id),
             ).fetchall())
         elif role == "org_admin":
             org = db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone()
             if not org or org["id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
@@ -112,7 +112,7 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
                 "FROM event_applications ea "
                 "JOIN volunteers v ON ea.volunteer_id = v.id "
                 "LEFT JOIN activities a ON a.volunteer_id = v.id AND a.event_id = ea.event_id "
-                "WHERE ea.event_id = ? AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
+                "WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
                 (event_id,),
             ).fetchall())
         else:
@@ -126,7 +126,7 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
 def create_event(body: dict, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -140,19 +140,19 @@ def create_event(body: dict, current_user: dict = Depends(require_roles("org_adm
         if acceptance_mode not in ("manual", "auto"):
             acceptance_mode = "manual"
 
-        cur = db.execute(
+        row = db.execute(
             "INSERT INTO events "
             "(org_id, name, description, location, date, time, duration, max_volunteers, "
             "required_skills, status, acceptance_mode) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Upcoming', ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Upcoming', %s) RETURNING id",
             (
                 org["id"], name, body.get("description", ""), body.get("location", ""),
                 date, body.get("time", ""), body.get("duration", 0),
                 body.get("max_volunteers", 0), body.get("required_skills", ""),
                 acceptance_mode,
             ),
-        )
-        event = dict_row(db.execute("SELECT * FROM events WHERE id = ?", (cur.lastrowid,)).fetchone())
+        ).fetchone()
+        event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (row["id"],)).fetchone())
         return event
 
 
@@ -160,11 +160,11 @@ def create_event(body: dict, current_user: dict = Depends(require_roles("org_adm
 def update_event(event_id: int, body: dict, current_user: dict = Depends(require_roles("org_admin"))):
     with exclusive_db() as db:
         org = db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone()
         if not org:
             raise HTTPException(403, FORBIDDEN)
-        event = dict_row(db.execute("SELECT org_id, status FROM events WHERE id = ?", (event_id,)).fetchone())
+        event = dict_row(db.execute("SELECT org_id, status FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event or event["org_id"] != org["id"]:
             raise HTTPException(403, FORBIDDEN)
 
@@ -187,13 +187,13 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
 
         db.execute(
             "UPDATE events SET "
-            "name = COALESCE(?, name), description = COALESCE(?, description), "
-            "location = COALESCE(?, location), date = COALESCE(?, date), "
-            "time = COALESCE(?, time), duration = COALESCE(?, duration), "
-            "max_volunteers = COALESCE(?, max_volunteers), "
-            "required_skills = COALESCE(?, required_skills), "
-            "status = COALESCE(?, status), "
-            "acceptance_mode = COALESCE(?, acceptance_mode) WHERE id = ?",
+            "name = COALESCE(%s, name), description = COALESCE(%s, description), "
+            "location = COALESCE(%s, location), date = COALESCE(%s, date), "
+            "time = COALESCE(%s, time), duration = COALESCE(%s, duration), "
+            "max_volunteers = COALESCE(%s, max_volunteers), "
+            "required_skills = COALESCE(%s, required_skills), "
+            "status = COALESCE(%s, status), "
+            "acceptance_mode = COALESCE(%s, acceptance_mode) WHERE id = %s",
             (
                 body.get("name"), body.get("description"), body.get("location"),
                 body.get("date"), body.get("time"), body.get("duration"),
@@ -203,24 +203,24 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
         )
         log_action(db, current_user["id"], current_user["role"], "update_event",
                    "event", event_id, {"status": new_status} if new_status else {})
-        return dict_row(db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone())
+        return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
 
 
 @router.delete("/{event_id}")
 def delete_event(event_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
         org = db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone()
         if not org:
             raise HTTPException(403, FORBIDDEN)
-        event = db.execute("SELECT org_id, status FROM events WHERE id = ?", (event_id,)).fetchone()
+        event = db.execute("SELECT org_id, status FROM events WHERE id = %s", (event_id,)).fetchone()
         if not event or event["org_id"] != org["id"]:
             raise HTTPException(403, FORBIDDEN)
         if event["status"] in ("Active", "Completed"):
             raise HTTPException(409, "Cannot delete an event that is Active or Completed")
 
-        db.execute("DELETE FROM events WHERE id = ?", (event_id,))
+        db.execute("DELETE FROM events WHERE id = %s", (event_id,))
         return {"message": "Event deleted"}
 
 
@@ -238,7 +238,7 @@ def bulk_mark_attendance(
     """
     with get_db() as db:
         event = dict_row(db.execute(
-            "SELECT * FROM events WHERE id = ?", (event_id,)
+            "SELECT * FROM events WHERE id = %s", (event_id,)
         ).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
@@ -254,7 +254,7 @@ def bulk_mark_attendance(
         supervisor_id = None
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
@@ -262,7 +262,7 @@ def bulk_mark_attendance(
             caller_org_id = sup["org_id"]
         else:
             org = db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone()
             if not org or org["id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
@@ -278,7 +278,7 @@ def bulk_mark_attendance(
 
         # Determine if this org tracks hours or only participation.
         org_row = dict_row(db.execute(
-            "SELECT tracks_hours FROM organizations WHERE id = ?", (caller_org_id,)
+            "SELECT tracks_hours FROM organizations WHERE id = %s", (caller_org_id,)
         ).fetchone())
         tracks_hours = bool((org_row or {}).get("tracks_hours", 1))
 
@@ -302,7 +302,7 @@ def bulk_mark_attendance(
             # Only mark attendance for volunteers with an Approved application for this event.
             approved_app = db.execute(
                 "SELECT id FROM event_applications "
-                "WHERE event_id = ? AND volunteer_id = ? AND status = 'Approved' AND cancelled_at IS NULL",
+                "WHERE event_id = %s AND volunteer_id = %s AND status = 'Approved' AND cancelled_at IS NULL",
                 (event_id, vol_id),
             ).fetchone()
             if not approved_app:
@@ -312,7 +312,7 @@ def bulk_mark_attendance(
             # Verify volunteer is an active org member.
             membership = db.execute(
                 "SELECT id FROM org_volunteers "
-                "WHERE org_id = ? AND volunteer_id = ? AND status = 'Active'",
+                "WHERE org_id = %s AND volunteer_id = %s AND status = 'Active'",
                 (caller_org_id, vol_id),
             ).fetchone()
             if not membership:
@@ -322,7 +322,7 @@ def bulk_mark_attendance(
             # Supervisors may only mark attendance for their assigned volunteers.
             if supervisor_id:
                 assignment = db.execute(
-                    "SELECT id FROM org_volunteers WHERE volunteer_id = ? AND supervisor_id = ?",
+                    "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
                     (vol_id, supervisor_id),
                 ).fetchone()
                 if not assignment:
@@ -331,28 +331,28 @@ def bulk_mark_attendance(
 
             # Upsert: update existing record if present, otherwise insert.
             existing = db.execute(
-                "SELECT id FROM activities WHERE volunteer_id = ? AND event_id = ?",
+                "SELECT id FROM activities WHERE volunteer_id = %s AND event_id = %s",
                 (vol_id, event_id),
             ).fetchone()
 
             if existing:
                 db.execute(
-                    "UPDATE activities SET date = ?, hours = ?, description = ?, status = ?, "
-                    "reviewed_by = NULL, reviewed_at = NULL WHERE id = ?",
+                    "UPDATE activities SET date = %s, hours = %s, description = %s, status = %s, "
+                    "reviewed_by = NULL, reviewed_at = NULL WHERE id = %s",
                     (date, hours, description, act_status, existing["id"]),
                 )
                 updated_ids.append(existing["id"])
             else:
-                cur = db.execute(
+                row = db.execute(
                     "INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
                     (vol_id, event_id, caller_org_id, date, hours, description, act_status),
-                )
-                created_ids.append(cur.lastrowid)
+                ).fetchone()
+                created_ids.append(row["id"])
 
             # Notify volunteer of attendance record.
             vol_user = db.execute(
-                "SELECT user_id FROM volunteers WHERE id = ?", (vol_id,)
+                "SELECT user_id FROM volunteers WHERE id = %s", (vol_id,)
             ).fetchone()
             if vol_user and vol_user["user_id"]:
                 if tracks_hours:

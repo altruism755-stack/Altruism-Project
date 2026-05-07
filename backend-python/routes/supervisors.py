@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/supervisors", tags=["supervisors"])
 def _get_supervisor_record(db, user_id: int) -> dict:
     """Resolve a supervisor record and their org_id from auth user id."""
     sup = dict_row(db.execute(
-        "SELECT * FROM supervisors WHERE user_id = ?", (user_id,)
+        "SELECT * FROM supervisors WHERE user_id = %s", (user_id,)
     ).fetchone())
     if not sup:
         raise HTTPException(404, "Supervisor profile not found")
@@ -22,7 +22,7 @@ def _get_supervisor_record(db, user_id: int) -> dict:
 def list_supervisors(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -30,7 +30,7 @@ def list_supervisors(current_user: dict = Depends(require_roles("org_admin"))):
         supervisors = dict_rows(db.execute(
             "SELECT s.*, "
             "(SELECT COUNT(*) FROM org_volunteers ov WHERE ov.supervisor_id = s.id) as assigned_volunteers "
-            "FROM supervisors s WHERE s.org_id = ?",
+            "FROM supervisors s WHERE s.org_id = %s",
             (org["id"],),
         ).fetchall())
 
@@ -49,40 +49,40 @@ def create_supervisor(body: dict, current_user: dict = Depends(require_roles("or
 
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
-        existing_user = dict_row(db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone())
+        existing_user = dict_row(db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone())
         if existing_user:
             user_id = existing_user["id"]
-            db.execute("UPDATE users SET role = 'supervisor' WHERE id = ?", (user_id,))
+            db.execute("UPDATE users SET role = 'supervisor' WHERE id = %s", (user_id,))
         else:
             hashed = hash_password("supervisor123")
-            cur = db.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, ?, 'supervisor')",
+            row = db.execute(
+                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'supervisor') RETURNING id",
                 (email, hashed),
-            )
-            user_id = cur.lastrowid
+            ).fetchone()
+            user_id = row["id"]
 
-        existing_sup = dict_row(db.execute("SELECT id FROM supervisors WHERE user_id = ?", (user_id,)).fetchone())
+        existing_sup = dict_row(db.execute("SELECT id FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
         if existing_sup:
             raise HTTPException(409, "Supervisor already exists")
 
         db.execute(
-            "INSERT INTO supervisors (user_id, name, email, phone, team, org_id, status) VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+            "INSERT INTO supervisors (user_id, name, email, phone, team, org_id, status) VALUES (%s, %s, %s, %s, %s, %s, 'Active')",
             (user_id, name, email, phone, team, org["id"]),
         )
 
-        sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = ?", (user_id,)).fetchone())
+        sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
         return sup
 
 
 @router.delete("/{supervisor_id}")
 def delete_supervisor(supervisor_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        db.execute("DELETE FROM supervisors WHERE id = ?", (supervisor_id,))
+        db.execute("DELETE FROM supervisors WHERE id = %s", (supervisor_id,))
         return {"message": "Supervisor removed"}
 
 
@@ -94,7 +94,7 @@ def get_my_profile(current_user: dict = Depends(require_roles("supervisor"))):
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
         org = dict_row(db.execute(
-            "SELECT id, name, description, category, color, initials, tracks_hours FROM organizations WHERE id = ?",
+            "SELECT id, name, description, category, color, initials, tracks_hours FROM organizations WHERE id = %s",
             (sup["org_id"],),
         ).fetchone())
         return {"supervisor": sup, "organization": org}
@@ -113,7 +113,7 @@ def get_my_volunteers(current_user: dict = Depends(require_roles("supervisor")))
             "FROM volunteers v "
             "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
             "LEFT JOIN supervisors s2 ON ov.supervisor_id = s2.id "
-            "WHERE ov.org_id = ? AND ov.supervisor_id = ? AND ov.status = 'Active' "
+            "WHERE ov.org_id = %s AND ov.supervisor_id = %s AND ov.status = 'Active' "
             "ORDER BY v.name",
             (sup["org_id"], sup["id"]),
         ).fetchall())
@@ -131,14 +131,14 @@ def get_pending_requests(current_user: dict = Depends(require_roles("supervisor"
             "SELECT v.*, ov.id as ov_id, ov.joined_date "
             "FROM volunteers v "
             "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "WHERE ov.org_id = ? AND ov.status = 'Pending' "
+            "WHERE ov.org_id = %s AND ov.status = 'Pending' "
             "ORDER BY ov.joined_date DESC",
             (sup["org_id"],),
         ).fetchall())
 
         # Also get supervisors for assignment
         supervisors = dict_rows(db.execute(
-            "SELECT id, name, team FROM supervisors WHERE org_id = ? AND status = 'Active'",
+            "SELECT id, name, team FROM supervisors WHERE org_id = %s AND status = 'Active'",
             (sup["org_id"],),
         ).fetchall())
 
@@ -153,7 +153,7 @@ def approve_request(vol_id: int, body: dict, current_user: dict = Depends(requir
 
         # Prevent double assignment
         existing = dict_row(db.execute(
-            "SELECT supervisor_id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            "SELECT supervisor_id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
             (sup["org_id"], vol_id),
         ).fetchone())
         if not existing:
@@ -162,15 +162,15 @@ def approve_request(vol_id: int, body: dict, current_user: dict = Depends(requir
             raise HTTPException(409, "This volunteer has already been assigned to a supervisor")
 
         vol = dict_row(db.execute(
-            "SELECT governorate, city FROM volunteers WHERE id = ?", (vol_id,)
+            "SELECT governorate, city FROM volunteers WHERE id = %s", (vol_id,)
         ).fetchone())
         gov_snap = (vol or {}).get("governorate") or ""
         city_snap = (vol or {}).get("city") or ""
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', supervisor_id = ?, department = ?, "
-            "is_active = 1, joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), "
-            "governorate_snapshot = ?, city_snapshot = ? "
-            "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            "UPDATE org_volunteers SET status = 'Active', supervisor_id = %s, department = %s, "
+            "is_active = 1, joined_at = NOW(), "
+            "governorate_snapshot = %s, city_snapshot = %s "
+            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
             (sup["id"], body.get("department", ""),
              gov_snap, city_snap, sup["org_id"], vol_id),
         )
@@ -184,7 +184,7 @@ def reject_request(vol_id: int, current_user: dict = Depends(require_roles("supe
         sup = _get_supervisor_record(db, current_user["id"])
         db.execute(
             "UPDATE org_volunteers SET status = 'Rejected' "
-            "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
             (sup["org_id"], vol_id),
         )
         return {"message": "Request rejected"}
@@ -196,7 +196,7 @@ def get_my_events(current_user: dict = Depends(require_roles("supervisor"))):
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
         events = dict_rows(db.execute(
-            "SELECT * FROM events WHERE org_id = ? ORDER BY date DESC",
+            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC",
             (sup["org_id"],),
         ).fetchall())
         return {"events": events}
@@ -213,8 +213,8 @@ def get_my_activities(current_user: dict = Depends(require_roles("supervisor")))
             "FROM activities a "
             "LEFT JOIN volunteers v ON a.volunteer_id = v.id "
             "LEFT JOIN events e ON a.event_id = e.id "
-            "JOIN org_volunteers ov ON a.volunteer_id = ov.volunteer_id AND ov.supervisor_id = ? "
-            "WHERE a.org_id = ? AND a.status = 'Pending' "
+            "JOIN org_volunteers ov ON a.volunteer_id = ov.volunteer_id AND ov.supervisor_id = %s "
+            "WHERE a.org_id = %s AND a.status = 'Pending' "
             "ORDER BY a.date DESC",
             (sup["id"], sup["org_id"]),
         ).fetchall())

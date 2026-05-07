@@ -216,7 +216,7 @@ router = APIRouter(prefix="/api/organizations", tags=["organizations"])
 
 def _get_my_org_id(db, user_id: int) -> int:
     org = dict_row(db.execute(
-        "SELECT id FROM organizations WHERE admin_user_id = ?", (user_id,)
+        "SELECT id FROM organizations WHERE admin_user_id = %s", (user_id,)
     ).fetchone())
     if not org:
         raise HTTPException(404, "Organization not found for this user")
@@ -234,7 +234,7 @@ def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
             # so it's correct for all existing orgs without any column migration.
             "SELECT o.*, u.email AS submitter_email "
             "FROM organizations o JOIN users u ON u.id = o.admin_user_id "
-            "WHERE o.admin_user_id = ?",
+            "WHERE o.admin_user_id = %s",
             (current_user["id"],),
         ).fetchone())
         if not org:
@@ -243,11 +243,9 @@ def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
 
         # Forward-compat: if a created_by_user_id column is ever added it takes
         # precedence over admin_user_id as the canonical submitter identity.
-        # Today the column doesn't exist so org.get() returns None and the
-        # submitter_email set by the JOIN above is used unchanged.
         if org.get("created_by_user_id"):
             override = dict_row(db.execute(
-                "SELECT email FROM users WHERE id = ?",
+                "SELECT email FROM users WHERE id = %s",
                 (org["created_by_user_id"],),
             ).fetchone())
             if override:
@@ -256,7 +254,7 @@ def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
         pending_rows = dict_rows(db.execute(
             "SELECT id, field, new_value, status, created_at "
             "FROM org_profile_change_requests "
-            "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
+            "WHERE org_id = %s AND status = 'pending' ORDER BY created_at DESC",
             (org["id"],),
         ).fetchall())
         # Build a field → new_value dict for easy frontend consumption.
@@ -279,7 +277,7 @@ def update_my_profile(
 
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT * FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT * FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -289,7 +287,7 @@ def update_my_profile(
             pending = dict_rows(db.execute(
                 "SELECT id, field, new_value, status, created_at "
                 "FROM org_profile_change_requests "
-                "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
+                "WHERE org_id = %s AND status = 'pending' ORDER BY created_at DESC",
                 (org["id"],),
             ).fetchall())
             pending_dict = {row["field"]: row["new_value"] for row in pending}
@@ -309,10 +307,10 @@ def update_my_profile(
             if k in EDITABLE_FIELDS and v != org_decoded.get(k)
         }
         if edits:
-            sets = ", ".join(f"{k} = ?" for k in edits)
+            sets = ", ".join(f"{k} = %s" for k in edits)
             values = [_encode_for_db(k, v) for k, v in edits.items()]
             db.execute(
-                f"UPDATE organizations SET {sets} WHERE id = ?",
+                f"UPDATE organizations SET {sets} WHERE id = %s",
                 (*values, org["id"]),
             )
             applied = list(edits.keys())
@@ -323,23 +321,23 @@ def update_my_profile(
                 continue
             db.execute(
                 "DELETE FROM org_profile_change_requests "
-                "WHERE org_id = ? AND field = ? AND status = 'pending'",
+                "WHERE org_id = %s AND field = %s AND status = 'pending'",
                 (org["id"], field),
             )
             db.execute(
                 "INSERT INTO org_profile_change_requests (org_id, requested_by, field, new_value) "
-                "VALUES (?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s)",
                 (org["id"], current_user["id"], field, new_val),
             )
             queued.append(field)
 
         org_after = _decode_org_json(dict_row(db.execute(
-            "SELECT * FROM organizations WHERE id = ?", (org["id"],)
+            "SELECT * FROM organizations WHERE id = %s", (org["id"],)
         ).fetchone()))
         pending = dict_rows(db.execute(
             "SELECT id, field, new_value, status, created_at "
             "FROM org_profile_change_requests "
-            "WHERE org_id = ? AND status = 'pending' ORDER BY created_at DESC",
+            "WHERE org_id = %s AND status = 'pending' ORDER BY created_at DESC",
             (org["id"],),
         ).fetchall())
 
@@ -372,7 +370,7 @@ def _fetch_org_admins(db, org_id: int) -> list:
     return dict_rows(db.execute(
         "SELECT oa.id, oa.user_id, u.email, oa.created_at, oa.role "
         "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
-        "WHERE oa.org_id = ? ORDER BY oa.created_at ASC",
+        "WHERE oa.org_id = %s ORDER BY oa.created_at ASC",
         (org_id,),
     ).fetchall())
 
@@ -383,10 +381,9 @@ def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin))
         org_id = _get_my_org_id(db, current_user["id"])
         rows = _fetch_org_admins(db, org_id)
         # This acts as a one-time lazy migration for legacy organizations.
-        # INSERT OR IGNORE prevents duplicate rows against the UNIQUE(user_id, org_id) constraint.
         if not rows:
             db.execute(
-                "INSERT OR IGNORE INTO org_admins (user_id, org_id, role) VALUES (?, ?, 'creator')",
+                "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, 'creator') ON CONFLICT DO NOTHING",
                 (current_user["id"], org_id),
             )
             rows = _fetch_org_admins(db, org_id)
@@ -397,20 +394,22 @@ def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin))
 def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require_approved_org_admin)):
     with get_db() as db:
         org_id = _get_my_org_id(db, current_user["id"])
-        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
+        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = %s", (body.email,)).fetchone())
         if not user:
             raise HTTPException(404, f"No user found with email '{body.email}'")
         # Idempotent check FIRST — handles both "already-admin other" and "already-admin self".
         existing = db.execute(
-            "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], org_id)
+            "SELECT id FROM org_admins WHERE user_id = %s AND org_id = %s", (user["id"], org_id)
         ).fetchone()
         if existing:
             return JSONResponse(status_code=200, content={"message": f"{body.email} is already an organization admin"})
         # Self-grant prevention: a non-admin user must not be able to escalate their own privileges.
         if user["id"] == current_user["id"]:
             raise HTTPException(403, "You cannot grant yourself admin access")
-        # INSERT OR IGNORE defends against any concurrent race to the UNIQUE constraint.
-        db.execute("INSERT OR IGNORE INTO org_admins (user_id, org_id, role) VALUES (?, ?, 'admin')", (user["id"], org_id))
+        db.execute(
+            "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, 'admin') ON CONFLICT DO NOTHING",
+            (user["id"], org_id),
+        )
         return {"message": f"{body.email} is now an organization admin"}
 
 
@@ -419,11 +418,11 @@ def remove_my_org_admin(admin_id: int, current_user: dict = Depends(require_appr
     with get_db() as db:
         org_id = _get_my_org_id(db, current_user["id"])
         row = dict_row(db.execute(
-            "SELECT id, user_id FROM org_admins WHERE id = ? AND org_id = ?", (admin_id, org_id)
+            "SELECT id, user_id FROM org_admins WHERE id = %s AND org_id = %s", (admin_id, org_id)
         ).fetchone())
         if not row:
             raise HTTPException(404, "Organization admin not found")
-        db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
+        db.execute("DELETE FROM org_admins WHERE id = %s", (admin_id,))
         return {"message": "Organization admin removed"}
 
 
@@ -467,8 +466,8 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
                 END                                                         AS status,
                 COALESCE(ov.is_active, 0)                                  AS is_active,
                 COALESCE(
-                    ov.joined_at,
-                    ov.joined_date || 'T00:00:00Z',
+                    ov.joined_at::text,
+                    ov.joined_date::text || 'T00:00:00Z',
                     ''
                 )                                                           AS joined_at,
                 ''                                                          AS activity_id,
@@ -476,8 +475,8 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
                 COALESCE(ov.city_snapshot,        '')                       AS city
             FROM volunteers v
             JOIN org_volunteers ov ON v.id = ov.volunteer_id
-            WHERE ov.org_id = ?
-            ORDER BY COALESCE(ov.joined_at, ov.joined_date) ASC
+            WHERE ov.org_id = %s
+            ORDER BY COALESCE(ov.joined_at, ov.joined_date::timestamptz) ASC
             """,
             (org_id,),
         ).fetchall())
@@ -586,14 +585,14 @@ def _fetch_export_rows(db, org_id: int) -> list[dict]:
             ov.status AS membership_status,
             COALESCE(ov.join_source, 'other') AS join_source,
             COALESCE(ov.channel_detail, '') AS channel_detail,
-            COALESCE(ov.joined_at, ov.joined_date) AS joined_at,
+            COALESCE(ov.joined_at, ov.joined_date::text) AS joined_at,
             ov.joined_date,
             COALESCE(ov.is_active, 0) AS is_active
         FROM volunteers v
         JOIN org_volunteers ov ON v.id = ov.volunteer_id
         LEFT JOIN supervisors s ON ov.supervisor_id = s.id
-        WHERE ov.org_id = ?
-        ORDER BY v.name COLLATE NOCASE ASC
+        WHERE ov.org_id = %s
+        ORDER BY v.name ASC
         """,
         (org_id,),
     ).fetchall())
@@ -620,7 +619,7 @@ def export_volunteers_full(
 
     with get_db() as db:
         org_id = _get_my_org_id(db, current_user["id"])
-        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = %s", (org_id,)).fetchone())
         rows = _fetch_export_rows(db, org_id)
 
     shaped = [_shape_row(r) for r in rows]
@@ -726,13 +725,13 @@ def list_organizations():
         for org in orgs:
             oid = org["id"]
             org["total_volunteers"] = db.execute(
-                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = ? AND status = 'Active'", (oid,)
+                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s AND status = 'Active'", (oid,)
             ).fetchone()["c"]
             org["pending_requests"] = db.execute(
-                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = ? AND status = 'Pending'", (oid,)
+                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s AND status = 'Pending'", (oid,)
             ).fetchone()["c"]
             org["active_activities"] = db.execute(
-                "SELECT COUNT(*) as c FROM events WHERE org_id = ? AND status IN ('Active', 'Upcoming')", (oid,)
+                "SELECT COUNT(*) as c FROM events WHERE org_id = %s AND status IN ('Active', 'Upcoming')", (oid,)
             ).fetchone()["c"]
 
         return {"organizations": orgs}
@@ -741,22 +740,22 @@ def list_organizations():
 @router.get("/{org_id}")
 def get_organization(org_id: int):
     with get_db() as db:
-        org = dict_row(db.execute("SELECT * FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT * FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
         volunteers = dict_rows(db.execute(
             "SELECT v.id, v.name, v.email, v.phone, v.status, ov.department, ov.joined_date "
-            "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id WHERE ov.org_id = ?",
+            "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id WHERE ov.org_id = %s",
             (org["id"],),
         ).fetchall())
 
         supervisors = dict_rows(db.execute(
-            "SELECT * FROM supervisors WHERE org_id = ?", (org["id"],)
+            "SELECT * FROM supervisors WHERE org_id = %s", (org["id"],)
         ).fetchall())
 
         events = dict_rows(db.execute(
-            "SELECT * FROM events WHERE org_id = ? ORDER BY date DESC", (org["id"],)
+            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC", (org["id"],)
         ).fetchall())
 
         return {**org, "volunteers": volunteers, "supervisors": supervisors, "events": events}
@@ -769,12 +768,12 @@ def get_org_members(org_id: int, current_user: dict = Depends(get_current_user))
             "SELECT v.*, ov.department, ov.status as org_status, ov.joined_date, "
             "ov.join_source, ov.supervisor_id, s.name as supervisor_name "
             "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "LEFT JOIN supervisors s ON ov.supervisor_id = s.id WHERE ov.org_id = ?",
+            "LEFT JOIN supervisors s ON ov.supervisor_id = s.id WHERE ov.org_id = %s",
             (org_id,),
         ).fetchall())
 
         supervisors = dict_rows(db.execute(
-            "SELECT * FROM supervisors WHERE org_id = ?", (org_id,)
+            "SELECT * FROM supervisors WHERE org_id = %s", (org_id,)
         ).fetchall())
 
         return {"volunteers": volunteers, "supervisors": supervisors}
@@ -784,21 +783,21 @@ def get_org_members(org_id: int, current_user: dict = Depends(get_current_user))
 def join_organization(org_id: int, current_user: dict = Depends(require_roles("volunteer"))):
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id, governorate, city, education_level FROM volunteers WHERE user_id = ?",
+            "SELECT id, governorate, city, education_level FROM volunteers WHERE user_id = %s",
             (current_user["id"],),
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer profile not found")
 
         existing = dict_row(db.execute(
-            "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            "SELECT id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
             (org_id, vol["id"]),
         ).fetchone())
         if existing:
             raise HTTPException(409, "Already a member of this organization")
 
         org = dict_row(db.execute(
-            "SELECT name, admin_user_id, student_only FROM organizations WHERE id = ?", (org_id,)
+            "SELECT name, admin_user_id, student_only FROM organizations WHERE id = %s", (org_id,)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -814,12 +813,12 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
             "INSERT INTO org_volunteers "
             "(org_id, volunteer_id, status, is_active, join_source, "
             " governorate_snapshot, city_snapshot, joined_at) "
-            "VALUES (?, ?, 'Pending', ?, 'website', ?, ?, ?)",
+            "VALUES (%s, %s, 'Pending', %s, 'website', %s, %s, %s)",
             (org_id, vol["id"], _is_active("Pending"),
              vol.get("governorate") or "", vol.get("city") or "", _now),
         )
         vol_name = dict_row(db.execute(
-            "SELECT name FROM volunteers WHERE id = ?", (vol["id"],)
+            "SELECT name FROM volunteers WHERE id = %s", (vol["id"],)
         ).fetchone()) or {}
         create_notification(
             db,
@@ -842,21 +841,21 @@ def approve_org_member(
     with get_db() as db:
         vol = dict_row(db.execute(
             "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
-            "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = ?", (vol_id,)
+            "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = %s", (vol_id,)
         ).fetchone())
         gov_snap = (vol or {}).get("governorate") or ""
         city_snap = (vol or {}).get("city") or ""
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', is_active = ?, supervisor_id = ?, department = ?, "
-            "joined_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), "
-            "approved_at = datetime('now'), "
-            "governorate_snapshot = ?, city_snapshot = ? "
-            "WHERE org_id = ? AND volunteer_id = ?",
+            "UPDATE org_volunteers SET status = 'Active', is_active = %s, supervisor_id = %s, department = %s, "
+            "joined_at = NOW(), "
+            "approved_at = NOW(), "
+            "governorate_snapshot = %s, city_snapshot = %s "
+            "WHERE org_id = %s AND volunteer_id = %s",
             (_is_active("Active"), body.get("supervisor_id"), body.get("department"),
              gov_snap, city_snap, org_id, vol_id),
         )
         # Notify volunteer
-        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = %s", (org_id,)).fetchone())
         org_name = (org or {}).get("name", "the organization")
         if vol and vol.get("user_id"):
             create_notification(
@@ -880,15 +879,15 @@ def reject_org_member(
     with get_db() as db:
         # Get volunteer user_id before deleting
         vol = dict_row(db.execute(
-            "SELECT v.user_id FROM volunteers v WHERE v.id = ?", (vol_id,)
+            "SELECT v.user_id FROM volunteers v WHERE v.id = %s", (vol_id,)
         ).fetchone())
         db.execute(
             "UPDATE org_volunteers SET status = 'Rejected' "
-            "WHERE org_id = ? AND volunteer_id = ? AND status = 'Pending'",
+            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
             (org_id, vol_id),
         )
         # Notify volunteer
-        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT name FROM organizations WHERE id = %s", (org_id,)).fetchone())
         org_name = (org or {}).get("name", "the organization")
         if vol and vol.get("user_id"):
             create_notification(
@@ -905,7 +904,7 @@ def reject_org_member(
 
 def _assert_org_access(db, org_id: int, user_id: int):
     org = dict_row(db.execute(
-        "SELECT id, name FROM organizations WHERE id = ? AND admin_user_id = ?",
+        "SELECT id, name FROM organizations WHERE id = %s AND admin_user_id = %s",
         (org_id, user_id),
     ).fetchone())
     if not org:
@@ -961,19 +960,19 @@ def preview_import_csv(
 
             # DB lookup to determine status
             user_row = dict_row(db.execute(
-                "SELECT id FROM users WHERE email = ?", (cleaned["email"],)
+                "SELECT id FROM users WHERE email = %s", (cleaned["email"],)
             ).fetchone())
 
             if not user_row:
                 row_status = "new"
             else:
                 vol_row = dict_row(db.execute(
-                    "SELECT id FROM volunteers WHERE user_id = ?", (user_row["id"],)
+                    "SELECT id FROM volunteers WHERE user_id = %s", (user_row["id"],)
                 ).fetchone())
                 vol_id = vol_row["id"] if vol_row else None
                 if vol_id:
                     in_org = db.execute(
-                        "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                        "SELECT id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
                         (org_id, vol_id),
                     ).fetchone()
                     row_status = "existing"  # covers both already-in and will-link
@@ -1028,27 +1027,27 @@ def import_volunteers_csv(
             email = r["email"]
             try:
                 existing_user = dict_row(db.execute(
-                    "SELECT id, role, invite_token FROM users WHERE email = ?", (email,)
+                    "SELECT id, role, invite_token FROM users WHERE email = %s", (email,)
                 ).fetchone())
 
                 if existing_user:
                     user_id = existing_user["id"]
                     vol_row = dict_row(db.execute(
-                        "SELECT id FROM volunteers WHERE user_id = ?", (user_id,)
+                        "SELECT id FROM volunteers WHERE user_id = %s", (user_id,)
                     ).fetchone())
                     vol_id = vol_row["id"] if vol_row else None
 
                     if vol_id is None:
-                        cur = db.execute(
+                        row = db.execute(
                             "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                            "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+                            "VALUES (%s, %s, %s, %s, %s, %s, 'Active') RETURNING id",
                             (user_id, r["name"], email, r["phone"] or None, r["city"] or None,
                              json.dumps(r["skills"])),
-                        )
-                        vol_id = cur.lastrowid
+                        ).fetchone()
+                        vol_id = row["id"]
 
                     in_org = db.execute(
-                        "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                        "SELECT id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
                         (org_id, vol_id),
                     ).fetchone()
 
@@ -1059,8 +1058,8 @@ def import_volunteers_csv(
                         elif body.duplicate_strategy == "update_existing":
                             db.execute(
                                 "UPDATE org_volunteers "
-                                "SET department = ?, source = ?, join_source = ?, channel_detail = ? "
-                                "WHERE org_id = ? AND volunteer_id = ?",
+                                "SET department = %s, source = %s, join_source = %s, channel_detail = %s "
+                                "WHERE org_id = %s AND volunteer_id = %s",
                                 (r["department"] or None, r["source"],
                                  r["join_source"], r["channel_detail"],
                                  org_id, vol_id),
@@ -1072,7 +1071,7 @@ def import_volunteers_csv(
                             token = secrets.token_urlsafe(32)
                             expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
                             db.execute(
-                                "UPDATE users SET invite_token = ?, invite_expires_at = ? WHERE id = ?",
+                                "UPDATE users SET invite_token = %s, invite_expires_at = %s WHERE id = %s",
                                 (token, expires, user_id),
                             )
                             invite_links.append({"email": email, "link": _make_invite_link(token)})
@@ -1085,7 +1084,7 @@ def import_volunteers_csv(
                         "INSERT INTO org_volunteers "
                         "(org_id, volunteer_id, status, is_active, department, source, join_source, "
                         " channel_detail, governorate_snapshot, city_snapshot, joined_at) "
-                        "VALUES (?, ?, 'Active', ?, ?, 'existing_user', ?, ?, ?, ?, ?)",
+                        "VALUES (%s, %s, 'Active', %s, %s, 'existing_user', %s, %s, %s, %s, %s)",
                         (org_id, vol_id, _is_active("Active"), r["department"] or None,
                          r["join_source"], r["channel_detail"],
                          r["governorate_snap"], r["city_snap"], _now),
@@ -1096,25 +1095,25 @@ def import_volunteers_csv(
                     # Brand-new user — create without password, issue invite token
                     token   = secrets.token_urlsafe(32)
                     expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
-                    cur = db.execute(
+                    row = db.execute(
                         "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
-                        "VALUES (?, '', 'volunteer', ?, ?)",
+                        "VALUES (%s, '', 'volunteer', %s, %s) RETURNING id",
                         (email, token, expires),
-                    )
-                    user_id = cur.lastrowid
-                    cur = db.execute(
+                    ).fetchone()
+                    user_id = row["id"]
+                    row = db.execute(
                         "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                        "VALUES (?, ?, ?, ?, ?, ?, 'Pending')",
+                        "VALUES (%s, %s, %s, %s, %s, %s, 'Pending') RETURNING id",
                         (user_id, r["name"], email, r["phone"] or None, r["city"] or None,
                          json.dumps(r["skills"])),
-                    )
-                    vol_id = cur.lastrowid
+                    ).fetchone()
+                    vol_id = row["id"]
                     _now = _utcnow()
                     db.execute(
                         "INSERT INTO org_volunteers "
                         "(org_id, volunteer_id, status, is_active, department, source, join_source, "
                         " channel_detail, governorate_snapshot, city_snapshot, joined_at) "
-                        "VALUES (?, ?, 'Pending', ?, ?, 'invite', ?, ?, ?, ?, ?)",
+                        "VALUES (%s, %s, 'Pending', %s, %s, 'invite', %s, %s, %s, %s, %s)",
                         (org_id, vol_id, _is_active("Pending"), r["department"] or None,
                          r["join_source"], r["channel_detail"],
                          r["governorate_snap"], r["city_snap"], _now),
@@ -1150,7 +1149,7 @@ def remove_org_member(
 ):
     with get_db() as db:
         db.execute(
-            "DELETE FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+            "DELETE FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
             (org_id, vol_id),
         )
         return {"message": "Volunteer removed from organization"}
@@ -1179,50 +1178,50 @@ def add_volunteer_manually(
     _now = _utcnow()
 
     with get_db() as db:
-        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
-        user = dict_row(db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone())
+        user = dict_row(db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone())
 
         if user:
             volunteer = dict_row(db.execute(
-                "SELECT id FROM volunteers WHERE user_id = ?", (user["id"],)
+                "SELECT id FROM volunteers WHERE user_id = %s", (user["id"],)
             ).fetchone())
             if not volunteer:
-                cur = db.execute(
+                row = db.execute(
                     "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+                    "VALUES (%s, %s, %s, %s, %s, %s, 'Active') RETURNING id",
                     (user["id"], name, email, phone, city, body.skills),
-                )
-                volunteer_id = cur.lastrowid
+                ).fetchone()
+                volunteer_id = row["id"]
             else:
                 volunteer_id = volunteer["id"]
 
             existing = dict_row(db.execute(
-                "SELECT id FROM org_volunteers WHERE org_id = ? AND volunteer_id = ?",
+                "SELECT id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
                 (org_id, volunteer_id),
             ).fetchone())
             if existing:
                 raise HTTPException(409, "This volunteer is already a member of your organization")
         else:
-            cur = db.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, '', 'volunteer')",
+            row = db.execute(
+                "INSERT INTO users (email, password, role) VALUES (%s, '', 'volunteer') RETURNING id",
                 (email,),
-            )
-            user_id = cur.lastrowid
-            cur = db.execute(
+            ).fetchone()
+            user_id = row["id"]
+            row = db.execute(
                 "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, 'Active')",
+                "VALUES (%s, %s, %s, %s, %s, %s, 'Active') RETURNING id",
                 (user_id, name, email, phone, city, body.skills),
-            )
-            volunteer_id = cur.lastrowid
+            ).fetchone()
+            volunteer_id = row["id"]
 
         db.execute(
             "INSERT INTO org_volunteers "
             "(org_id, volunteer_id, status, is_active, join_source, source, "
             " city_snapshot, joined_at, added_by_admin_id, notes) "
-            "VALUES (?, ?, 'Active', 1, 'manual', 'manual', ?, ?, ?, ?)",
+            "VALUES (%s, %s, 'Active', 1, 'manual', 'manual', %s, %s, %s, %s)",
             (org_id, volunteer_id, city, _now, current_user["id"], body.notes),
         )
 

@@ -27,12 +27,12 @@ def rate_event(body: dict, current_user: dict = Depends(require_roles("volunteer
 
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id FROM volunteers WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
 
-        event = dict_row(db.execute("SELECT id, status, name FROM events WHERE id = ?", (event_id,)).fetchone())
+        event = dict_row(db.execute("SELECT id, status, name FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
 
@@ -43,7 +43,7 @@ def rate_event(body: dict, current_user: dict = Depends(require_roles("volunteer
         # Volunteer must have attended (have an approved application + activity record).
         attended = db.execute(
             "SELECT ea.id FROM event_applications ea "
-            "WHERE ea.event_id = ? AND ea.volunteer_id = ? AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
+            "WHERE ea.event_id = %s AND ea.volunteer_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
             (event_id, vol["id"]),
         ).fetchone()
         if not attended:
@@ -52,8 +52,8 @@ def rate_event(body: dict, current_user: dict = Depends(require_roles("volunteer
         # Upsert: one rating per volunteer per event.
         db.execute(
             "INSERT INTO event_ratings (event_id, volunteer_id, rating, feedback) "
-            "VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(event_id, volunteer_id) DO UPDATE SET rating = excluded.rating, feedback = excluded.feedback",
+            "VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT(event_id, volunteer_id) DO UPDATE SET rating = EXCLUDED.rating, feedback = EXCLUDED.feedback",
             (event_id, vol["id"], rating, feedback or None),
         )
         log_action(db, current_user["id"], current_user["role"], "rate_event",
@@ -69,33 +69,33 @@ def get_event_ratings(event_id: int, current_user: dict = Depends(require_roles(
     Returns: average rating, total count, individual feedback entries (anonymous).
     """
     with get_db() as db:
-        event = dict_row(db.execute("SELECT id, org_id, name FROM events WHERE id = ?", (event_id,)).fetchone())
+        event = dict_row(db.execute("SELECT id, org_id, name FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
 
         # Scope check.
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if not org or org["id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         summary = dict_row(db.execute(
-            "SELECT COUNT(*) as total_ratings, ROUND(AVG(rating), 2) as average_rating "
-            "FROM event_ratings WHERE event_id = ?",
+            "SELECT COUNT(*) as total_ratings, ROUND(AVG(rating)::numeric, 2) as average_rating "
+            "FROM event_ratings WHERE event_id = %s",
             (event_id,),
         ).fetchone())
 
         feedback_rows = dict_rows(db.execute(
             "SELECT rating, feedback, created_at FROM event_ratings "
-            "WHERE event_id = ? AND feedback IS NOT NULL AND feedback != '' "
+            "WHERE event_id = %s AND feedback IS NOT NULL AND feedback != '' "
             "ORDER BY created_at DESC",
             (event_id,),
         ).fetchall())

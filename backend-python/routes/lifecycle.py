@@ -134,19 +134,19 @@ def compute_volunteer_lifecycle(
 def compute_org_lifecycle(db, org_id: int) -> dict:
     """Aggregate pipeline lifecycle for an org admin."""
     pending_members = db.execute(
-        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = ? AND status = 'Pending'",
+        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'Pending'",
         (org_id,),
     ).fetchone()["c"]
     active_members = db.execute(
-        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = ? AND status = 'Active'",
+        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'Active'",
         (org_id,),
     ).fetchone()["c"]
     pending_acts = db.execute(
-        "SELECT COUNT(*) c FROM activities WHERE org_id = ? AND status = 'Pending'",
+        "SELECT COUNT(*) c FROM activities WHERE org_id = %s AND status = 'Pending'",
         (org_id,),
     ).fetchone()["c"]
     total_hours = db.execute(
-        "SELECT COALESCE(SUM(hours), 0) h FROM activities WHERE org_id = ? AND status = 'Approved'",
+        "SELECT COALESCE(SUM(hours), 0) h FROM activities WHERE org_id = %s AND status = 'Approved'",
         (org_id,),
     ).fetchone()["h"]
 
@@ -289,7 +289,7 @@ def compute_supervisor_lifecycle(volunteers_count: int, pending_activities_count
 def get_org_lifecycle(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
         org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -300,16 +300,16 @@ def get_org_lifecycle(current_user: dict = Depends(require_roles("org_admin"))):
 def get_supervisor_lifecycle(current_user: dict = Depends(require_roles("supervisor"))):
     with get_db() as db:
         sup = dict_row(db.execute(
-            "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+            "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not sup:
             raise HTTPException(404, "Supervisor not found")
         volunteers_count = db.execute(
-            "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = ? AND status = 'Active'",
+            "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'Active'",
             (sup["org_id"],),
         ).fetchone()["c"]
         pending_acts = db.execute(
-            "SELECT COUNT(*) c FROM activities WHERE org_id = ? AND status = 'Pending'",
+            "SELECT COUNT(*) c FROM activities WHERE org_id = %s AND status = 'Pending'",
             (sup["org_id"],),
         ).fetchone()["c"]
         return {"lifecycle": compute_supervisor_lifecycle(volunteers_count, pending_acts)}

@@ -16,7 +16,7 @@ def _get_approved_count(db, event_id: int) -> int:
     """Count active approved applications for capacity decisions. Always computed, never cached."""
     row = db.execute(
         "SELECT COUNT(*) as cnt FROM event_applications "
-        "WHERE event_id = ? AND status = 'Approved' AND cancelled_at IS NULL",
+        "WHERE event_id = %s AND status = 'Approved' AND cancelled_at IS NULL",
         (event_id,),
     ).fetchone()
     return row["cnt"] if row else 0
@@ -26,7 +26,7 @@ def _sync_current_volunteers(db, event_id: int) -> None:
     """Keep current_volunteers in sync with live approved count. No is_full flag."""
     approved = _get_approved_count(db, event_id)
     db.execute(
-        "UPDATE events SET current_volunteers = ? WHERE id = ?",
+        "UPDATE events SET current_volunteers = %s WHERE id = %s",
         (approved, event_id),
     )
 
@@ -38,7 +38,7 @@ def _auto_promote_next(db, event_id: int) -> None:
     Must run inside exclusive_db() to be atomic.
     """
     event = dict_row(db.execute(
-        "SELECT max_volunteers, acceptance_mode FROM events WHERE id = ?", (event_id,)
+        "SELECT max_volunteers, acceptance_mode FROM events WHERE id = %s", (event_id,)
     ).fetchone())
     if not event or event.get("acceptance_mode") != "auto":
         return
@@ -54,7 +54,7 @@ def _auto_promote_next(db, event_id: int) -> None:
         "FROM event_applications ea "
         "JOIN volunteers v ON v.id = ea.volunteer_id "
         "JOIN events e ON e.id = ea.event_id "
-        "WHERE ea.event_id = ? AND ea.status = 'Waitlisted' AND ea.cancelled_at IS NULL "
+        "WHERE ea.event_id = %s AND ea.status = 'Waitlisted' AND ea.cancelled_at IS NULL "
         "ORDER BY ea.applied_date ASC LIMIT 1",
         (event_id,),
     ).fetchone())
@@ -62,7 +62,7 @@ def _auto_promote_next(db, event_id: int) -> None:
         return
 
     db.execute(
-        "UPDATE event_applications SET status = 'Approved' WHERE id = ?",
+        "UPDATE event_applications SET status = 'Approved' WHERE id = %s",
         (next_app["id"],),
     )
     _sync_current_volunteers(db, event_id)
@@ -88,16 +88,16 @@ def _notify_org_slot_opened(db, event_id: int, org_id: int) -> None:
     """
     waitlist_count = db.execute(
         "SELECT COUNT(*) as cnt FROM event_applications "
-        "WHERE event_id = ? AND status = 'Waitlisted' AND cancelled_at IS NULL",
+        "WHERE event_id = %s AND status = 'Waitlisted' AND cancelled_at IS NULL",
         (event_id,),
     ).fetchone()
     count = waitlist_count["cnt"] if waitlist_count else 0
     if count == 0:
         return  # No one waiting — nothing to notify about.
 
-    event = dict_row(db.execute("SELECT name FROM events WHERE id = ?", (event_id,)).fetchone())
+    event = dict_row(db.execute("SELECT name FROM events WHERE id = %s", (event_id,)).fetchone())
     org_admin = dict_row(db.execute(
-        "SELECT admin_user_id FROM organizations WHERE id = ?", (org_id,)
+        "SELECT admin_user_id FROM organizations WHERE id = %s", (org_id,)
     ).fetchone())
     if org_admin and org_admin.get("admin_user_id"):
         create_notification(
@@ -116,7 +116,7 @@ def _notify_org_slot_opened(db, event_id: int, org_id: int) -> None:
 def list_applications(current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id FROM volunteers WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
@@ -128,7 +128,7 @@ def list_applications(current_user: dict = Depends(get_current_user)):
             "FROM event_applications ea "
             "JOIN events e ON ea.event_id = e.id "
             "JOIN organizations o ON ea.org_id = o.id "
-            "WHERE ea.volunteer_id = ? AND ea.cancelled_at IS NULL "
+            "WHERE ea.volunteer_id = %s AND ea.cancelled_at IS NULL "
             "ORDER BY ea.applied_date DESC",
             (vol["id"],),
         ).fetchall())
@@ -141,15 +141,15 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
     if not event_id:
         raise HTTPException(400, "event_id is required")
 
-    # exclusive_db() issues BEGIN IMMEDIATE — prevents concurrent over-capacity approvals.
+    # exclusive_db() issues a SERIALIZABLE transaction — prevents concurrent over-capacity approvals.
     with exclusive_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id FROM volunteers WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
 
-        event = dict_row(db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone())
+        event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
 
@@ -159,11 +159,11 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
 
         # Student-only eligibility check
         org = dict_row(db.execute(
-            "SELECT student_only FROM organizations WHERE id = ?", (event["org_id"],)
+            "SELECT student_only FROM organizations WHERE id = %s", (event["org_id"],)
         ).fetchone())
         if org and org.get("student_only"):
             volunteer = dict_row(db.execute(
-                "SELECT education_level FROM volunteers WHERE id = ?", (vol["id"],)
+                "SELECT education_level FROM volunteers WHERE id = %s", (vol["id"],)
             ).fetchone())
             if not volunteer or volunteer.get("education_level") != "University Student":
                 raise HTTPException(
@@ -174,7 +174,7 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
         # Prevent duplicate active applications
         existing = dict_row(db.execute(
             "SELECT id FROM event_applications "
-            "WHERE volunteer_id = ? AND event_id = ? AND cancelled_at IS NULL",
+            "WHERE volunteer_id = %s AND event_id = %s AND cancelled_at IS NULL",
             (vol["id"], event_id),
         ).fetchone())
         if existing:
@@ -189,18 +189,16 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
             is_full = capacity > 0 and approved_count >= capacity
 
             if is_full:
-                # Capacity reached: place on internal waitlist (not shown in UI as a feature)
-                cur = db.execute(
+                row = db.execute(
                     "INSERT INTO event_applications (volunteer_id, event_id, org_id, status) "
-                    "VALUES (?, ?, ?, 'Waitlisted')",
+                    "VALUES (%s, %s, %s, 'Waitlisted') RETURNING id",
                     (vol["id"], event_id, event["org_id"]),
-                )
-                app_id = cur.lastrowid
+                ).fetchone()
+                app_id = row["id"]
                 logger.info("[EVENT %d] Volunteer %d placed on waitlist (event full)", event_id, vol["id"])
                 log_action(db, current_user["id"], current_user["role"], "apply_event",
                            "event_application", app_id,
                            {"event_id": event_id, "volunteer_id": vol["id"], "mode": "auto", "status": "Waitlisted"})
-                # Inform the volunteer they are on the waitlist
                 create_notification(
                     db, current_user["id"], "application_pending",
                     "You're on the Waitlist",
@@ -210,12 +208,12 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                 return {"message": "Event is full — added to waitlist", "status": "Waitlisted", "auto_accepted": False}
 
             else:
-                cur = db.execute(
+                row = db.execute(
                     "INSERT INTO event_applications (volunteer_id, event_id, org_id, status) "
-                    "VALUES (?, ?, ?, 'Approved')",
+                    "VALUES (%s, %s, %s, 'Approved') RETURNING id",
                     (vol["id"], event_id, event["org_id"]),
-                )
-                app_id = cur.lastrowid
+                ).fetchone()
+                app_id = row["id"]
                 _sync_current_volunteers(db, event_id)
                 logger.info("[EVENT %d] Volunteer %d applied and auto-approved", event_id, vol["id"])
                 log_action(db, current_user["id"], current_user["role"], "apply_event",
@@ -230,9 +228,9 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                 )
 
                 org_admin = dict_row(db.execute(
-                    "SELECT admin_user_id FROM organizations WHERE id = ?", (event["org_id"],)
+                    "SELECT admin_user_id FROM organizations WHERE id = %s", (event["org_id"],)
                 ).fetchone())
-                vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = ?", (vol["id"],)).fetchone())
+                vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = %s", (vol["id"],)).fetchone())
                 vol_name = (vol_info or {}).get("name", "A volunteer")
                 if org_admin and org_admin.get("admin_user_id"):
                     create_notification(
@@ -246,27 +244,25 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
 
         else:
             # Manual mode: check capacity to decide whether to queue as Pending or Waitlisted.
-            # Capacity is enforced at approval time (exclusive lock), but we track the queue
-            # explicitly so the org can see who is waiting and pick who to promote.
             approved_count = _get_approved_count(db, event_id)
             is_full = capacity > 0 and approved_count >= capacity
             initial_status = "Waitlisted" if is_full else "Pending"
 
-            cur = db.execute(
+            row = db.execute(
                 "INSERT INTO event_applications (volunteer_id, event_id, org_id, status) "
-                "VALUES (?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s) RETURNING id",
                 (vol["id"], event_id, event["org_id"], initial_status),
-            )
-            app_id = cur.lastrowid
+            ).fetchone()
+            app_id = row["id"]
             logger.info("[EVENT %d] Volunteer %d applied (manual mode, status=%s)", event_id, vol["id"], initial_status)
             log_action(db, current_user["id"], current_user["role"], "apply_event",
                        "event_application", app_id,
                        {"event_id": event_id, "volunteer_id": vol["id"], "mode": "manual", "status": initial_status})
 
-            vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = ?", (vol["id"],)).fetchone())
+            vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = %s", (vol["id"],)).fetchone())
             vol_name = (vol_info or {}).get("name", "A volunteer")
             org_admin = dict_row(db.execute(
-                "SELECT admin_user_id FROM organizations WHERE id = ?", (event["org_id"],)
+                "SELECT admin_user_id FROM organizations WHERE id = %s", (event["org_id"],)
             ).fetchone())
             if org_admin and org_admin.get("admin_user_id"):
                 if is_full:
@@ -299,7 +295,7 @@ def cancel_application(app_id: int, current_user: dict = Depends(require_roles("
     """
     with exclusive_db() as db:
         vol = dict_row(db.execute(
-            "SELECT id FROM volunteers WHERE user_id = ?", (current_user["id"],)
+            "SELECT id FROM volunteers WHERE user_id = %s", (current_user["id"],)
         ).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
@@ -308,7 +304,7 @@ def cancel_application(app_id: int, current_user: dict = Depends(require_roles("
             "SELECT ea.*, e.acceptance_mode, e.org_id as event_org_id, e.status as event_status "
             "FROM event_applications ea "
             "JOIN events e ON e.id = ea.event_id "
-            "WHERE ea.id = ? AND ea.cancelled_at IS NULL",
+            "WHERE ea.id = %s AND ea.cancelled_at IS NULL",
             (app_id,),
         ).fetchone())
         if not app:
@@ -324,7 +320,7 @@ def cancel_application(app_id: int, current_user: dict = Depends(require_roles("
         event_id = app["event_id"]
 
         db.execute(
-            "UPDATE event_applications SET cancelled_at = datetime('now') WHERE id = ?",
+            "UPDATE event_applications SET cancelled_at = NOW() WHERE id = %s",
             (app_id,),
         )
         logger.info("[EVENT %d] Volunteer %d cancelled application (was_approved=%s)", event_id, vol["id"], was_approved)
@@ -358,7 +354,7 @@ def list_org_applications(org_id: int, current_user: dict = Depends(require_role
             "FROM event_applications ea "
             "JOIN volunteers v ON ea.volunteer_id = v.id "
             "JOIN events e ON ea.event_id = e.id "
-            "WHERE ea.org_id = ? AND ea.cancelled_at IS NULL "
+            "WHERE ea.org_id = %s AND ea.cancelled_at IS NULL "
             "ORDER BY ea.applied_date DESC",
             (org_id,),
         ).fetchall())
@@ -374,7 +370,7 @@ def list_waitlist(event_id: int, current_user: dict = Depends(require_roles("org
     """
     with get_db() as db:
         event = dict_row(db.execute(
-            "SELECT id, org_id, name, acceptance_mode FROM events WHERE id = ?", (event_id,)
+            "SELECT id, org_id, name, acceptance_mode FROM events WHERE id = %s", (event_id,)
         ).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
@@ -382,13 +378,13 @@ def list_waitlist(event_id: int, current_user: dict = Depends(require_roles("org
         # Scope check.
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if not org or org["id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
@@ -398,7 +394,7 @@ def list_waitlist(event_id: int, current_user: dict = Depends(require_roles("org
             "v.name as volunteer_name, v.email as volunteer_email "
             "FROM event_applications ea "
             "JOIN volunteers v ON ea.volunteer_id = v.id "
-            "WHERE ea.event_id = ? AND ea.status = 'Waitlisted' AND ea.cancelled_at IS NULL "
+            "WHERE ea.event_id = %s AND ea.status = 'Waitlisted' AND ea.cancelled_at IS NULL "
             "ORDER BY ea.applied_date ASC",
             (event_id,),
         ).fetchall())
@@ -422,7 +418,7 @@ def approve_application(app_id: int, current_user: dict = Depends(require_roles(
             "FROM event_applications ea "
             "JOIN events e ON e.id = ea.event_id "
             "JOIN volunteers v ON v.id = ea.volunteer_id "
-            "WHERE ea.id = ? AND ea.cancelled_at IS NULL",
+            "WHERE ea.id = %s AND ea.cancelled_at IS NULL",
             (app_id,),
         ).fetchone())
         if not app:
@@ -441,7 +437,7 @@ def approve_application(app_id: int, current_user: dict = Depends(require_roles(
             if approved_count >= capacity:
                 raise HTTPException(409, "Event is at full capacity — cannot approve more volunteers")
 
-        db.execute("UPDATE event_applications SET status = 'Approved' WHERE id = ?", (app_id,))
+        db.execute("UPDATE event_applications SET status = 'Approved' WHERE id = %s", (app_id,))
         _sync_current_volunteers(db, app["event_id"])
         logger.info("[EVENT %d] Volunteer %d manually approved", app["event_id"], app["volunteer_id"])
         log_action(db, current_user["id"], current_user["role"], "approve_application",
@@ -477,7 +473,7 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
             "FROM event_applications ea "
             "JOIN events e ON e.id = ea.event_id "
             "JOIN volunteers v ON v.id = ea.volunteer_id "
-            "WHERE ea.id = ? AND ea.cancelled_at IS NULL",
+            "WHERE ea.id = %s AND ea.cancelled_at IS NULL",
             (app_id,),
         ).fetchone())
         if not app:
@@ -486,13 +482,13 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
         # Scope check.
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
-                "SELECT id, org_id FROM supervisors WHERE user_id = ?", (current_user["id"],)
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != app["event_org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
             org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = ?", (current_user["id"],)
+                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
             ).fetchone())
             if not org or org["id"] != app["event_org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
@@ -507,7 +503,7 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
         if app["event_status"] != "Upcoming":
             raise HTTPException(409, "Can only promote waitlisted volunteers for upcoming events")
 
-        db.execute("UPDATE event_applications SET status = 'Pending' WHERE id = ?", (app_id,))
+        db.execute("UPDATE event_applications SET status = 'Pending' WHERE id = %s", (app_id,))
         logger.info("[EVENT %d] Volunteer %d promoted from waitlist to Pending by %s",
                     app["event_id"], app["volunteer_id"], current_user["role"])
         log_action(db, current_user["id"], current_user["role"], "promote_waitlist",
@@ -534,7 +530,7 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
             "FROM event_applications ea "
             "JOIN events e ON e.id = ea.event_id "
             "JOIN volunteers v ON v.id = ea.volunteer_id "
-            "WHERE ea.id = ? AND ea.cancelled_at IS NULL",
+            "WHERE ea.id = %s AND ea.cancelled_at IS NULL",
             (app_id,),
         ).fetchone())
         if not app:
@@ -543,7 +539,7 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
             raise HTTPException(400, "Application is already rejected")
 
         was_approved = app["status"] == "Approved"
-        db.execute("UPDATE event_applications SET status = 'Rejected' WHERE id = ?", (app_id,))
+        db.execute("UPDATE event_applications SET status = 'Rejected' WHERE id = %s", (app_id,))
         log_action(db, current_user["id"], current_user["role"], "reject_application",
                    "event_application", app_id,
                    {"volunteer_id": app["volunteer_id"], "event_id": app["event_id"]})

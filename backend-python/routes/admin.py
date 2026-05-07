@@ -32,7 +32,7 @@ def list_organizations_for_review(
         )
         params: list = []
         if status:
-            query += " WHERE o.status = ?"
+            query += " WHERE o.status = %s"
             params.append(status)
         query += " ORDER BY o.created_at DESC"
         orgs = dict_rows(db.execute(query, params).fetchall())
@@ -44,7 +44,7 @@ def get_organization_detail(org_id: int, current_user: dict = Depends(require_pl
     with get_db() as db:
         org = dict_row(db.execute(
             "SELECT o.*, u.email as admin_email FROM organizations o "
-            "LEFT JOIN users u ON o.admin_user_id = u.id WHERE o.id = ?",
+            "LEFT JOIN users u ON o.admin_user_id = u.id WHERE o.id = %s",
             (org_id,),
         ).fetchone())
         if not org:
@@ -55,12 +55,12 @@ def get_organization_detail(org_id: int, current_user: dict = Depends(require_pl
 @router.put("/organizations/{org_id}/approve")
 def approve_organization(org_id: int, current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
-        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
-        org = dict_row(db.execute("SELECT name, admin_user_id FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT name, admin_user_id FROM organizations WHERE id = %s", (org_id,)).fetchone())
         db.execute(
-            "UPDATE organizations SET status = 'approved', rejection_reason = NULL, reviewed_at = datetime('now') WHERE id = ?",
+            "UPDATE organizations SET status = 'approved', rejection_reason = NULL, reviewed_at = NOW() WHERE id = %s",
             (org_id,),
         )
         if org:
@@ -83,12 +83,12 @@ def reject_organization(
 ):
     reason = (body or {}).get("reason", "")
     with get_db() as db:
-        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT id FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
-        org = dict_row(db.execute("SELECT name, admin_user_id FROM organizations WHERE id = ?", (org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT name, admin_user_id FROM organizations WHERE id = %s", (org_id,)).fetchone())
         db.execute(
-            "UPDATE organizations SET status = 'rejected', rejection_reason = ?, reviewed_at = datetime('now') WHERE id = ?",
+            "UPDATE organizations SET status = 'rejected', rejection_reason = %s, reviewed_at = NOW() WHERE id = %s",
             (reason, org_id),
         )
         if org:
@@ -169,7 +169,7 @@ def list_profile_changes(
         )
         params: list = []
         if status and status != "all":
-            query += " WHERE r.status = ?"
+            query += " WHERE r.status = %s"
             params.append(status)
         query += " ORDER BY r.created_at DESC"
         rows = dict_rows(db.execute(query, params).fetchall())
@@ -178,7 +178,7 @@ def list_profile_changes(
             field = row["field"]
             row["field_label"] = _FIELD_LABELS.get(field, field.replace("_", " ").title())
             org_row = dict_row(db.execute(
-                f"SELECT {field} FROM organizations WHERE id = ?", (row["org_id"],)
+                f"SELECT {field} FROM organizations WHERE id = %s", (row["org_id"],)
             ).fetchone()) if field in _SENSITIVE_COLUMNS else {}
             row["current_value"] = (org_row or {}).get(field)
         return {"changes": rows, "total": len(rows)}
@@ -189,7 +189,7 @@ def approve_profile_change(change_id: int, current_user: dict = Depends(require_
     """Approve a pending profile change — applies the new value to the organization."""
     with get_db() as db:
         change = dict_row(db.execute(
-            "SELECT * FROM org_profile_change_requests WHERE id = ?", (change_id,)
+            "SELECT * FROM org_profile_change_requests WHERE id = %s", (change_id,)
         ).fetchone())
         if not change:
             raise HTTPException(404, "Change request not found")
@@ -199,15 +199,15 @@ def approve_profile_change(change_id: int, current_user: dict = Depends(require_
         if field not in _SENSITIVE_COLUMNS:
             raise HTTPException(400, f"Field '{field}' is not a recognized sensitive field")
         db.execute(
-            f"UPDATE organizations SET {field} = ? WHERE id = ?",
+            f"UPDATE organizations SET {field} = %s WHERE id = %s",
             (change["new_value"], change["org_id"]),
         )
         db.execute(
-            "UPDATE org_profile_change_requests SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?",
+            "UPDATE org_profile_change_requests SET status = 'approved', reviewed_at = NOW() WHERE id = %s",
             (change_id,),
         )
         org = dict_row(db.execute(
-            "SELECT admin_user_id FROM organizations WHERE id = ?", (change["org_id"],)
+            "SELECT admin_user_id FROM organizations WHERE id = %s", (change["org_id"],)
         ).fetchone())
         if org:
             label = _FIELD_LABELS.get(field, field)
@@ -232,7 +232,7 @@ def reject_profile_change(
     reason = (body or {}).get("reason", "")
     with get_db() as db:
         change = dict_row(db.execute(
-            "SELECT * FROM org_profile_change_requests WHERE id = ?", (change_id,)
+            "SELECT * FROM org_profile_change_requests WHERE id = %s", (change_id,)
         ).fetchone())
         if not change:
             raise HTTPException(404, "Change request not found")
@@ -240,12 +240,12 @@ def reject_profile_change(
             raise HTTPException(400, f"Change request is already {change['status']}")
         db.execute(
             "UPDATE org_profile_change_requests "
-            "SET status = 'rejected', reviewed_at = datetime('now') WHERE id = ?",
+            "SET status = 'rejected', reviewed_at = NOW() WHERE id = %s",
             (change_id,),
         )
         field = change["field"]
         org = dict_row(db.execute(
-            "SELECT admin_user_id FROM organizations WHERE id = ?", (change["org_id"],)
+            "SELECT admin_user_id FROM organizations WHERE id = %s", (change["org_id"],)
         ).fetchone())
         org_admin_user_id = (org or {}).get("admin_user_id")
         print("REJECTION TRIGGER FIRED", change_id, org_admin_user_id)
@@ -284,10 +284,10 @@ def list_all_volunteers(
         )
         conditions, params = [], []
         if status:
-            conditions.append("v.status = ?")
+            conditions.append("v.status = %s")
             params.append(status)
         if search:
-            conditions.append("(v.name LIKE ? OR v.email LIKE ?)")
+            conditions.append("(v.name ILIKE %s OR v.email ILIKE %s)")
             params.extend([f"%{search}%", f"%{search}%"])
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
@@ -306,10 +306,10 @@ def update_volunteer_status(
     if new_status not in ("Active", "Pending", "Suspended"):
         raise HTTPException(400, "Status must be Active, Pending, or Suspended")
     with get_db() as db:
-        vol = dict_row(db.execute("SELECT id FROM volunteers WHERE id = ?", (volunteer_id,)).fetchone())
+        vol = dict_row(db.execute("SELECT id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
         if not vol:
             raise HTTPException(404, "Volunteer not found")
-        db.execute("UPDATE volunteers SET status = ? WHERE id = ?", (new_status, volunteer_id))
+        db.execute("UPDATE volunteers SET status = %s WHERE id = %s", (new_status, volunteer_id))
         return {"message": f"Volunteer status set to {new_status}"}
 
 
@@ -329,15 +329,15 @@ def list_platform_admins(current_user: dict = Depends(require_platform_admin)):
 @router.post("/platform-admins", status_code=201)
 def add_platform_admin(body: AddAdminBody, current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
-        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
+        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = %s", (body.email,)).fetchone())
         if not user:
             raise HTTPException(404, f"No user found with email '{body.email}'")
         existing = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = ?", (user["id"],)
+            "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
         ).fetchone()
         if existing:
             raise HTTPException(409, "User is already a platform admin")
-        db.execute("INSERT INTO platform_admins (user_id) VALUES (?)", (user["id"],))
+        db.execute("INSERT INTO platform_admins (user_id) VALUES (%s)", (user["id"],))
         return {"message": f"{body.email} is now a platform admin"}
 
 
@@ -346,10 +346,10 @@ def remove_platform_admin(user_id: int, current_user: dict = Depends(require_pla
     if current_user["id"] == user_id:
         raise HTTPException(400, "You cannot remove yourself as platform admin")
     with get_db() as db:
-        row = db.execute("SELECT user_id FROM platform_admins WHERE user_id = ?", (user_id,)).fetchone()
+        row = db.execute("SELECT user_id FROM platform_admins WHERE user_id = %s", (user_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Platform admin not found")
-        db.execute("DELETE FROM platform_admins WHERE user_id = ?", (user_id,))
+        db.execute("DELETE FROM platform_admins WHERE user_id = %s", (user_id,))
         return {"message": "Platform admin removed"}
 
 
@@ -368,7 +368,7 @@ def list_org_admins(
         )
         params: list = []
         if org_id:
-            query += " WHERE oa.org_id = ?"
+            query += " WHERE oa.org_id = %s"
             params.append(org_id)
         query += " ORDER BY o.name ASC, oa.created_at ASC"
         rows = dict_rows(db.execute(query, params).fetchall())
@@ -378,26 +378,26 @@ def list_org_admins(
 @router.post("/org-admins", status_code=201)
 def add_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
-        org = dict_row(db.execute("SELECT id, name FROM organizations WHERE id = ?", (body.org_id,)).fetchone())
+        org = dict_row(db.execute("SELECT id, name FROM organizations WHERE id = %s", (body.org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
-        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = ?", (body.email,)).fetchone())
+        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = %s", (body.email,)).fetchone())
         if not user:
             raise HTTPException(404, f"No user found with email '{body.email}'")
         existing = db.execute(
-            "SELECT id FROM org_admins WHERE user_id = ? AND org_id = ?", (user["id"], body.org_id)
+            "SELECT id FROM org_admins WHERE user_id = %s AND org_id = %s", (user["id"], body.org_id)
         ).fetchone()
         if existing:
             raise HTTPException(409, "User is already an organization admin for this organization")
-        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (?, ?)", (user["id"], body.org_id))
+        db.execute("INSERT INTO org_admins (user_id, org_id) VALUES (%s, %s)", (user["id"], body.org_id))
         return {"message": f"{body.email} is now an organization admin for {org['name']}"}
 
 
 @router.delete("/org-admins/{admin_id}")
 def remove_org_admin(admin_id: int, current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
-        row = db.execute("SELECT id FROM org_admins WHERE id = ?", (admin_id,)).fetchone()
+        row = db.execute("SELECT id FROM org_admins WHERE id = %s", (admin_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Organization admin not found")
-        db.execute("DELETE FROM org_admins WHERE id = ?", (admin_id,))
+        db.execute("DELETE FROM org_admins WHERE id = %s", (admin_id,))
         return {"message": "Organization admin removed"}
