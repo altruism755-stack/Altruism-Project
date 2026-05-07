@@ -1,5 +1,6 @@
 import os
 import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request
@@ -7,9 +8,12 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from database import init_schema
+from database import init_schema, open_pool, close_pool
 from routes.auth_routes import router as auth_router
 from routes.volunteers import router as volunteers_router
 from routes.supervisors import router as supervisors_router
@@ -27,7 +31,22 @@ from routes.audit import router as audit_router
 from routes.event_ratings import router as event_ratings_router
 
 API_VERSION = "1.0.0"
-app = FastAPI(title="Altruism API", version=API_VERSION, redirect_slashes=False)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    open_pool()
+    init_schema()
+    _seed_platform_admin()
+    yield
+    close_pool()
+
+
+app = FastAPI(title="Altruism API", version=API_VERSION, redirect_slashes=False, lifespan=lifespan)
+
+_limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = _limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS — comma-separated list of allowed origins
 cors_origins = [
@@ -100,13 +119,6 @@ def health():
         "version": API_VERSION,
         "timestamp": datetime.now().isoformat(),
     }
-
-
-# Init DB schema on startup
-@app.on_event("startup")
-def startup():
-    init_schema()
-    _seed_platform_admin()
 
 
 def _seed_platform_admin():

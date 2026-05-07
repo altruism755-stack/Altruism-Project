@@ -124,7 +124,7 @@ def _build_volunteer_response(db, vol: dict) -> dict:
         "SELECT a.*, e.name as event_name, o.name as org_name FROM activities a "
         "LEFT JOIN events e ON a.event_id = e.id "
         "LEFT JOIN organizations o ON a.org_id = o.id "
-        "WHERE a.volunteer_id = %s ORDER BY a.date DESC",
+        "WHERE a.volunteer_id = %s ORDER BY a.date DESC LIMIT 50",
         (vol["id"],),
     ).fetchall())
 
@@ -201,7 +201,7 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         cause_areas = body.get("cause_areas")
         if cause_areas is not None:
             n = len(cause_areas)
-            if 1 <= n <= 4:
+            if n != 0 and n != 5:
                 raise HTTPException(422, "Please select exactly 5 interests, or leave it empty.")
         university_name = body.get("university_name")
         faculty = body.get("faculty")

@@ -58,7 +58,6 @@ def rate_event(body: dict, current_user: dict = Depends(require_roles("volunteer
         )
         log_action(db, current_user["id"], current_user["role"], "rate_event",
                    "event", event_id, {"rating": rating, "volunteer_id": vol["id"]})
-        db.commit()
         return {"message": "Rating submitted", "rating": rating}
 
 

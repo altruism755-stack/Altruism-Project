@@ -717,55 +717,78 @@ def export_volunteers_full(
 def list_organizations():
     with get_db() as db:
         orgs = dict_rows(db.execute(
-            "SELECT id, name, description, category, color, secondary_color, initials, founded, "
-            "founded_year, location, org_type, logo_url, website, student_only "
-            "FROM organizations WHERE status = 'approved' OR status IS NULL"
+            """
+            SELECT o.id, o.name, o.description, o.category, o.color, o.secondary_color,
+                   o.initials, o.founded, o.founded_year, o.location, o.org_type,
+                   o.logo_url, o.website, o.student_only,
+                   COUNT(CASE WHEN ov.status = 'Active'  THEN 1 END) AS total_volunteers,
+                   COUNT(CASE WHEN ov.status = 'Pending' THEN 1 END) AS pending_requests,
+                   COUNT(CASE WHEN e.status IN ('Active','Upcoming') THEN 1 END) AS active_activities
+            FROM organizations o
+            LEFT JOIN org_volunteers ov ON ov.org_id = o.id
+            LEFT JOIN events e ON e.org_id = o.id
+            WHERE o.status = 'approved'
+            GROUP BY o.id
+            """
         ).fetchall())
-
-        for org in orgs:
-            oid = org["id"]
-            org["total_volunteers"] = db.execute(
-                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s AND status = 'Active'", (oid,)
-            ).fetchone()["c"]
-            org["pending_requests"] = db.execute(
-                "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s AND status = 'Pending'", (oid,)
-            ).fetchone()["c"]
-            org["active_activities"] = db.execute(
-                "SELECT COUNT(*) as c FROM events WHERE org_id = %s AND status IN ('Active', 'Upcoming')", (oid,)
-            ).fetchone()["c"]
-
         return {"organizations": orgs}
 
 
 @router.get("/{org_id}")
-def get_organization(org_id: int):
+def get_organization(org_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         org = dict_row(db.execute("SELECT * FROM organizations WHERE id = %s", (org_id,)).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
 
-        volunteers = dict_rows(db.execute(
-            "SELECT v.id, v.name, v.email, v.phone, v.status, ov.department, ov.joined_date "
-            "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id WHERE ov.org_id = %s",
-            (org["id"],),
-        ).fetchall())
+        role = current_user["role"]
+
+        # Public-safe volunteer projection for non-admins; full data for admins.
+        if role in ("org_admin", "supervisor"):
+            vol_query = (
+                "SELECT v.id, v.name, v.email, v.phone, v.status, ov.department, ov.joined_date "
+                "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
+                "WHERE ov.org_id = %s LIMIT 200"
+            )
+        else:
+            vol_query = (
+                "SELECT v.id, v.name, v.status, ov.department, ov.joined_date "
+                "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
+                "WHERE ov.org_id = %s AND ov.status = 'Active' LIMIT 200"
+            )
+
+        volunteers = dict_rows(db.execute(vol_query, (org["id"],)).fetchall())
 
         supervisors = dict_rows(db.execute(
-            "SELECT * FROM supervisors WHERE org_id = %s", (org["id"],)
+            "SELECT id, name, team FROM supervisors WHERE org_id = %s", (org["id"],)
         ).fetchall())
 
         events = dict_rows(db.execute(
-            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC", (org["id"],)
+            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC LIMIT 100", (org["id"],)
         ).fetchall())
 
         return {**org, "volunteers": volunteers, "supervisors": supervisors, "events": events}
 
 
 @router.get("/{org_id}/members")
-def get_org_members(org_id: int, current_user: dict = Depends(get_current_user)):
+def get_org_members(org_id: int, current_user: dict = Depends(require_roles("org_admin", "supervisor"))):
+    """Full member list — restricted to org admins and supervisors of that org."""
     with get_db() as db:
+        # Scope: org_admin must own the org; supervisor must belong to it.
+        role = current_user["role"]
+        if role == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup or sup["org_id"] != org_id:
+                raise HTTPException(403, "You do not have permission to access this resource")
+        else:
+            _assert_org_access(db, org_id, current_user["id"])
+
         volunteers = dict_rows(db.execute(
-            "SELECT v.*, ov.department, ov.status as org_status, ov.joined_date, "
+            "SELECT v.id, v.name, v.email, v.phone, v.city, v.skills, v.status, "
+            "v.gender, v.education_level, v.cause_areas, "
+            "ov.department, ov.status as org_status, ov.joined_date, "
             "ov.join_source, ov.supervisor_id, s.name as supervisor_name "
             "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
             "LEFT JOIN supervisors s ON ov.supervisor_id = s.id WHERE ov.org_id = %s",
@@ -839,6 +862,7 @@ def approve_org_member(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
+        _assert_org_access(db, org_id, current_user["id"])
         vol = dict_row(db.execute(
             "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
             "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = %s", (vol_id,)
@@ -866,7 +890,6 @@ def approve_org_member(
                 f"You have been accepted as a volunteer at {org_name}. You can now log activities!",
                 f"/dashboard/org/{org_id}",
             )
-        db.commit()
         return {"message": "Volunteer approved"}
 
 
@@ -877,7 +900,7 @@ def reject_org_member(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
-        # Get volunteer user_id before deleting
+        _assert_org_access(db, org_id, current_user["id"])
         vol = dict_row(db.execute(
             "SELECT v.user_id FROM volunteers v WHERE v.id = %s", (vol_id,)
         ).fetchone())
@@ -898,7 +921,6 @@ def reject_org_member(
                 f"Your request to join {org_name} was not accepted at this time.",
                 "/dashboard/orgs",
             )
-        db.commit()
         return {"message": "Request rejected"}
 
 
@@ -1148,6 +1170,7 @@ def remove_org_member(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
+        _assert_org_access(db, org_id, current_user["id"])
         db.execute(
             "DELETE FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
             (org_id, vol_id),
@@ -1176,6 +1199,7 @@ def add_volunteer_manually(
         raise HTTPException(422, "City is required")
 
     _now = _utcnow()
+    new_invite_token: str | None = None
 
     with get_db() as db:
         org = dict_row(db.execute("SELECT id FROM organizations WHERE id = %s", (org_id,)).fetchone())
@@ -1205,9 +1229,14 @@ def add_volunteer_manually(
             if existing:
                 raise HTTPException(409, "This volunteer is already a member of your organization")
         else:
+            import secrets
+            from datetime import timedelta
+            new_invite_token = secrets.token_urlsafe(32)
+            invite_expires_at = _utcnow() + timedelta(days=7)
             row = db.execute(
-                "INSERT INTO users (email, password, role) VALUES (%s, '', 'volunteer') RETURNING id",
-                (email,),
+                "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
+                "VALUES (%s, '', 'volunteer', %s, %s) RETURNING id",
+                (email, new_invite_token, invite_expires_at),
             ).fetchone()
             user_id = row["id"]
             row = db.execute(
@@ -1225,4 +1254,7 @@ def add_volunteer_manually(
             (org_id, volunteer_id, city, _now, current_user["id"], body.notes),
         )
 
-        return {"message": "Volunteer added successfully (Manual)", "volunteer_id": volunteer_id}
+        response: dict = {"message": "Volunteer added successfully (Manual)", "volunteer_id": volunteer_id}
+        if new_invite_token:
+            response["invite_token"] = new_invite_token
+        return response

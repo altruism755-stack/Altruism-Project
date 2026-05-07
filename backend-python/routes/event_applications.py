@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 import logging
 
 from database import get_db, exclusive_db, dict_row, dict_rows
@@ -346,7 +346,12 @@ def cancel_application(app_id: int, current_user: dict = Depends(require_roles("
 # "org" or "event" into an integer and 422 before reaching the correct handler.
 
 @router.get("/org/{org_id}")
-def list_org_applications(org_id: int, current_user: dict = Depends(require_roles("org_admin"))):
+def list_org_applications(
+    org_id: int,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict = Depends(require_roles("org_admin")),
+):
     with get_db() as db:
         apps = dict_rows(db.execute(
             "SELECT ea.*, v.name as volunteer_name, v.email as volunteer_email, "
@@ -355,10 +360,10 @@ def list_org_applications(org_id: int, current_user: dict = Depends(require_role
             "JOIN volunteers v ON ea.volunteer_id = v.id "
             "JOIN events e ON ea.event_id = e.id "
             "WHERE ea.org_id = %s AND ea.cancelled_at IS NULL "
-            "ORDER BY ea.applied_date DESC",
-            (org_id,),
+            "ORDER BY ea.applied_date DESC LIMIT %s OFFSET %s",
+            (org_id, limit, offset),
         ).fetchall())
-        return {"applications": apps}
+        return {"applications": apps, "limit": limit, "offset": offset}
 
 
 @router.get("/event/{event_id}/waitlist")
@@ -526,7 +531,8 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
 def reject_application(app_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with exclusive_db() as db:
         app = dict_row(db.execute(
-            "SELECT ea.volunteer_id, ea.event_id, ea.status, e.name as event_name, v.user_id "
+            "SELECT ea.volunteer_id, ea.event_id, ea.status, e.name as event_name, "
+            "e.acceptance_mode, e.org_id as event_org_id, v.user_id "
             "FROM event_applications ea "
             "JOIN events e ON e.id = ea.event_id "
             "JOIN volunteers v ON v.id = ea.volunteer_id "
@@ -544,9 +550,13 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
                    "event_application", app_id,
                    {"volunteer_id": app["volunteer_id"], "event_id": app["event_id"]})
 
-        # If an Approved application is rejected, free the spot.
+        # If an Approved application is rejected, free the spot and fill it.
         if was_approved:
             _sync_current_volunteers(db, app["event_id"])
+            if app.get("acceptance_mode") == "auto":
+                _auto_promote_next(db, app["event_id"])
+            else:
+                _notify_org_slot_opened(db, app["event_id"], app["event_org_id"])
 
         if app.get("user_id"):
             create_notification(

@@ -24,6 +24,8 @@ _VALID_TRANSITIONS = {
 def list_events(
     status: Optional[str] = None,
     org_id: Optional[int] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(get_current_user),
 ):
     with get_db() as db:
@@ -65,8 +67,9 @@ def list_events(
             query += " AND e.org_id = %s"
             params.append(org_id)
 
-        query += " ORDER BY e.date DESC"
-        return {"events": dict_rows(db.execute(query, params).fetchall())}
+        query += " ORDER BY e.date DESC LIMIT %s OFFSET %s"
+        params += [limit, offset]
+        return {"events": dict_rows(db.execute(query, params).fetchall()), "limit": limit, "offset": offset}
 
 
 @router.get("/{event_id}")
@@ -294,87 +297,103 @@ def bulk_mark_attendance(
             hours = None
             act_status = "Completed"
 
-        created_ids: list[int] = []
-        updated_ids: list[int] = []
-        skipped_count = 0
+        # Resolve the eligible volunteer IDs in one query:
+        # volunteers who have an Approved application, are Active org members,
+        # and (if supervisor) are assigned to this supervisor.
+        if supervisor_id:
+            eligible_rows = db.execute(
+                """
+                SELECT ea.volunteer_id, v.user_id
+                FROM event_applications ea
+                JOIN org_volunteers ov
+                    ON ov.volunteer_id = ea.volunteer_id
+                    AND ov.org_id = %s
+                    AND ov.status = 'Active'
+                    AND ov.supervisor_id = %s
+                JOIN volunteers v ON v.id = ea.volunteer_id
+                WHERE ea.event_id = %s
+                  AND ea.status = 'Approved'
+                  AND ea.cancelled_at IS NULL
+                  AND ea.volunteer_id = ANY(%s)
+                """,
+                (caller_org_id, supervisor_id, event_id, list(volunteer_ids)),
+            ).fetchall()
+        else:
+            eligible_rows = db.execute(
+                """
+                SELECT ea.volunteer_id, v.user_id
+                FROM event_applications ea
+                JOIN org_volunteers ov
+                    ON ov.volunteer_id = ea.volunteer_id
+                    AND ov.org_id = %s
+                    AND ov.status = 'Active'
+                JOIN volunteers v ON v.id = ea.volunteer_id
+                WHERE ea.event_id = %s
+                  AND ea.status = 'Approved'
+                  AND ea.cancelled_at IS NULL
+                  AND ea.volunteer_id = ANY(%s)
+                """,
+                (caller_org_id, event_id, list(volunteer_ids)),
+            ).fetchall()
 
-        for vol_id in volunteer_ids:
-            # Only mark attendance for volunteers with an Approved application for this event.
-            approved_app = db.execute(
-                "SELECT id FROM event_applications "
-                "WHERE event_id = %s AND volunteer_id = %s AND status = 'Approved' AND cancelled_at IS NULL",
-                (event_id, vol_id),
-            ).fetchone()
-            if not approved_app:
-                skipped_count += 1
-                continue
+        eligible_map = {r["volunteer_id"]: r["user_id"] for r in eligible_rows}
+        skipped_count = len(volunteer_ids) - len(eligible_map)
 
-            # Verify volunteer is an active org member.
-            membership = db.execute(
-                "SELECT id FROM org_volunteers "
-                "WHERE org_id = %s AND volunteer_id = %s AND status = 'Active'",
-                (caller_org_id, vol_id),
-            ).fetchone()
-            if not membership:
-                skipped_count += 1
-                continue
+        upsert_results = []
+        if eligible_map:
+            # Single INSERT … ON CONFLICT DO UPDATE — atomic, no race on the unique index.
+            rows = db.execute(
+                """
+                INSERT INTO activities
+                    (volunteer_id, event_id, org_id, date, hours, description, status)
+                SELECT
+                    v, %s, %s, %s, %s, %s, %s
+                FROM unnest(%s::int[]) AS v
+                WHERE v = ANY(%s::int[])
+                ON CONFLICT (volunteer_id, event_id) WHERE event_id IS NOT NULL
+                DO UPDATE SET
+                    date        = EXCLUDED.date,
+                    hours       = EXCLUDED.hours,
+                    description = EXCLUDED.description,
+                    status      = EXCLUDED.status,
+                    reviewed_by = NULL,
+                    reviewed_at = NULL
+                RETURNING id, (xmax::text <> '0') AS was_updated
+                """,
+                (
+                    event_id, caller_org_id, date, hours, description, act_status,
+                    list(eligible_map.keys()),
+                    list(eligible_map.keys()),
+                ),
+            ).fetchall()
+            upsert_results = rows
 
-            # Supervisors may only mark attendance for their assigned volunteers.
-            if supervisor_id:
-                assignment = db.execute(
-                    "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
-                    (vol_id, supervisor_id),
-                ).fetchone()
-                if not assignment:
-                    skipped_count += 1
-                    continue
+        created_count = sum(1 for r in upsert_results if not r["was_updated"])
+        updated_count = sum(1 for r in upsert_results if r["was_updated"])
 
-            # Upsert: update existing record if present, otherwise insert.
-            existing = db.execute(
-                "SELECT id FROM activities WHERE volunteer_id = %s AND event_id = %s",
-                (vol_id, event_id),
-            ).fetchone()
-
-            if existing:
-                db.execute(
-                    "UPDATE activities SET date = %s, hours = %s, description = %s, status = %s, "
-                    "reviewed_by = NULL, reviewed_at = NULL WHERE id = %s",
-                    (date, hours, description, act_status, existing["id"]),
-                )
-                updated_ids.append(existing["id"])
-            else:
-                row = db.execute(
-                    "INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                    (vol_id, event_id, caller_org_id, date, hours, description, act_status),
-                ).fetchone()
-                created_ids.append(row["id"])
-
-            # Notify volunteer of attendance record.
-            vol_user = db.execute(
-                "SELECT user_id FROM volunteers WHERE id = %s", (vol_id,)
-            ).fetchone()
-            if vol_user and vol_user["user_id"]:
+        # Notify each eligible volunteer.
+        event_name = event["name"]
+        for vol_id, user_id in eligible_map.items():
+            if user_id:
                 if tracks_hours:
-                    msg = f"Your attendance at '{event['name']}' was recorded ({hours} hrs)."
+                    msg = f"Your attendance at '{event_name}' was recorded ({hours} hrs)."
                 else:
-                    msg = f"Your participation in '{event['name']}' has been recorded."
+                    msg = f"Your participation in '{event_name}' has been recorded."
                 create_notification(
-                    db, vol_user["user_id"], "activity_submitted",
+                    db, user_id, "activity_submitted",
                     "Attendance Recorded", msg, "/dashboard/profile",
                 )
 
         logger.info(
             "[EVENT %d] Attendance recorded — created=%d updated=%d skipped=%d",
-            event_id, len(created_ids), len(updated_ids), skipped_count,
+            event_id, created_count, updated_count, skipped_count,
         )
         log_action(db, current_user["id"], current_user["role"], "bulk_attendance",
                    "event", event_id,
-                   {"created": len(created_ids), "updated": len(updated_ids), "skipped": skipped_count,
+                   {"created": created_count, "updated": updated_count, "skipped": skipped_count,
                     "volunteer_ids": volunteer_ids})
-        db.commit()
         return {
-            "created": len(created_ids),
-            "updated": len(updated_ids),
+            "created": created_count,
+            "updated": updated_count,
             "skipped": skipped_count,
         }

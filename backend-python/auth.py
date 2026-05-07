@@ -6,7 +6,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
-JWT_SECRET = os.getenv("JWT_SECRET", "altruism-secret-key-change-in-production")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable must be set")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 7
 
@@ -77,14 +79,24 @@ def require_platform_admin(current_user: dict = Depends(get_current_user)) -> di
 
 
 def require_approved_org_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """Org admin whose organization has been approved by the platform."""
+    """Org admin whose organization has been approved by the platform.
+    Accepts admins registered either via organizations.admin_user_id or org_admins table.
+    """
     if current_user["role"] != "org_admin":
         raise HTTPException(status_code=403, detail="Org admin access required")
     from database import get_db
     with get_db() as db:
         row = db.execute(
-            "SELECT status FROM organizations WHERE admin_user_id = %s",
-            (current_user["id"],),
+            """
+            SELECT o.status FROM organizations o
+            WHERE o.admin_user_id = %s
+            UNION
+            SELECT o.status FROM organizations o
+            JOIN org_admins oa ON oa.org_id = o.id
+            WHERE oa.user_id = %s
+            LIMIT 1
+            """,
+            (current_user["id"], current_user["id"]),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Organization not found")

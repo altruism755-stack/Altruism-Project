@@ -14,10 +14,14 @@ Connection configuration is driven entirely by environment variables — no hard
 
 import os
 import sys
+import time
 from contextlib import contextmanager
 
 import psycopg
+import psycopg.errors
 from psycopg.rows import dict_row as _psycopg_dict_row
+from psycopg_pool import ConnectionPool
+from fastapi import HTTPException
 
 # ── DSN / connection string ───────────────────────────────────────────────────
 # Prefer DATABASE_URL (standard Heroku/Railway/Render style).
@@ -36,17 +40,51 @@ if not _DATABASE_URL:
 
 print(f"[db] Connecting to PostgreSQL at {_DATABASE_URL.split('@')[-1]}", file=sys.stderr)
 
+# ── Connection pool ───────────────────────────────────────────────────────────
+_pool: ConnectionPool | None = None
+
+
+def open_pool() -> None:
+    """Open the connection pool. Called once at application startup."""
+    global _pool
+    _pool = ConnectionPool(
+        _DATABASE_URL,
+        min_size=2,
+        max_size=10,
+        kwargs={"row_factory": _psycopg_dict_row},
+        open=True,
+    )
+    print("[db] Connection pool opened (min=2, max=10)", file=sys.stderr)
+
+
+def close_pool() -> None:
+    """Close the connection pool. Called at application shutdown."""
+    global _pool
+    if _pool:
+        _pool.close()
+        _pool = None
+
 
 # ── Connection factory ────────────────────────────────────────────────────────
 
 def get_connection() -> psycopg.Connection:
     """
-    Open a new psycopg connection with dict_row as the default row factory.
-    Autocommit is OFF — callers are responsible for commit/rollback.
+    Borrow a connection from the pool (or open a raw connection during init_schema
+    before the pool is available). Autocommit is OFF.
     Use get_db() or exclusive_db() context managers in application code.
     """
-    conn = psycopg.connect(_DATABASE_URL, row_factory=_psycopg_dict_row)
-    return conn
+    if _pool is not None:
+        # Returns a connection from the pool; caller must close() to return it.
+        return _pool.getconn()
+    return psycopg.connect(_DATABASE_URL, row_factory=_psycopg_dict_row)
+
+
+def _return_connection(conn: psycopg.Connection) -> None:
+    """Return a connection to the pool, or close it if the pool is not running."""
+    if _pool is not None:
+        _pool.putconn(conn)
+    else:
+        conn.close()
 
 
 @contextmanager
@@ -64,33 +102,39 @@ def get_db():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        _return_connection(conn)
 
 
 @contextmanager
 def exclusive_db():
     """
-    Serializable transaction — replaces BEGIN IMMEDIATE from SQLite.
+    Serializable transaction context manager with automatic retry on
+    psycopg.errors.SerializationFailure (up to 3 attempts, exponential back-off).
 
     PostgreSQL SERIALIZABLE is stronger than SQLite BEGIN IMMEDIATE:
-    - Detects and aborts conflicting concurrent transactions (serialization failure)
-    - Callers must be prepared to retry on psycopg.errors.SerializationFailure
+    - Detects and aborts conflicting concurrent transactions
     - Used for capacity-enforcement paths: apply_to_event, approve_application,
-      cancel_application, promote_waitlisted.
-
-    The application currently handles each of these in a single request so the
-    retry burden is low; add retry logic here if contention becomes measurable.
+      cancel_application, promote_waitlisted, reject_application.
     """
-    conn = get_connection()
-    try:
-        conn.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    max_retries = 3
+    for attempt in range(max_retries):
+        conn = get_connection()
+        try:
+            conn.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+            yield conn
+            conn.commit()
+            _return_connection(conn)
+            return
+        except psycopg.errors.SerializationFailure:
+            conn.rollback()
+            _return_connection(conn)
+            if attempt == max_retries - 1:
+                raise HTTPException(503, "Server busy, please try again")
+            time.sleep(0.05 * (2 ** attempt))
+        except Exception:
+            conn.rollback()
+            _return_connection(conn)
+            raise
 
 
 # ── Row helpers ───────────────────────────────────────────────────────────────

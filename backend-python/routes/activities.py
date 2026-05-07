@@ -17,6 +17,8 @@ def list_activities(
     volunteer_id: Optional[int] = None,
     status: Optional[str] = None,
     supervisor_id: Optional[int] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(get_current_user),
 ):
     with get_db() as db:
@@ -70,10 +72,10 @@ def list_activities(
             query += " " + " ".join(join_parts)
         if where_clauses:
             query += " WHERE " + " AND ".join(where_clauses)
-        query += " ORDER BY a.date DESC"
+        query += " ORDER BY a.date DESC LIMIT %s OFFSET %s"
 
-        params = join_params + where_params
-        return {"activities": dict_rows(db.execute(query, params).fetchall())}
+        params = join_params + where_params + [limit, offset]
+        return {"activities": dict_rows(db.execute(query, params).fetchall()), "limit": limit, "offset": offset}
 
 
 def _resolve_caller_org_id(db, current_user: dict) -> int:
@@ -152,8 +154,11 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
         if not event_row:
             raise HTTPException(404, "Event not found")
         if event_row.get("date"):
-            today_utc = datetime.datetime.utcnow().date().isoformat()
-            if event_row["date"] > today_utc:
+            today_utc = datetime.datetime.utcnow().date()
+            event_date = event_row["date"]
+            if not isinstance(event_date, datetime.date):
+                event_date = datetime.date.fromisoformat(str(event_date))
+            if event_date > today_utc:
                 raise HTTPException(400, "Attendance can only be recorded after the event date")
 
         # Fetch org settings.
@@ -230,7 +235,6 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
                 "/dashboard/profile",
             )
 
-        db.commit()
         return activity
 
 
@@ -298,7 +302,6 @@ def approve_activity(
                 notif_msg,
                 "/dashboard/profile",
             )
-        db.commit()
         return {"message": "Activity approved"}
 
 
@@ -366,5 +369,4 @@ def reject_activity(
                 notif_msg,
                 "/dashboard/profile",
             )
-        db.commit()
         return {"message": "Activity rejected"}

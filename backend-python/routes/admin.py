@@ -109,26 +109,21 @@ def reject_organization(
 @router.get("/stats")
 def platform_stats(current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
-        counts = {
-            "total_organizations": db.execute("SELECT COUNT(*) c FROM organizations").fetchone()["c"],
-            "pending_organizations": db.execute(
-                "SELECT COUNT(*) c FROM organizations WHERE status = 'pending'"
-            ).fetchone()["c"],
-            "approved_organizations": db.execute(
-                "SELECT COUNT(*) c FROM organizations WHERE status = 'approved'"
-            ).fetchone()["c"],
-            "rejected_organizations": db.execute(
-                "SELECT COUNT(*) c FROM organizations WHERE status = 'rejected'"
-            ).fetchone()["c"],
-            "total_volunteers": db.execute("SELECT COUNT(*) c FROM volunteers").fetchone()["c"],
-            "total_supervisors": db.execute("SELECT COUNT(*) c FROM supervisors").fetchone()["c"],
-            "total_users": db.execute("SELECT COUNT(*) c FROM users").fetchone()["c"],
-            "total_platform_admins": db.execute("SELECT COUNT(*) c FROM platform_admins").fetchone()["c"],
-            "pending_profile_changes": db.execute(
-                "SELECT COUNT(*) c FROM org_profile_change_requests WHERE status = 'pending'"
-            ).fetchone()["c"],
-        }
-        return counts
+        row = db.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM organizations)                                        AS total_organizations,
+                (SELECT COUNT(*) FROM organizations WHERE status = 'pending')               AS pending_organizations,
+                (SELECT COUNT(*) FROM organizations WHERE status = 'approved')              AS approved_organizations,
+                (SELECT COUNT(*) FROM organizations WHERE status = 'rejected')              AS rejected_organizations,
+                (SELECT COUNT(*) FROM volunteers)                                           AS total_volunteers,
+                (SELECT COUNT(*) FROM supervisors)                                          AS total_supervisors,
+                (SELECT COUNT(*) FROM users)                                                AS total_users,
+                (SELECT COUNT(*) FROM platform_admins)                                     AS total_platform_admins,
+                (SELECT COUNT(*) FROM org_profile_change_requests WHERE status = 'pending') AS pending_profile_changes
+            """
+        ).fetchone()
+        return dict(row)
 
 
 # ── Organization profile change requests ───────────────────────────────────
@@ -248,7 +243,6 @@ def reject_profile_change(
             "SELECT admin_user_id FROM organizations WHERE id = %s", (change["org_id"],)
         ).fetchone())
         org_admin_user_id = (org or {}).get("admin_user_id")
-        print("REJECTION TRIGGER FIRED", change_id, org_admin_user_id)
         if not org_admin_user_id:
             raise Exception(f"Missing org admin user_id for notification (org_id={change['org_id']})")
         label = _FIELD_LABELS.get(field, field)

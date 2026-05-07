@@ -67,40 +67,35 @@ def report_summary(current_user: dict = Depends(require_roles("org_admin"))):
             raise HTTPException(404, "Organization not found")
 
         oid = org["id"]
-        total_volunteers = db.execute(
-            "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s", (oid,)
-        ).fetchone()["c"]
-        active_volunteers = db.execute(
-            "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s AND status = 'Active'", (oid,)
-        ).fetchone()["c"]
-        total_hours = db.execute(
-            "SELECT COALESCE(SUM(hours), 0) as h FROM activities WHERE org_id = %s AND status = 'Approved'", (oid,)
-        ).fetchone()["h"]
-        pending_activities = db.execute(
-            "SELECT COUNT(*) as c FROM activities WHERE org_id = %s AND status = 'Pending'", (oid,)
-        ).fetchone()["c"]
-        pending_members = db.execute(
-            "SELECT COUNT(*) as c FROM org_volunteers WHERE org_id = %s AND status = 'Pending'", (oid,)
-        ).fetchone()["c"]
-        completed_events = db.execute(
-            "SELECT COUNT(*) as c FROM events WHERE org_id = %s AND status = 'Completed'", (oid,)
-        ).fetchone()["c"]
-        total_events = db.execute(
-            "SELECT COUNT(*) as c FROM events WHERE org_id = %s", (oid,)
-        ).fetchone()["c"]
-        active_events = db.execute(
-            "SELECT COUNT(*) as c FROM events WHERE org_id = %s AND status IN ('Active','Upcoming')", (oid,)
-        ).fetchone()["c"]
+        row = db.execute(
+            """
+            SELECT
+                COUNT(ov.id)                                                          AS total_volunteers,
+                COUNT(ov.id) FILTER (WHERE ov.status = 'Active')                     AS active_volunteers,
+                COUNT(ov.id) FILTER (WHERE ov.status = 'Pending')                    AS pending_members,
+                COALESCE(SUM(a.hours) FILTER (WHERE a.status = 'Approved'), 0)       AS total_hours,
+                COUNT(a.id)  FILTER (WHERE a.status = 'Pending')                     AS pending_activities,
+                COUNT(e.id)                                                           AS total_events,
+                COUNT(e.id)  FILTER (WHERE e.status = 'Completed')                   AS completed_events,
+                COUNT(e.id)  FILTER (WHERE e.status IN ('Active','Upcoming'))        AS active_events
+            FROM organizations o
+            LEFT JOIN org_volunteers ov ON ov.org_id = o.id
+            LEFT JOIN activities a ON a.org_id = o.id
+            LEFT JOIN events e ON e.org_id = o.id
+            WHERE o.id = %s
+            """,
+            (oid,),
+        ).fetchone()
 
         return {
-            "totalVolunteers": total_volunteers,
-            "activeVolunteers": active_volunteers,
-            "totalHours": total_hours,
-            "pendingActivities": pending_activities,
-            "pendingMembers": pending_members,
-            "completedEvents": completed_events,
-            "totalEvents": total_events,
-            "activeEvents": active_events,
+            "totalVolunteers": row["total_volunteers"],
+            "activeVolunteers": row["active_volunteers"],
+            "totalHours": float(row["total_hours"]),
+            "pendingActivities": row["pending_activities"],
+            "pendingMembers": row["pending_members"],
+            "completedEvents": row["completed_events"],
+            "totalEvents": row["total_events"],
+            "activeEvents": row["active_events"],
         }
 
 

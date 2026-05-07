@@ -138,7 +138,6 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
                    "certificate", row["id"],
                    {"volunteer_id": volunteer_id, "org_id": org["id"], "title": certificate_title,
                     "event_id": body.get("event_id")})
-        db.commit()
         return cert
 
 
@@ -195,7 +194,6 @@ async def upload_certificate_file(
         log_action(db, current_user["id"], current_user["role"], "upload_certificate",
                    "certificate", cert_id,
                    {"volunteer_id": cert["volunteer_id"], "org_id": cert["org_id"], "file_url": file_url})
-        db.commit()
         return {"file_url": file_url}
 
 

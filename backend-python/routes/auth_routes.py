@@ -3,14 +3,17 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from database import get_db, dict_row
 from auth import hash_password, verify_password, generate_token, get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+_limiter = Limiter(key_func=get_remote_address)
 
 
 class RegisterBody(BaseModel):
@@ -74,7 +77,8 @@ class AcceptInviteBody(BaseModel):
 
 
 @router.post("/register", status_code=201)
-def register(body: RegisterBody):
+@_limiter.limit("20/minute")
+def register(request: Request, body: RegisterBody):
     if not body.email or not body.password or not body.role:
         raise HTTPException(400, "Email, password, and role are required")
 
@@ -88,7 +92,7 @@ def register(body: RegisterBody):
         if body.role == "volunteer":
             if body.causeAreas is not None:
                 n = len(body.causeAreas)
-                if 1 <= n <= 4:
+                if n != 0 and n != 5:
                     raise HTTPException(422, "Please select exactly 5 interests, or leave it empty.")
 
             row = db.execute(
@@ -198,7 +202,8 @@ def register(body: RegisterBody):
 
 
 @router.post("/login")
-def login(body: LoginBody):
+@_limiter.limit("10/minute")
+def login(request: Request, body: LoginBody):
     if not body.email or not body.password:
         raise HTTPException(400, "Email and password are required")
 
