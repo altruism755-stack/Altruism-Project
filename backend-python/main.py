@@ -24,6 +24,7 @@ from routes.admin import router as admin_router
 from routes.notifications import router as notifications_router
 from routes.lifecycle import router as lifecycle_router
 from routes.audit import router as audit_router
+from routes.event_ratings import router as event_ratings_router
 
 API_VERSION = "1.0.0"
 app = FastAPI(title="Altruism API", version=API_VERSION, redirect_slashes=False)
@@ -78,6 +79,7 @@ app.include_router(admin_router)
 app.include_router(notifications_router)
 app.include_router(lifecycle_router)
 app.include_router(audit_router)
+app.include_router(event_ratings_router)
 
 # Serve uploaded profile pictures
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads", "profiles")

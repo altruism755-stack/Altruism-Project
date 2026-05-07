@@ -559,20 +559,39 @@ def init_schema():
         conn.execute("ALTER TABLE events ADD COLUMN acceptance_mode TEXT DEFAULT 'manual'")
     except Exception:
         pass
-    # is_full: set to 1 when approved_count reaches max_volunteers, blocks new applications
-    try:
-        conn.execute("ALTER TABLE events ADD COLUMN is_full INTEGER DEFAULT 0")
-    except Exception:
-        pass
     # cancelled_at: timestamp when a volunteer withdraws their application
     try:
         conn.execute("ALTER TABLE event_applications ADD COLUMN cancelled_at TEXT")
     except Exception:
         pass
-    # Index for quickly finding the next pending waitlisted applicant (auto-promote on cancel)
+
+    # Expand event_applications.status to include 'Waitlisted' for auto-accept events at capacity.
+    # SQLite CHECK constraints cannot be altered, so we use rename-recreate when the old schema
+    # does not include Waitlisted.
+    _ea_schema = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='event_applications'"
+    ).fetchone()
+    if _ea_schema and "Waitlisted" not in (_ea_schema[0] or ""):
+        conn.execute("ALTER TABLE event_applications RENAME TO event_applications_pre_waitlist")
+        conn.execute("""
+            CREATE TABLE event_applications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                volunteer_id INTEGER REFERENCES volunteers(id),
+                event_id INTEGER REFERENCES events(id),
+                org_id INTEGER REFERENCES organizations(id),
+                status TEXT DEFAULT 'Pending'
+                    CHECK(status IN ('Pending','Approved','Rejected','Waitlisted')),
+                applied_date TEXT DEFAULT (datetime('now')),
+                cancelled_at TEXT
+            )
+        """)
+        conn.execute("INSERT INTO event_applications SELECT * FROM event_applications_pre_waitlist")
+        conn.execute("DROP TABLE event_applications_pre_waitlist")
+
+    # Index for quickly finding the next waitlisted applicant for FIFO promotion.
     try:
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_event_applications_event_pending "
+            "CREATE INDEX IF NOT EXISTS idx_event_applications_event_waitlist "
             "ON event_applications(event_id, status, applied_date)"
         )
     except Exception:
@@ -612,6 +631,26 @@ def init_schema():
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_logs_entity "
             "ON audit_logs(entity_type, entity_id, created_at DESC)"
+        )
+    except Exception:
+        pass
+
+    # ── Event ratings — volunteers rate a completed event (1–5 stars) ─────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS event_ratings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id INTEGER NOT NULL REFERENCES events(id),
+            volunteer_id INTEGER NOT NULL REFERENCES volunteers(id),
+            rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+            feedback TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(event_id, volunteer_id)
+        )
+    """)
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_ratings_event_id "
+            "ON event_ratings(event_id)"
         )
     except Exception:
         pass
