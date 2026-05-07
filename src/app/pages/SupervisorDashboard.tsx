@@ -46,6 +46,12 @@ export function SupervisorDashboard() {
   const [logBusy, setLogBusy] = useState(false);
   const [logError, setLogError] = useState("");
 
+  // Create activity panel state
+  const emptyActivityForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming", acceptanceMode: "manual" as "manual" | "auto" };
+  const [showCreateActivity, setShowCreateActivity] = useState(false);
+  const [activityForm, setActivityForm] = useState(emptyActivityForm);
+  const [activitySaving, setActivitySaving] = useState(false);
+
   const tracksHours = org?.tracks_hours !== 0;
 
   const loadAll = useCallback(async () => {
@@ -142,6 +148,30 @@ export function SupervisorDashboard() {
       await api.rejectActivity(id);
       setActivities((a) => a.filter((act) => act.id !== id));
     } catch (e) { console.error("Reject activity failed:", e); }
+  };
+
+  const handleCreateActivity = async () => {
+    setActivitySaving(true);
+    const data = {
+      name: activityForm.name,
+      description: activityForm.description,
+      location: activityForm.location,
+      date: activityForm.date,
+      time: activityForm.time,
+      duration: Number(activityForm.duration) || undefined,
+      max_volunteers: Number(activityForm.maxVolunteers) || undefined,
+      required_skills: activityForm.requiredSkills,
+      status: activityForm.status,
+      acceptance_mode: activityForm.acceptanceMode,
+      org_id: org?.id,
+    };
+    try {
+      await api.createEvent(data);
+      setShowCreateActivity(false);
+      setActivityForm(emptyActivityForm);
+      loadAll();
+    } catch (e) { console.error("Failed to create activity:", e); }
+    finally { setActivitySaving(false); }
   };
 
   const handleLogActivity = async () => {
@@ -579,8 +609,16 @@ export function SupervisorDashboard() {
             {/* Events tab */}
             {tab === "events" && (
               <div>
-                <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
-                  Events for <strong>{org?.name}</strong>. Volunteers who attend should log their hours after each event.
+                <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, color: "#64748B" }}>
+                    Events for <strong>{org?.name}</strong>. Volunteers who attend should log their hours after each event.
+                  </div>
+                  <button
+                    onClick={() => { setActivityForm(emptyActivityForm); setShowCreateActivity(true); }}
+                    style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    + New Activity
+                  </button>
                 </div>
                 {events.length === 0 ? (
                   <EmptyState label="No events found for your organization." />
@@ -753,6 +791,98 @@ export function SupervisorDashboard() {
           </div>
         </div>
       )}
+
+      {/* Create Activity side panel */}
+      {showCreateActivity && (() => {
+        const inputStyle = { width: "100%", height: 42, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" as const };
+        const labelStyle = { fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 };
+        return (
+          <>
+            <div onClick={() => setShowCreateActivity(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.3)", zIndex: 50 }} />
+            <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 500, backgroundColor: "#fff", zIndex: 51, boxShadow: "-8px 0 32px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column" }}>
+              <div className="flex items-center justify-between px-6" style={{ height: 64, borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", margin: 0 }}>New Activity</h3>
+                <button onClick={() => setShowCreateActivity(false)} style={{ background: "none", border: "none", fontSize: 22, color: "#94A3B8", cursor: "pointer" }}>×</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto" style={{ padding: 24 }}>
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label style={labelStyle}>Activity Name *</label>
+                    <input value={activityForm.name} onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Youth Leadership Workshop" style={inputStyle} />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Description</label>
+                    <textarea value={activityForm.description} onChange={(e) => setActivityForm((f) => ({ ...f, description: e.target.value }))} placeholder="What will volunteers be doing?" style={{ ...inputStyle, height: 90, padding: "10px 12px", resize: "vertical" as const }} />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Location</label>
+                    <input value={activityForm.location} onChange={(e) => setActivityForm((f) => ({ ...f, location: e.target.value }))} placeholder="e.g. Cairo Community Center" style={inputStyle} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label style={labelStyle}>Date *</label>
+                      <input type="date" value={activityForm.date} onChange={(e) => setActivityForm((f) => ({ ...f, date: e.target.value }))} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Time</label>
+                      <input type="time" value={activityForm.time} onChange={(e) => setActivityForm((f) => ({ ...f, time: e.target.value }))} style={inputStyle} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label style={labelStyle}>Duration (hours)</label>
+                      <input type="number" min="0" step="0.5" value={activityForm.duration} onChange={(e) => setActivityForm((f) => ({ ...f, duration: e.target.value }))} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Max Volunteers</label>
+                      <input type="number" min="0" value={activityForm.maxVolunteers} onChange={(e) => setActivityForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={inputStyle} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Required Skills</label>
+                    <input value={activityForm.requiredSkills} onChange={(e) => setActivityForm((f) => ({ ...f, requiredSkills: e.target.value }))} placeholder="e.g. Communication, Fieldwork (comma separated)" style={inputStyle} />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Status</label>
+                    <select value={activityForm.status} onChange={(e) => setActivityForm((f) => ({ ...f, status: e.target.value }))} style={inputStyle}>
+                      <option value="Upcoming">Upcoming</option>
+                      <option value="Active">Ongoing</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Acceptance Mode</label>
+                    <select value={activityForm.acceptanceMode} onChange={(e) => setActivityForm((f) => ({ ...f, acceptanceMode: e.target.value as "manual" | "auto" }))} style={inputStyle}>
+                      <option value="manual">✋ Manual Approval — you review each application</option>
+                      <option value="auto">⚡ Auto Accept — first come, first served</option>
+                    </select>
+                    <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, marginBottom: 0 }}>
+                      {activityForm.acceptanceMode === "auto"
+                        ? "Volunteers are accepted instantly up to the capacity limit."
+                        : "You manually approve or reject each application."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid #E2E8F0", flexShrink: 0 }}>
+                <button onClick={() => setShowCreateActivity(false)} style={{ flex: 1, height: 42, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                <button onClick={handleCreateActivity} disabled={activitySaving || !activityForm.name || !activityForm.date} style={{ flex: 1, height: 42, backgroundColor: activitySaving || !activityForm.name || !activityForm.date ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: activitySaving ? "not-allowed" : "pointer" }}>
+                  {activitySaving ? "Saving…" : "Create Activity"}
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Log Activity modal */}
       {showLogActivity && (

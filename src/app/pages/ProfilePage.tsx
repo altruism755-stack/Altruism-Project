@@ -543,15 +543,6 @@ export function ProfilePage() {
                   cta: "Browse Organizations", href: "/dashboard/orgs",
                 });
               }
-              if (pendingOrgs.length > 0) {
-                actions.push({
-                  priority: "urgent", icon: "⏳",
-                  title: "Awaiting Membership Approval",
-                  desc: `${pendingOrgs.length} organization${pendingOrgs.length > 1 ? "s" : ""} (${pendingOrgs.map((o: any) => o.name).join(", ")}) will confirm your request shortly.`,
-                  cta: "View Applications", href: "/dashboard/orgs",
-                  badge: pendingOrgs.length,
-                });
-              }
 if (actions.length === 0) return null;
               return <WorkflowPanel actions={actions} style={{ marginBottom: 20 }} />;
             })()}

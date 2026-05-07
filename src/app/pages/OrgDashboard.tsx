@@ -25,10 +25,11 @@ const actStatus: Record<string, { bg: string; band: string; text: string; label:
 };
 
 // ─── Volunteers tab ───────────────────────────────────────────────────────────
-function VolunteersTab({ orgId, members, supervisors, onRefresh }: {
-  orgId: number; members: any[]; supervisors: any[]; onRefresh: () => void;
+function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
+  orgId: number; members: any[]; supervisors: any[]; onRefresh: () => void; defaultSub?: "pending" | "active" | "rejected";
 }) {
-  const [sub, setSub] = useState<"pending" | "active" | "rejected">("pending");
+  const [sub, setSub] = useState<"pending" | "active" | "rejected">(defaultSub ?? "pending");
+  useEffect(() => { if (defaultSub) setSub(defaultSub); }, [defaultSub]);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [approveTarget, setApproveTarget] = useState<any | null>(null);
@@ -1228,6 +1229,7 @@ export function OrgDashboard() {
   const [orgLifecycle, setOrgLifecycle]   = useState<BackendLifecycle | null>(null);
   const [loading, setLoading]     = useState(true);
   const [tab, setTab]             = useState<MainTab>("volunteers");
+  const [volunteerSub, setVolunteerSub] = useState<"pending" | "active" | "rejected">("pending");
   const [showAddManually, setShowAddManually] = useState(false);
 
   const loadAll = useCallback(async () => {
@@ -1263,22 +1265,20 @@ export function OrgDashboard() {
     {
       label: "Active Volunteers", value: active.length,
       gradient: "linear-gradient(135deg,#16A34A,#22C55E)",
-      sub: "View list →", tab: "volunteers" as MainTab,
+      sub: "View list →",
+      onClick: () => { setVolunteerSub("active"); setTab("volunteers"); },
     },
     {
       label: "Pending Requests", value: pending.length,
       gradient: pending.length > 0 ? "linear-gradient(135deg,#D97706,#F59E0B)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)",
-      sub: pending.length > 0 ? "Review now →" : "All caught up", tab: "volunteers" as MainTab,
+      sub: pending.length > 0 ? "Review now →" : "All caught up",
+      onClick: () => { setVolunteerSub("pending"); setTab("volunteers"); },
     },
     {
       label: "Activity Reviews", value: pendingActivityCount,
       gradient: pendingActivityCount > 0 ? "linear-gradient(135deg,#7C3AED,#8B5CF6)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)",
-      sub: pendingActivityCount > 0 ? "Approve hours →" : "No pending hours", tab: "volunteers" as MainTab,
-    },
-    {
-      label: "Hours Logged", value: stats?.totalHours ?? 0,
-      gradient: "linear-gradient(135deg,#0891B2,#06B6D4)",
-      sub: `${active.length} volunteers · ${activeEv.length} events`, tab: null,
+      sub: pendingActivityCount > 0 ? "Approve hours →" : "No pending hours",
+      onClick: () => setTab("activities"),
     },
   ];
 
@@ -1383,18 +1383,18 @@ export function OrgDashboard() {
           />
         )}
         {/* Stats row */}
-        <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 28 }}>
+        <div className="grid grid-cols-3 gap-4" style={{ marginBottom: 28 }}>
           {statCards.map((s) => (
             <div
               key={s.label}
-              onClick={() => s.tab && setTab(s.tab)}
+              onClick={s.onClick}
               style={{
                 background: s.gradient, borderRadius: 12, padding: "18px 22px", height: 110,
                 display: "flex", flexDirection: "column", justifyContent: "space-between",
-                cursor: s.tab ? "pointer" : "default",
+                cursor: "pointer",
                 transition: "transform 140ms, box-shadow 140ms",
               }}
-              onMouseEnter={(e) => { if (s.tab) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.13)"; }}}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.13)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
             >
               <div style={{ fontSize: 34, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{s.value}</div>
@@ -1431,7 +1431,7 @@ export function OrgDashboard() {
           {/* Tab body */}
           <div style={{ padding: 24 }}>
             {tab === "volunteers" && (
-              <VolunteersTab orgId={orgId} members={members} supervisors={supervisors} onRefresh={loadAll} />
+              <VolunteersTab orgId={orgId} members={members} supervisors={supervisors} onRefresh={loadAll} defaultSub={volunteerSub} />
             )}
             {tab === "supervisors" && (
               <SupervisorsTab supervisors={supervisors} onRefresh={loadAll} />
