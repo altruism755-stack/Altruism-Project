@@ -4,7 +4,7 @@ import datetime
 import logging
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles
+from auth import get_current_user, require_roles, get_org_for_admin
 from routes.notifications import create_notification
 from routes.audit import log_action
 
@@ -42,12 +42,9 @@ def list_activities(
             where_clauses.append("a.org_id = %s")
             where_params.append(sup["org_id"])
         elif role == "org_admin":
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if org:
-                where_clauses.append("a.org_id = %s")
-                where_params.append(org["id"])
+            org = get_org_for_admin(db, current_user["id"])
+            where_clauses.append("a.org_id = %s")
+            where_params.append(org["id"])
 
         if volunteer_id:
             where_clauses.append("a.volunteer_id = %s")
@@ -87,13 +84,8 @@ def _resolve_caller_org_id(db, current_user: dict) -> int:
         if not sup:
             raise HTTPException(403, "Supervisor profile not found")
         return sup["org_id"]
-    # org_admin
-    org = dict_row(db.execute(
-        "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-    ).fetchone())
-    if not org:
-        raise HTTPException(403, "Organization not found for this admin")
-    return org["id"]
+    # org_admin — check both admin_user_id and org_admins table
+    return get_org_for_admin(db, current_user["id"])["id"]
 
 
 @router.post("", status_code=201)

@@ -4,7 +4,7 @@ import datetime
 import logging
 
 from database import get_db, exclusive_db, dict_row, dict_rows
-from auth import get_current_user, require_roles
+from auth import get_current_user, require_roles, get_org_for_admin
 from routes.notifications import create_notification
 from routes.audit import log_action
 
@@ -43,11 +43,7 @@ def list_events(
                 raise HTTPException(403, FORBIDDEN)
             org_id = caller_org
         elif role == "org_admin":
-            org = db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone()
-            if not org:
-                raise HTTPException(403, FORBIDDEN)
+            org = get_org_for_admin(db, current_user["id"])
             caller_org = org["id"]
             if org_id and org_id != caller_org:
                 raise HTTPException(403, FORBIDDEN)
@@ -103,10 +99,8 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
                 (sup_id, event_id),
             ).fetchall())
         elif role == "org_admin":
-            org = db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone()
-            if not org or org["id"] != event["org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
             # Org admin sees all approved participants with attendance status.
             participants = dict_rows(db.execute(
@@ -128,11 +122,7 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
 @router.post("", status_code=201)
 def create_event(body: dict, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
 
         name = body.get("name")
         date = body.get("date")
@@ -162,11 +152,7 @@ def create_event(body: dict, current_user: dict = Depends(require_roles("org_adm
 @router.put("/{event_id}")
 def update_event(event_id: int, body: dict, current_user: dict = Depends(require_roles("org_admin"))):
     with exclusive_db() as db:
-        org = db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone()
-        if not org:
-            raise HTTPException(403, FORBIDDEN)
+        org = get_org_for_admin(db, current_user["id"])
         event = dict_row(db.execute("SELECT org_id, status FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event or event["org_id"] != org["id"]:
             raise HTTPException(403, FORBIDDEN)
@@ -212,11 +198,7 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
 @router.delete("/{event_id}")
 def delete_event(event_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone()
-        if not org:
-            raise HTTPException(403, FORBIDDEN)
+        org = get_org_for_admin(db, current_user["id"])
         event = db.execute("SELECT org_id, status FROM events WHERE id = %s", (event_id,)).fetchone()
         if not event or event["org_id"] != org["id"]:
             raise HTTPException(403, FORBIDDEN)
@@ -264,10 +246,8 @@ def bulk_mark_attendance(
             supervisor_id = sup["id"]
             caller_org_id = sup["org_id"]
         else:
-            org = db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone()
-            if not org or org["id"] != event["org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
             caller_org_id = org["id"]
 

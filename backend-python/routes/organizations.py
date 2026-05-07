@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from typing import Any, Optional
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles, require_approved_org_admin
+from auth import get_current_user, require_roles, require_approved_org_admin, get_org_for_admin
 from routes.notifications import create_notification
 
 # Base URL for invite links — set APP_BASE_URL in env for production.
@@ -215,12 +215,7 @@ router = APIRouter(prefix="/api/organizations", tags=["organizations"])
 # the literal string "me" to an integer and fail with a 422. ─────────────────
 
 def _get_my_org_id(db, user_id: int) -> int:
-    org = dict_row(db.execute(
-        "SELECT id FROM organizations WHERE admin_user_id = %s", (user_id,)
-    ).fetchone())
-    if not org:
-        raise HTTPException(404, "Organization not found for this user")
-    return org["id"]
+    return get_org_for_admin(db, user_id)["id"]
 
 
 # ── Organization profile (self-service) ──────────────────────────────────────
@@ -276,11 +271,8 @@ def update_my_profile(
     payload = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
 
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT * FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
+        org = dict_row(db.execute("SELECT * FROM organizations WHERE id = %s", (org["id"],)).fetchone())
 
         if not payload:
             org_now = _decode_org_json(dict(org))

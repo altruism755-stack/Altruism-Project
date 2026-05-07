@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 import logging
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles
+from auth import get_current_user, require_roles, get_org_for_admin
 from routes.audit import log_action
 
 router = APIRouter(prefix="/api/event-ratings", tags=["event_ratings"])
@@ -80,10 +80,8 @@ def get_event_ratings(event_id: int, current_user: dict = Depends(require_roles(
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if not org or org["id"] != event["org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         summary = dict_row(db.execute(

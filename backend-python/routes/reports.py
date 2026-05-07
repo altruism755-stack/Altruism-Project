@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse, Response
 from typing import Optional
 
 from database import get_db, dict_row, dict_rows
-from auth import require_roles
+from auth import require_roles, get_org_for_admin
 
 
 def _to_csv(rows) -> str:
@@ -60,11 +60,7 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 @router.get("/summary")
 def report_summary(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
 
         oid = org["id"]
         row = db.execute(
@@ -106,11 +102,7 @@ def volunteer_hours(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
 
         oid = org["id"]
         query = (
@@ -143,11 +135,7 @@ def volunteer_hours(
 @router.get("/export-csv")
 def export_csv(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
 
         oid = org["id"]
         rows = dict_rows(db.execute(
@@ -174,13 +162,19 @@ def export_csv(current_user: dict = Depends(require_roles("org_admin"))):
 @router.get("/star-schema")
 def export_star_schema(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id, name FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
 
         oid = org["id"]
+
+        row_count = db.execute(
+            "SELECT COUNT(*) AS c FROM activities WHERE org_id = %s", (oid,)
+        ).fetchone()["c"]
+        if row_count > 100_000:
+            raise HTTPException(
+                413,
+                "Export too large (>100,000 activity rows). Contact support for a bulk extract.",
+            )
+
         slug = re.sub(r"[^a-z0-9]+", "_", org["name"].lower())[:30].strip("_")
 
         buf = io.BytesIO()
@@ -281,15 +275,15 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     e.name,
                     COALESCE(e.location, '')                                         AS location,
                     e.date                                                           AS event_date,
-                    EXTRACT(YEAR FROM e.date::date)::int                             AS event_year,
+                    EXTRACT(YEAR FROM e.date)::int                             AS event_year,
                     CASE
-                        WHEN EXTRACT(MONTH FROM e.date::date) <= 3  THEN 1
-                        WHEN EXTRACT(MONTH FROM e.date::date) <= 6  THEN 2
-                        WHEN EXTRACT(MONTH FROM e.date::date) <= 9  THEN 3
+                        WHEN EXTRACT(MONTH FROM e.date) <= 3  THEN 1
+                        WHEN EXTRACT(MONTH FROM e.date) <= 6  THEN 2
+                        WHEN EXTRACT(MONTH FROM e.date) <= 9  THEN 3
                         ELSE 4
                     END                                                              AS event_quarter,
-                    EXTRACT(MONTH FROM e.date::date)::int                            AS event_month,
-                    TO_CHAR(e.date::date, 'Day')                                     AS day_of_week,
+                    EXTRACT(MONTH FROM e.date)::int                            AS event_month,
+                    TO_CHAR(e.date, 'Day')                                     AS day_of_week,
                     COALESCE(e.time, '')                                             AS start_time,
                     COALESCE(e.duration, 0)                                          AS planned_duration_hours,
                     COALESCE(e.max_volunteers, 0)                                    AS max_volunteers,

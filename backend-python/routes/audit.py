@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Optional
 
@@ -30,7 +29,7 @@ def log_action(
                 action,
                 entity_type,
                 entity_id,
-                json.dumps(metadata, default=str) if metadata else None,
+                metadata,  # psycopg3 serialises dict → JSONB natively
             ),
         )
     except Exception as exc:
@@ -47,11 +46,43 @@ def list_audit_logs(
     actor_id: Optional[int] = None,
     action: Optional[str] = None,
     limit: int = 100,
+    offset: int = 0,
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
-        clauses = ["1=1"]
-        params: list = []
+        # Resolve the caller's org — supports both admin_user_id and org_admins table.
+        org = dict_row(db.execute(
+            """
+            SELECT id FROM organizations WHERE admin_user_id = %s
+            UNION
+            SELECT o.id FROM organizations o
+            JOIN org_admins oa ON oa.org_id = o.id
+            WHERE oa.user_id = %s AND o.status = 'approved'
+            LIMIT 1
+            """,
+            (current_user["id"], current_user["id"]),
+        ).fetchone())
+        if not org:
+            raise HTTPException(403, "Organization not found")
+        org_id = org["id"]
+
+        # Scope: only logs where the actor belongs to this org, or the entity is
+        # an event/activity/application/certificate owned by this org.
+        clauses = [
+            """(
+                actor_id IN (
+                    SELECT user_id FROM supervisors WHERE org_id = %s
+                    UNION SELECT admin_user_id FROM organizations WHERE id = %s
+                    UNION SELECT user_id FROM org_admins WHERE org_id = %s
+                )
+                OR (entity_type = 'event'        AND entity_id IN (SELECT id FROM events WHERE org_id = %s))
+                OR (entity_type = 'activity'     AND entity_id IN (SELECT id FROM activities WHERE org_id = %s))
+                OR (entity_type = 'certificate'  AND entity_id IN (SELECT id FROM certificates WHERE org_id = %s))
+                OR (entity_type = 'event_application' AND entity_id IN (SELECT id FROM event_applications WHERE org_id = %s))
+            )"""
+        ]
+        params: list = [org_id, org_id, org_id, org_id, org_id, org_id, org_id]
+
         if entity_type:
             clauses.append("entity_type = %s")
             params.append(entity_type)
@@ -64,9 +95,10 @@ def list_audit_logs(
         if action:
             clauses.append("action = %s")
             params.append(action)
-        params.append(min(limit, 500))
+
+        params += [min(limit, 500), max(offset, 0)]
         rows = dict_rows(db.execute(
-            f"SELECT * FROM audit_logs WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT %s",
+            f"SELECT * FROM audit_logs WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT %s OFFSET %s",
             params,
         ).fetchall())
-        return {"audit_logs": rows, "total": len(rows)}
+        return {"audit_logs": rows, "total": len(rows), "limit": min(limit, 500), "offset": offset}

@@ -1,20 +1,22 @@
 """
 database.py — PostgreSQL connection layer for the Altruism platform.
 
-Replaces the previous sqlite3 implementation. All public surface area is preserved:
-  get_db()         — context manager, yields a psycopg connection, auto-commits on exit
-  exclusive_db()   — context manager, yields a connection inside a serializable transaction
-  get_connection() — raw connection (use sparingly; prefer get_db)
+  get_db()         — context manager, yields a pooled psycopg connection, auto-commits on exit
+  exclusive_db()   — SERIALIZABLE transaction with automatic SerializationFailure retry (3 attempts)
+  get_connection() — borrow a raw connection from the pool (use sparingly; prefer get_db)
   dict_row()       — convert one Row → dict | None
   dict_rows()      — convert list[Row] → list[dict]
   init_schema()    — idempotent: creates tables/indexes that don't yet exist (no drops)
+  open_pool()      — open the connection pool (called once at startup via lifespan)
+  close_pool()     — drain the pool (called at shutdown via lifespan)
 
-Connection configuration is driven entirely by environment variables — no hardcoded path.
+Connection configuration is driven entirely by environment variables — no hardcoded defaults.
 """
 
 import os
 import sys
 import time
+import urllib.parse
 from contextlib import contextmanager
 
 import psycopg
@@ -38,7 +40,8 @@ if not _DATABASE_URL:
         f"postgresql://{_PG_USER}:{_PG_PASS}@{_PG_HOST}:{_PG_PORT}/{_PG_DB}"
     )
 
-print(f"[db] Connecting to PostgreSQL at {_DATABASE_URL.split('@')[-1]}", file=sys.stderr)
+_parsed = urllib.parse.urlparse(_DATABASE_URL)
+print(f"[db] Connecting to PostgreSQL at {_parsed.hostname}:{_parsed.port}/{_parsed.path.lstrip('/')}", file=sys.stderr)
 
 # ── Connection pool ───────────────────────────────────────────────────────────
 _pool: ConnectionPool | None = None
@@ -92,7 +95,6 @@ def get_db():
     """
     Standard read/write context manager.
     Commits on clean exit, rolls back on any exception.
-    Replaces the old sqlite3 get_db() — identical call signature.
     """
     conn = get_connection()
     try:
@@ -106,35 +108,48 @@ def get_db():
 
 
 @contextmanager
+def _serializable_conn():
+    """
+    Single-shot SERIALIZABLE transaction. Raises SerializationFailure on conflict —
+    callers must not retry here; use exclusive_db() which wraps this with retry logic.
+    """
+    conn = get_connection()
+    try:
+        conn.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        _return_connection(conn)
+
+
+@contextmanager
 def exclusive_db():
     """
-    Serializable transaction context manager with automatic retry on
-    psycopg.errors.SerializationFailure (up to 3 attempts, exponential back-off).
+    SERIALIZABLE transaction with automatic retry on SerializationFailure
+    (up to 3 attempts, exponential back-off).
 
-    PostgreSQL SERIALIZABLE is stronger than SQLite BEGIN IMMEDIATE:
-    - Detects and aborts conflicting concurrent transactions
-    - Used for capacity-enforcement paths: apply_to_event, approve_application,
-      cancel_application, promote_waitlisted, reject_application.
+    A @contextmanager generator cannot yield inside a retry loop (the generator
+    frame is suspended after yield and cannot be re-entered on a retry attempt).
+    The correct model is: one context manager per attempt, retried at the call site
+    level. Callers write `with exclusive_db() as db:` exactly as before.
+
+    Used for capacity-enforcement paths: apply_to_event, approve_application,
+    cancel_application, promote_waitlisted, reject_application.
     """
     max_retries = 3
     for attempt in range(max_retries):
-        conn = get_connection()
         try:
-            conn.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-            yield conn
-            conn.commit()
-            _return_connection(conn)
-            return
+            with _serializable_conn() as conn:
+                yield conn
+                return  # committed cleanly — done
         except psycopg.errors.SerializationFailure:
-            conn.rollback()
-            _return_connection(conn)
-            if attempt == max_retries - 1:
-                raise HTTPException(503, "Server busy, please try again")
-            time.sleep(0.05 * (2 ** attempt))
-        except Exception:
-            conn.rollback()
-            _return_connection(conn)
-            raise
+            if attempt < max_retries - 1:
+                time.sleep(0.05 * (2 ** attempt))
+        # Any non-serialization exception propagates immediately.
+    raise HTTPException(503, "Server busy, please try again")
 
 
 # ── Row helpers ───────────────────────────────────────────────────────────────

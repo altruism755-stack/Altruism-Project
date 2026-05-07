@@ -10,7 +10,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from database import get_db, dict_row
-from auth import hash_password, verify_password, generate_token, get_current_user
+from auth import hash_password, verify_password, generate_token, get_current_user, get_org_for_admin
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 _limiter = Limiter(key_func=get_remote_address)
@@ -225,7 +225,11 @@ def login(request: Request, body: LoginBody):
         elif user["role"] == "supervisor":
             profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user["id"],)).fetchone())
         elif user["role"] == "org_admin":
-            profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user["id"],)).fetchone())
+            try:
+                org_ref = get_org_for_admin(db, user["id"])
+                profile = dict_row(db.execute("SELECT * FROM organizations WHERE id = %s", (org_ref["id"],)).fetchone())
+            except HTTPException:
+                profile = None
             if profile:
                 org_status = profile.get("status") or "approved"
 
@@ -261,7 +265,11 @@ def me(current_user: dict = Depends(get_current_user)):
         elif user["role"] == "supervisor":
             profile = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user["id"],)).fetchone())
         elif user["role"] == "org_admin":
-            profile = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user["id"],)).fetchone())
+            try:
+                org_ref = get_org_for_admin(db, user["id"])
+                profile = dict_row(db.execute("SELECT * FROM organizations WHERE id = %s", (org_ref["id"],)).fetchone())
+            except HTTPException:
+                profile = None
 
         pa_row = db.execute(
             "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
@@ -296,7 +304,7 @@ def accept_invite(body: AcceptInviteBody):
                 if datetime.now(timezone.utc) > exp_dt:
                     raise HTTPException(400, "Invitation link has expired. Please ask the organization to re-invite you.")
             except ValueError:
-                pass  # malformed date — let it through rather than hard-block
+                raise HTTPException(400, "Invitation link is invalid. Please request a new one.")
 
         hashed = hash_password(body.password)
         db.execute(
@@ -312,8 +320,10 @@ def accept_invite(body: AcceptInviteBody):
             "SELECT id FROM volunteers WHERE user_id = %s", (user["id"],)
         ).fetchone()
         if vol_row:
+            # Activate all pending memberships, regardless of how the account was created.
             db.execute(
-                "UPDATE org_volunteers SET status = 'Active' WHERE volunteer_id = %s AND source = 'invite'",
+                "UPDATE org_volunteers SET status = 'Active', is_active = 1 "
+                "WHERE volunteer_id = %s AND status = 'Pending'",
                 (vol_row["id"],),
             )
 

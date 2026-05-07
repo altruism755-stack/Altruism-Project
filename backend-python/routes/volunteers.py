@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles, hash_password, verify_password
+from auth import get_current_user, require_roles, hash_password, verify_password, get_org_for_admin
 from routes.lifecycle import compute_volunteer_lifecycle
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "profiles")
@@ -26,10 +26,7 @@ def _resolve_supervisor(db, user_id: int) -> dict:
 
 
 def _resolve_org_admin(db, user_id: int) -> dict:
-    org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user_id,)).fetchone())
-    if not org:
-        raise HTTPException(403, FORBIDDEN)
-    return org
+    return get_org_for_admin(db, user_id)
 
 
 def _assert_supervisor_volunteer(db, supervisor_id: int, volunteer_id: int) -> None:
@@ -257,6 +254,12 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         if new_email:
             vol = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if vol:
+                conflict = db.execute(
+                    "SELECT id FROM users WHERE email = %s AND id != %s",
+                    (new_email, vol["user_id"]),
+                ).fetchone()
+                if conflict:
+                    raise HTTPException(409, "Email already in use by another account")
                 db.execute("UPDATE users SET email = %s WHERE id = %s", (new_email, vol["user_id"]))
                 db.execute("UPDATE volunteers SET email = %s WHERE id = %s", (new_email, volunteer_id))
 
@@ -264,6 +267,8 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
         new_password = body.get("new_password")
         current_password = body.get("current_password")
         if new_password and current_password:
+            if len(new_password) < 8:
+                raise HTTPException(400, "Password must be at least 8 characters")
             vol = dict_row(db.execute("SELECT user_id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
             if vol:
                 user = dict_row(db.execute("SELECT * FROM users WHERE id = %s", (vol["user_id"],)).fetchone())

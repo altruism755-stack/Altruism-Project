@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 import logging
 
 from database import get_db, exclusive_db, dict_row, dict_rows
-from auth import get_current_user, require_roles
+from auth import get_current_user, require_roles, get_org_for_admin
 from routes.notifications import create_notification
 from routes.audit import log_action
 
@@ -388,10 +388,8 @@ def list_waitlist(event_id: int, current_user: dict = Depends(require_roles("org
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if not org or org["id"] != event["org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         waitlist = dict_rows(db.execute(
@@ -492,10 +490,8 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
             if not sup or sup["org_id"] != app["event_org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if not org or org["id"] != app["event_org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != app["event_org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
 
         if app["acceptance_mode"] != "manual":

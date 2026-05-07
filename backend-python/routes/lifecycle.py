@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 
 from database import get_db, dict_row
-from auth import require_roles
+from auth import require_roles, get_org_for_admin
 
 router = APIRouter(prefix="/api/lifecycle", tags=["lifecycle"])
 
@@ -288,11 +288,7 @@ def compute_supervisor_lifecycle(volunteers_count: int, pending_activities_count
 @router.get("/org")
 def get_org_lifecycle(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = get_org_for_admin(db, current_user["id"])
         return {"lifecycle": compute_org_lifecycle(db, org["id"])}
 
 

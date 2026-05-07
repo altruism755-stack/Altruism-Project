@@ -78,6 +78,34 @@ def require_platform_admin(current_user: dict = Depends(get_current_user)) -> di
     return current_user
 
 
+def get_org_for_admin(db, user_id: int) -> dict:
+    """
+    Return the org row (id, name, …) for an org_admin user.
+    Checks both organizations.admin_user_id and the org_admins many-to-many table
+    so that admins added via POST /me/admins work everywhere.
+    Raises HTTP 403 if the user has no approved org.
+    """
+    org = db.execute(
+        """
+        SELECT o.id, o.name, o.status, o.tracks_hours, o.admin_user_id
+        FROM organizations o
+        WHERE (
+            o.admin_user_id = %s
+            OR EXISTS (
+                SELECT 1 FROM org_admins oa
+                WHERE oa.org_id = o.id AND oa.user_id = %s
+            )
+        )
+        AND o.status = 'approved'
+        LIMIT 1
+        """,
+        (user_id, user_id),
+    ).fetchone()
+    if not org:
+        raise HTTPException(status_code=403, detail="No approved organization found for this admin")
+    return dict(org)
+
+
 def require_approved_org_admin(current_user: dict = Depends(get_current_user)) -> dict:
     """Org admin whose organization has been approved by the platform.
     Accepts admins registered either via organizations.admin_user_id or org_admins table.
@@ -88,18 +116,19 @@ def require_approved_org_admin(current_user: dict = Depends(get_current_user)) -
     with get_db() as db:
         row = db.execute(
             """
-            SELECT o.status FROM organizations o
-            WHERE o.admin_user_id = %s
-            UNION
-            SELECT o.status FROM organizations o
-            JOIN org_admins oa ON oa.org_id = o.id
-            WHERE oa.user_id = %s
+            SELECT 1 FROM organizations o
+            WHERE (
+                o.admin_user_id = %s
+                OR EXISTS (
+                    SELECT 1 FROM org_admins oa
+                    WHERE oa.org_id = o.id AND oa.user_id = %s
+                )
+            )
+            AND o.status = 'approved'
             LIMIT 1
             """,
             (current_user["id"], current_user["id"]),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Organization not found")
-        if row["status"] not in ("approved", None):
-            raise HTTPException(status_code=403, detail=f"Organization is {row['status']}")
+            raise HTTPException(status_code=403, detail="No approved organization found for this admin")
     return current_user

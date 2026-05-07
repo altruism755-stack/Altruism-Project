@@ -1,9 +1,30 @@
-from fastapi import APIRouter, HTTPException, Depends
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, HTTPException, Depends, Query
 
 from database import get_db, dict_row, dict_rows
-from auth import hash_password, get_current_user, require_roles
+from auth import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/supervisors", tags=["supervisors"])
+
+
+def _resolve_org_for_admin(db, user_id: int) -> dict:
+    """Return the org for an org_admin, checking both admin_user_id and org_admins table."""
+    org = dict_row(db.execute(
+        """
+        SELECT id FROM organizations WHERE admin_user_id = %s
+        UNION
+        SELECT o.id FROM organizations o
+        JOIN org_admins oa ON oa.org_id = o.id
+        WHERE oa.user_id = %s AND o.status = 'approved'
+        LIMIT 1
+        """,
+        (user_id, user_id),
+    ).fetchone())
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    return org
 
 
 def _get_supervisor_record(db, user_id: int) -> dict:
@@ -21,16 +42,17 @@ def _get_supervisor_record(db, user_id: int) -> dict:
 @router.get("")
 def list_supervisors(current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = _resolve_org_for_admin(db, current_user["id"])
 
         supervisors = dict_rows(db.execute(
-            "SELECT s.*, "
-            "(SELECT COUNT(*) FROM org_volunteers ov WHERE ov.supervisor_id = s.id) as assigned_volunteers "
-            "FROM supervisors s WHERE s.org_id = %s",
+            """
+            SELECT s.*,
+                   COUNT(ov.id) AS assigned_volunteers
+            FROM supervisors s
+            LEFT JOIN org_volunteers ov ON ov.supervisor_id = s.id
+            WHERE s.org_id = %s
+            GROUP BY s.id
+            """,
             (org["id"],),
         ).fetchall())
 
@@ -48,41 +70,57 @@ def create_supervisor(body: dict, current_user: dict = Depends(require_roles("or
         raise HTTPException(400, "Name and email are required")
 
     with get_db() as db:
-        org = dict_row(db.execute(
-            "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-        ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+        org = _resolve_org_for_admin(db, current_user["id"])
 
-        existing_user = dict_row(db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone())
+        existing_user = dict_row(db.execute("SELECT id, role FROM users WHERE email = %s", (email,)).fetchone())
         if existing_user:
+            # Refuse to silently hijack an account that belongs to another role.
+            if existing_user["role"] != "supervisor":
+                raise HTTPException(
+                    409,
+                    f"A user with this email already exists as a '{existing_user['role']}'. "
+                    "Cannot reassign to supervisor.",
+                )
             user_id = existing_user["id"]
-            db.execute("UPDATE users SET role = 'supervisor' WHERE id = %s", (user_id,))
+            invite_token = None
         else:
-            hashed = hash_password("supervisor123")
+            # Issue an invite token — never store a default password.
+            invite_token = secrets.token_urlsafe(32)
+            invite_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
             row = db.execute(
-                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'supervisor') RETURNING id",
-                (email, hashed),
+                "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
+                "VALUES (%s, '', 'supervisor', %s, %s) RETURNING id",
+                (email, invite_token, invite_expires_at),
             ).fetchone()
             user_id = row["id"]
 
         existing_sup = dict_row(db.execute("SELECT id FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
         if existing_sup:
-            raise HTTPException(409, "Supervisor already exists")
+            raise HTTPException(409, "Supervisor already exists for this user")
 
         db.execute(
-            "INSERT INTO supervisors (user_id, name, email, phone, team, org_id, status) VALUES (%s, %s, %s, %s, %s, %s, 'Active')",
+            "INSERT INTO supervisors (user_id, name, email, phone, team, org_id, status) "
+            "VALUES (%s, %s, %s, %s, %s, %s, 'Active')",
             (user_id, name, email, phone, team, org["id"]),
         )
 
         sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
-        return sup
+        response = dict(sup)
+        if invite_token:
+            response["invite_token"] = invite_token
+        return response
 
 
 @router.delete("/{supervisor_id}")
 def delete_supervisor(supervisor_id: int, current_user: dict = Depends(require_roles("org_admin"))):
     with get_db() as db:
-        db.execute("DELETE FROM supervisors WHERE id = %s", (supervisor_id,))
+        org = _resolve_org_for_admin(db, current_user["id"])
+        result = db.execute(
+            "DELETE FROM supervisors WHERE id = %s AND org_id = %s RETURNING id",
+            (supervisor_id, org["id"]),
+        ).fetchone()
+        if not result:
+            raise HTTPException(404, "Supervisor not found in your organization")
         return {"message": "Supervisor removed"}
 
 
@@ -191,15 +229,19 @@ def reject_request(vol_id: int, current_user: dict = Depends(require_roles("supe
 
 
 @router.get("/me/events")
-def get_my_events(current_user: dict = Depends(require_roles("supervisor"))):
+def get_my_events(
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict = Depends(require_roles("supervisor")),
+):
     """Events for the supervisor's org."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
         events = dict_rows(db.execute(
-            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC",
-            (sup["org_id"],),
+            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC LIMIT %s OFFSET %s",
+            (sup["org_id"], limit, offset),
         ).fetchall())
-        return {"events": events}
+        return {"events": events, "limit": limit, "offset": offset}
 
 
 @router.get("/me/activities")

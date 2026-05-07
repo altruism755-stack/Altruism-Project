@@ -1,5 +1,5 @@
 """Platform-admin-only routes — review and approve organizations, system oversight."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import Optional
 
@@ -154,10 +154,14 @@ def list_profile_changes(
 ):
     """List organization profile change requests, defaulting to pending ones."""
     with get_db() as db:
+        # Join all 7 sensitive columns in one go — avoids N extra queries per row.
         query = (
             "SELECT r.id, r.org_id, r.field, r.new_value, r.status, r.created_at, r.reviewed_at, "
             "o.name as org_name, o.logo_url as org_logo, "
-            "u.email as requested_by_email "
+            "u.email as requested_by_email, "
+            "o.name as cur_name, o.official_email as cur_official_email, "
+            "o.org_type as cur_org_type, o.founded_year as cur_founded_year, "
+            "o.org_size as cur_org_size, o.location as cur_location, o.hq_city as cur_hq_city "
             "FROM org_profile_change_requests r "
             "JOIN organizations o ON r.org_id = o.id "
             "JOIN users u ON r.requested_by = u.id"
@@ -168,14 +172,10 @@ def list_profile_changes(
             params.append(status)
         query += " ORDER BY r.created_at DESC"
         rows = dict_rows(db.execute(query, params).fetchall())
-        # Attach current field value and human-readable label to each row.
         for row in rows:
             field = row["field"]
             row["field_label"] = _FIELD_LABELS.get(field, field.replace("_", " ").title())
-            org_row = dict_row(db.execute(
-                f"SELECT {field} FROM organizations WHERE id = %s", (row["org_id"],)
-            ).fetchone()) if field in _SENSITIVE_COLUMNS else {}
-            row["current_value"] = (org_row or {}).get(field)
+            row["current_value"] = row.get(f"cur_{field}") if field in _SENSITIVE_COLUMNS else None
         return {"changes": rows, "total": len(rows)}
 
 
@@ -266,16 +266,12 @@ def reject_profile_change(
 def list_all_volunteers(
     status: Optional[str] = None,
     search: Optional[str] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(require_platform_admin),
 ):
-    """List all volunteers across the platform with their org memberships."""
+    """List all volunteers across the platform with aggregated org and activity counts."""
     with get_db() as db:
-        query = (
-            "SELECT v.*, u.email as user_email, u.created_at as user_created_at, "
-            "(SELECT COUNT(*) FROM org_volunteers ov WHERE ov.volunteer_id = v.id AND ov.status = 'Active') as active_orgs, "
-            "(SELECT COUNT(*) FROM activities a WHERE a.volunteer_id = v.id) as activity_count "
-            "FROM volunteers v LEFT JOIN users u ON v.user_id = u.id"
-        )
         conditions, params = [], []
         if status:
             conditions.append("v.status = %s")
@@ -283,11 +279,26 @@ def list_all_volunteers(
         if search:
             conditions.append("(v.name ILIKE %s OR v.email ILIKE %s)")
             params.extend([f"%{search}%", f"%{search}%"])
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY v.created_at DESC"
-        volunteers = dict_rows(db.execute(query, params).fetchall())
-        return {"volunteers": volunteers}
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        params += [limit, offset]
+        volunteers = dict_rows(db.execute(
+            f"""
+            SELECT v.*, u.email as user_email, u.created_at as user_created_at,
+                   COUNT(DISTINCT CASE WHEN ov.status = 'Active' THEN ov.id END) AS active_orgs,
+                   COUNT(DISTINCT a.id) AS activity_count
+            FROM volunteers v
+            LEFT JOIN users u ON v.user_id = u.id
+            LEFT JOIN org_volunteers ov ON ov.volunteer_id = v.id
+            LEFT JOIN activities a ON a.volunteer_id = v.id
+            {where}
+            GROUP BY v.id, u.email, u.created_at
+            ORDER BY v.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            params,
+        ).fetchall())
+        return {"volunteers": volunteers, "limit": limit, "offset": offset}
 
 
 @router.put("/volunteers/{volunteer_id}/status")

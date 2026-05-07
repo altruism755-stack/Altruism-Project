@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.responses import FileResponse
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles
+from auth import get_current_user, require_roles, get_org_for_admin
 from routes.notifications import create_notification
 from routes.audit import log_action
 
@@ -49,11 +49,7 @@ def list_certificates(
             clauses.append("c.org_id = %s")
             params.append(sup["org_id"])
         elif role == "org_admin":
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if not org:
-                raise HTTPException(403, "You do not have permission to access this resource")
+            org = get_org_for_admin(db, current_user["id"])
             clauses.append("c.org_id = %s")
             params.append(org["id"])
         elif role == "volunteer":
@@ -86,11 +82,7 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
                 raise HTTPException(404, "Supervisor not found")
             org = {"id": sup_record["org_id"]}
         else:
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-        if not org:
-            raise HTTPException(404, "Organization not found")
+            org = get_org_for_admin(db, current_user["id"])
 
         volunteer_id = body.get("volunteer_id")
         certificate_title = (body.get("certificate_title") or "").strip()
@@ -169,10 +161,8 @@ async def upload_certificate_file(
             if not assignment:
                 raise HTTPException(403, "You do not have permission to access this resource")
         else:
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if not org or org["id"] != cert["org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != cert["org_id"]:
                 raise HTTPException(403, "Not authorized for this certificate's organization")
 
         # Remove old file if one exists
@@ -185,7 +175,10 @@ async def upload_certificate_file(
         os.makedirs(CERT_UPLOAD_DIR, exist_ok=True)
         filename = f"cert_{cert_id}_{uuid.uuid4().hex}{ext}"
         file_path = os.path.join(CERT_UPLOAD_DIR, filename)
-        content = await file.read()
+        MAX_CERT_SIZE = 10 * 1024 * 1024  # 10 MB
+        content = await file.read(MAX_CERT_SIZE + 1)
+        if len(content) > MAX_CERT_SIZE:
+            raise HTTPException(413, "Certificate file must be 10 MB or smaller")
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -219,10 +212,8 @@ def download_certificate_file(cert_id: int, current_user: dict = Depends(get_cur
             if not sup or sup["org_id"] != cert["org_id"]:
                 raise HTTPException(403, "Access denied")
         elif role == "org_admin":
-            org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s", (current_user["id"],)
-            ).fetchone())
-            if not org or org["id"] != cert["org_id"]:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != cert["org_id"]:
                 raise HTTPException(403, "Access denied")
 
         file_url = cert.get("file_url")
