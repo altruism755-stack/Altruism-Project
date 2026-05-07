@@ -365,9 +365,7 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
           )
         : buildVolunteerRegisterPayload(volunteerState, volForm.password);
 
-    console.log("[Register] payload:", JSON.stringify(data, null, 2));
     const result = await register(data);
-    console.log("[Register] response:", result);
     setIsSubmitting(false);
 
     if (!result.ok) {

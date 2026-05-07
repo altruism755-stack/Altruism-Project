@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   // Single knob for where the backend lives during dev. Defaults to the
   // backend's `python main.py` port. Override with `BACKEND_URL=...` in .env
   // (or in the shell) if it ever changes.
-  const backendUrl = env.BACKEND_URL || 'http://localhost:3001'
+  const backendUrl = env.BACKEND_URL || 'http://localhost:8000'
   console.info(`[vite] proxying /api and /uploads → ${backendUrl}`)
 
   return {

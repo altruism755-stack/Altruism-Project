@@ -90,7 +90,6 @@ export function DatePicker({
   };
 
   const handleConfirm = () => {
-    console.log("[DatePicker] confirming date:", tentative);
     onChange(tentative);
     setOpen(false);
     onBlur?.();

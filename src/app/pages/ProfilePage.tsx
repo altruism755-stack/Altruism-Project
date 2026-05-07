@@ -187,7 +187,6 @@ export function ProfilePage() {
   const fetchProfile = async () => {
     try {
       const volRes = await api.getVolunteerMe();
-      console.log("[Profile] loaded volunteer data:", JSON.stringify(volRes, null, 2));
       setVolunteer(volRes);
 
       const orgs: any[] = volRes.organizations || [];
@@ -344,11 +343,7 @@ export function ProfilePage() {
     setSaving(true);
     try {
       const savePayload = buildVolunteerPayload(volunteerState);
-      console.log("[Profile] save payload (snake_case for PUT):", JSON.stringify(savePayload, null, 2));
-      console.log("[Profile] equivalent register payload (camelCase):",
-        JSON.stringify(buildVolunteerRegisterPayload(volunteerState, ""), null, 2));
-      const saveResult = await api.updateVolunteer(volRecordId, savePayload);
-      console.log("[Profile] save response:", saveResult);
+      await api.updateVolunteer(volRecordId, savePayload);
       setEditing(false);
       setSubmitAttempted(false);
       setTouched(createEmptyTouched());
