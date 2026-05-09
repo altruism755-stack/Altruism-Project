@@ -6,3 +6,382 @@ INFO:     Started server process [1036]
 INFO:     Waiting for application startup.
 [db] Connection pool opened (min=2, max=10)
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1036]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [30332]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\organizations.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [30332]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [16464]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\admin.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16464]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+WARNING:  WatchFiles detected changes in 'database.py'. Reloading...
+INFO:     Started server process [6812]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [24540]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24540]
+WARNING:  WatchFiles detected changes in 'database.py'. Reloading...
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [4012]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [31720]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\supervisors.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [31720]
+WARNING:  WatchFiles detected changes in 'routes\supervisors.py', 'routes\lifecycle.py'. Reloading...
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [30488]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [27524]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'seed.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27524]
+WARNING:  WatchFiles detected changes in 'routes\organizations.py', 'routes\events.py'. Reloading...
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [21352]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [3800]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3800]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [24784]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24784]
+WARNING:  WatchFiles detected changes in 'database.py'. Reloading...
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [20404]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [20940]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\organizations.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20940]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [5012]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\volunteers.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5012]
+WARNING:  WatchFiles detected changes in 'routes\volunteers.py'. Reloading...
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [7856]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [15388]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\activities.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15388]
+WARNING:  WatchFiles detected changes in 'routes\event_ratings.py', 'routes\volunteers.py', 'routes\supervisors.py', 'routes\auth_routes.py'. Reloading...
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [16892]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\vvmar\OneDrive\Desktop\Alturism Final\backend-python\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vvmar\AppData\Roaming\uv\python\cpython-3.14.2-windows-x86_64-none\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [5344]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\activities.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5344]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [24372]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
