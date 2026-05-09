@@ -221,14 +221,12 @@ def _get_my_org_id(db, user_id: int) -> int:
 @router.get("/me/profile")
 def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
     with get_db() as db:
+        org_ref = get_org_for_admin(db, current_user["id"])
         org = dict_row(db.execute(
-            # Join with users to expose the primary admin's email as submitter_email.
-            # admin_user_id IS the submitter — derived from the authoritative users table,
-            # so it's correct for all existing orgs without any column migration.
             "SELECT o.*, u.email AS submitter_email "
             "FROM organizations o JOIN users u ON u.id = o.admin_user_id "
-            "WHERE o.admin_user_id = %s",
-            (current_user["id"],),
+            "WHERE o.id = %s",
+            (org_ref["id"],),
         ).fetchone())
         if not org:
             raise HTTPException(404, "Organization not found")
@@ -927,11 +925,8 @@ def reject_org_member(
 
 
 def _assert_org_access(db, org_id: int, user_id: int):
-    org = dict_row(db.execute(
-        "SELECT id, name FROM organizations WHERE id = %s AND admin_user_id = %s",
-        (org_id, user_id),
-    ).fetchone())
-    if not org:
+    org = get_org_for_admin(db, user_id)
+    if org["id"] != org_id:
         raise HTTPException(403, "Not authorized for this organization")
     return org
 
@@ -1237,10 +1232,8 @@ def add_volunteer_manually(
             if existing:
                 raise HTTPException(409, "This volunteer is already a member of your organization")
         else:
-            import secrets
-            from datetime import timedelta
             new_invite_token = secrets.token_urlsafe(32)
-            invite_expires_at = _utcnow() + timedelta(days=7)
+            invite_expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
             row = db.execute(
                 "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
                 "VALUES (%s, '', 'volunteer', %s, %s) RETURNING id",

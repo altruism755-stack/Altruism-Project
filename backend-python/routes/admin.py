@@ -244,7 +244,7 @@ def reject_profile_change(
         ).fetchone())
         org_admin_user_id = (org or {}).get("admin_user_id")
         if not org_admin_user_id:
-            raise Exception(f"Missing org admin user_id for notification (org_id={change['org_id']})")
+            raise HTTPException(500, f"Organization has no admin user assigned (org_id={change['org_id']})")
         label = _FIELD_LABELS.get(field, field)
         msg = f"Your requested change to '{label}' was not approved."
         if reason:

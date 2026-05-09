@@ -14,7 +14,7 @@ export type EventStatus = "Upcoming" | "Active" | "Completed";
 export type ApplicationStatus = "Pending" | "Approved" | "Rejected" | "Waitlisted";
 
 /** Status of a volunteer's membership in an org (org_volunteers.status). */
-export type OrgMemberStatus = "Pending" | "Active" | "Rejected";
+export type OrgMemberStatus = "Pending" | "Active" | "Inactive" | "Rejected";
 
 /** Simplified membership indicator returned on org list endpoints. */
 export type MembershipStatus = "Active" | "Pending";
@@ -23,7 +23,7 @@ export type MembershipStatus = "Active" | "Pending";
 export type ActivityStatus = "Pending" | "Approved" | "Rejected" | "Completed";
 
 /** Status of a supervisor record. */
-export type SupervisorStatus = "Active" | "Inactive";
+export type SupervisorStatus = "Active" | "Pending";
 
 /**
  * Canonical status constants — import these instead of inline string literals so
@@ -48,6 +48,7 @@ export const APP_STATUS = {
 export const MEMBER_STATUS = {
   Pending:  "Pending",
   Active:   "Active",
+  Inactive: "Inactive",
   Rejected: "Rejected",
 } as const satisfies Record<string, OrgMemberStatus>;
 
@@ -62,6 +63,11 @@ export const MEMBERSHIP_STATUS = {
   Active:  "Active",
   Pending: "Pending",
 } as const satisfies Record<string, MembershipStatus>;
+
+export const SUPERVISOR_STATUS = {
+  Active:  "Active",
+  Pending: "Pending",
+} as const satisfies Record<string, SupervisorStatus>;
 
 export interface Event {
   id: number;

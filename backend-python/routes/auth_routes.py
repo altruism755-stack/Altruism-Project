@@ -320,10 +320,12 @@ def accept_invite(body: AcceptInviteBody):
             "SELECT id FROM volunteers WHERE user_id = %s", (user["id"],)
         ).fetchone()
         if vol_row:
-            # Activate all pending memberships, regardless of how the account was created.
+            # Only activate memberships pre-approved via invite or manual import.
+            # Self-applied memberships (join requests) must still go through supervisor approval.
             db.execute(
                 "UPDATE org_volunteers SET status = 'Active', is_active = 1 "
-                "WHERE volunteer_id = %s AND status = 'Pending'",
+                "WHERE volunteer_id = %s AND status = 'Pending' "
+                "AND source IN ('invite', 'manual_import')",
                 (vol_row["id"],),
             )
 

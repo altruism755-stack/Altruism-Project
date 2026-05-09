@@ -51,6 +51,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_no_duplicate
     ON certificates(volunteer_id, org_id, event_id, certificate_title)
     WHERE event_id IS NOT NULL;
 
+-- ── Fix 4b: prevent duplicate ad-hoc certificates (event_id IS NULL) ─────────
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_no_dup_adhoc
+    ON certificates(volunteer_id, org_id, certificate_title)
+    WHERE event_id IS NULL;
+
 -- ── Fix 5: audit_logs.metadata as JSONB ──────────────────────────────────────
 
 DO $$

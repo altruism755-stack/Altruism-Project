@@ -260,8 +260,9 @@ def approve_activity(
             sup = dict_row(db.execute(
                 "SELECT id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
-            if sup:
-                reviewer_id = sup["id"]
+            if not sup:
+                raise HTTPException(403, "Supervisor profile not found")
+            reviewer_id = sup["id"]
             # Supervisors may only approve activities for their assigned volunteers.
             assignment = db.execute(
                 "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",

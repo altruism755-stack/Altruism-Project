@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import base64
 import uuid
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -57,44 +56,40 @@ def list_volunteers(
     current_user: dict = Depends(require_roles("org_admin", "supervisor")),
 ):
     with get_db() as db:
-        query = (
-            "SELECT v.*, ov.department, ov.supervisor_id, s.name as supervisor_name "
+        _joins = (
             "FROM volunteers v "
             "LEFT JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "LEFT JOIN supervisors s ON ov.supervisor_id = s.id "
-            "WHERE 1=1"
+            "LEFT JOIN supervisors s ON ov.supervisor_id = s.id"
         )
+        filters: list[str] = []
         params: list = []
 
-        # Supervisors see only their assigned volunteers; org_admins see their org only.
         if current_user["role"] == "supervisor":
             sup = _resolve_supervisor(db, current_user["id"])
-            query += " AND ov.supervisor_id = %s"
+            filters.append("ov.supervisor_id = %s")
             params.append(sup["id"])
         else:
             org = _resolve_org_admin(db, current_user["id"])
-            query += " AND ov.org_id = %s"
+            filters.append("ov.org_id = %s")
             params.append(org["id"])
 
         if status:
-            query += " AND v.status = %s"
+            filters.append("v.status = %s")
             params.append(status)
         if supervisor:
-            query += " AND s.name = %s"
+            filters.append("s.name = %s")
             params.append(supervisor)
         if search:
-            query += " AND (v.name ILIKE %s OR v.email ILIKE %s)"
+            filters.append("(v.name ILIKE %s OR v.email ILIKE %s)")
             params.extend([f"%{search}%", f"%{search}%"])
 
-        # Count query
-        count_query = re.sub(r"SELECT .+? FROM", "SELECT COUNT(*) as total FROM", query, count=1)
-        total = db.execute(count_query, params).fetchone()["total"]
+        where = " WHERE " + " AND ".join(filters) if filters else ""
+
+        total = db.execute(f"SELECT COUNT(*) as total {_joins}{where}", params).fetchone()["total"]
 
         offset = (page - 1) * limit
-        query += " LIMIT %s OFFSET %s"
-        params.extend([limit, offset])
-
-        volunteers = dict_rows(db.execute(query, params).fetchall())
+        query = f"SELECT v.*, ov.department, ov.supervisor_id, s.name as supervisor_name {_joins}{where} LIMIT %s OFFSET %s"
+        volunteers = dict_rows(db.execute(query, params + [limit, offset]).fetchall())
 
         return {
             "volunteers": volunteers,
@@ -142,7 +137,7 @@ def _build_volunteer_response(db, vol: dict) -> dict:
         (vol["id"],),
     ).fetchall())
 
-    total_hours = sum(a["hours"] for a in activities if a["status"] == "Approved")
+    total_hours = sum(a["hours"] or 0 for a in activities if a["status"] == "Approved")
     return {**vol, "activities": activities, "organizations": orgs, "certificates": certificates, "totalHours": total_hours}
 
 
@@ -431,7 +426,7 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "SELECT ea.*, e.name as event_name, e.date as event_date "
             "FROM event_applications ea "
             "JOIN events e ON ea.event_id = e.id "
-            "WHERE ea.volunteer_id = %s AND ea.org_id = %s AND ea.status = 'Pending'",
+            "WHERE ea.volunteer_id = %s AND ea.org_id = %s AND ea.status IN ('Pending', 'Waitlisted')",
             (volunteer_id, org_id),
         ).fetchall())
 

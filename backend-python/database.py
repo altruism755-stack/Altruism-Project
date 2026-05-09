@@ -107,23 +107,6 @@ def get_db():
         _return_connection(conn)
 
 
-@contextmanager
-def _serializable_conn():
-    """
-    Single-shot SERIALIZABLE transaction. Raises SerializationFailure on conflict —
-    callers must not retry here; use exclusive_db() which wraps this with retry logic.
-    """
-    conn = get_connection()
-    try:
-        conn.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        _return_connection(conn)
-
 
 @contextmanager
 def exclusive_db():
@@ -131,24 +114,27 @@ def exclusive_db():
     SERIALIZABLE transaction with automatic retry on SerializationFailure
     (up to 3 attempts, exponential back-off).
 
-    A @contextmanager generator cannot yield inside a retry loop (the generator
-    frame is suspended after yield and cannot be re-entered on a retry attempt).
-    The correct model is: one context manager per attempt, retried at the call site
-    level. Callers write `with exclusive_db() as db:` exactly as before.
-
     Used for capacity-enforcement paths: apply_to_event, approve_application,
     cancel_application, promote_waitlisted, reject_application.
     """
     max_retries = 3
     for attempt in range(max_retries):
+        conn = get_connection()
         try:
-            with _serializable_conn() as conn:
-                yield conn
-                return  # committed cleanly — done
+            conn.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+            yield conn
+            conn.commit()
+            _return_connection(conn)
+            return
         except psycopg.errors.SerializationFailure:
+            conn.rollback()
+            _return_connection(conn)
             if attempt < max_retries - 1:
                 time.sleep(0.05 * (2 ** attempt))
-        # Any non-serialization exception propagates immediately.
+        except Exception:
+            conn.rollback()
+            _return_connection(conn)
+            raise
     raise HTTPException(503, "Server busy, please try again")
 
 
@@ -216,6 +202,23 @@ def init_schema():
                 website          TEXT,
                 phone            TEXT,
                 admin_user_id    INTEGER REFERENCES users(id),
+                status           TEXT DEFAULT 'approved',
+                rejection_reason TEXT,
+                org_type         TEXT,
+                official_email   TEXT,
+                founded_year     TEXT,
+                location         TEXT,
+                social_links     TEXT,
+                logo_url         TEXT,
+                documents_url    TEXT,
+                submitter_name   TEXT,
+                submitter_role   TEXT,
+                reviewed_at      TIMESTAMPTZ,
+                org_size         TEXT,
+                hq_city          TEXT,
+                branches         TEXT,
+                categories       TEXT,
+                additional_notes TEXT,
                 student_only     BOOLEAN NOT NULL DEFAULT FALSE,
                 tracks_hours     BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -261,6 +264,16 @@ def init_schema():
                 status               TEXT DEFAULT 'Pending'
                                          CHECK(status IN ('Active','Pending','Inactive','Rejected')),
                 joined_date          DATE NOT NULL DEFAULT CURRENT_DATE,
+                source               TEXT DEFAULT 'manual_import',
+                join_source          TEXT DEFAULT 'other',
+                is_active            INTEGER NOT NULL DEFAULT 0,
+                joined_at            TIMESTAMPTZ DEFAULT NOW(),
+                channel_detail       TEXT DEFAULT '',
+                governorate_snapshot TEXT DEFAULT '',
+                city_snapshot        TEXT DEFAULT '',
+                added_by_admin_id    INTEGER,
+                notes                TEXT DEFAULT '',
+                approved_at          TIMESTAMPTZ,
                 UNIQUE(org_id, volunteer_id)
             )
         """)
@@ -537,6 +550,13 @@ def init_schema():
             CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_no_duplicate
             ON certificates(volunteer_id, org_id, event_id, certificate_title)
             WHERE event_id IS NOT NULL
+        """)
+
+        # DB-05: prevent duplicate ad-hoc certificates (event_id IS NULL)
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_no_dup_adhoc
+            ON certificates(volunteer_id, org_id, certificate_title)
+            WHERE event_id IS NULL
         """)
 
         # Fix 8: composite index for supervisor activity queries

@@ -230,6 +230,9 @@ def delete_event(event_id: int, current_user: dict = Depends(require_roles("org_
         if event["status"] in ("Active", "Completed"):
             raise HTTPException(409, "Cannot delete an event that is Active or Completed")
 
+        db.execute("DELETE FROM event_applications WHERE event_id = %s", (event_id,))
+        db.execute("DELETE FROM activities WHERE event_id = %s", (event_id,))
+        db.execute("DELETE FROM certificates WHERE event_id = %s", (event_id,))
         db.execute("DELETE FROM events WHERE id = %s", (event_id,))
         return {"message": "Event deleted"}
 
@@ -246,7 +249,7 @@ def bulk_mark_attendance(
     Supervisors may only mark attendance for their assigned volunteers.
     Idempotent: updates existing activity records rather than duplicating.
     """
-    with get_db() as db:
+    with exclusive_db() as db:
         event = dict_row(db.execute(
             "SELECT * FROM events WHERE id = %s", (event_id,)
         ).fetchone())

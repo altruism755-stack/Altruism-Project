@@ -301,11 +301,14 @@ def get_supervisor_lifecycle(current_user: dict = Depends(require_roles("supervi
         if not sup:
             raise HTTPException(404, "Supervisor not found")
         volunteers_count = db.execute(
-            "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'Active'",
-            (sup["org_id"],),
+            "SELECT COUNT(*) c FROM org_volunteers "
+            "WHERE org_id = %s AND supervisor_id = %s AND status = 'Active'",
+            (sup["org_id"], sup["id"]),
         ).fetchone()["c"]
         pending_acts = db.execute(
-            "SELECT COUNT(*) c FROM activities WHERE org_id = %s AND status = 'Pending'",
-            (sup["org_id"],),
+            "SELECT COUNT(*) c FROM activities a "
+            "JOIN org_volunteers ov ON ov.volunteer_id = a.volunteer_id AND ov.supervisor_id = %s "
+            "WHERE a.org_id = %s AND a.status = 'Pending'",
+            (sup["id"], sup["org_id"]),
         ).fetchone()["c"]
         return {"lifecycle": compute_supervisor_lifecycle(volunteers_count, pending_acts)}

@@ -150,7 +150,7 @@ def _seed_platform_admin():
         if not existing:
             hashed = hash_password(admin_password)
             row = conn.execute(
-                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'volunteer') RETURNING id",
+                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'org_admin') RETURNING id",
                 (admin_email, hashed),
             ).fetchone()
             user_id = row["id"]
