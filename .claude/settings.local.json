@@ -3,7 +3,12 @@
     "allow": [
       "PowerShell(& \"C:\\\\Users\\\\vvmar\\\\OneDrive\\\\Desktop\\\\Alturism Final\\\\backend-python\\\\.venv\\\\Scripts\\\\python.exe\" -c \"import psycopg, psycopg_pool, fastapi, uvicorn, passlib, jose, slowapi; print\\('All packages OK'\\)\" 2>&1)",
       "PowerShell($env:PATH = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin;\" + $env:PATH; $env:PGPASSWORD = \"\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -h localhost -c \"\\\\l\" 2>&1)",
-      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin;\" + $env:PATH; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -h localhost -c \"ALTER USER postgres PASSWORD 'altruism123';\" 2>&1)"
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin;\" + $env:PATH; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -h localhost -c \"ALTER USER postgres PASSWORD 'altruism123';\" 2>&1)",
+      "Read(//c/Users/vvmar/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/7a41ecaa-50fa-41ef-9e78-cb2f0e957e11/cdf7bf8f-2e28-4f56-ac5e-d3ab6400d78c/skills/docx/**)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\Graduation_Project_Template.docx\" \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\template_unpacked\")",
+      "Read(//c/Users/vvmar/Downloads/**)",
+      "Bash(npm install *)",
+      "Bash(python scripts/office/validate.py \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\Graduation_Project_Filled.docx\")"
     ]
   }
 }
