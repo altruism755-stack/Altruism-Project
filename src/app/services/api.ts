@@ -144,14 +144,21 @@ export const api = {
 
   // Supervisor self-service
   getMyProfile: () => request("/supervisors/me"),
-  getMyVolunteers: () => request("/supervisors/me/volunteers"),
-  getMyPendingRequests: () => request("/supervisors/me/pending-requests"),
   getMyEvents: () => request("/supervisors/me/events"),
-  getMyActivities: () => request("/supervisors/me/activities"),
-  approveMyRequest: (volId: number, data: any) =>
-    request(`/supervisors/me/requests/${volId}/approve`, { method: "PUT", body: JSON.stringify(data) }),
-  rejectMyRequest: (volId: number) =>
-    request(`/supervisors/me/requests/${volId}/reject`, { method: "PUT" }),
+  getMyEventDetail: (id: number) => request(`/supervisors/me/events/${id}`),
+  getMyOrgEvents: () => request("/supervisors/me/org-events"),
+  getMyActivities: (status?: string) =>
+    request(`/supervisors/me/activities${status ? `?status=${status}` : ""}`),
+  getMyApplications: (status?: string) =>
+    request(`/supervisors/me/applications${status ? `?status=${status}` : ""}`),
+  approveMyApplication: (appId: number) =>
+    request(`/supervisors/me/applications/${appId}/approve`, { method: "PUT" }),
+  rejectMyApplication: (appId: number) =>
+    request(`/supervisors/me/applications/${appId}/reject`, { method: "PUT" }),
+  createMyEvent: (data: any) =>
+    request("/supervisors/me/events", { method: "POST", body: JSON.stringify(data) }),
+  updateMyEvent: (id: number, data: any) =>
+    request(`/supervisors/me/events/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 
   // Events
   getEvents: (params?: Record<string, string>) => {
@@ -165,6 +172,12 @@ export const api = {
     request(`/events/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteEvent: (id: number) =>
     request(`/events/${id}`, { method: "DELETE" }),
+  activateEvent: (id: number) =>
+    request(`/events/${id}/activate`, { method: "POST" }),
+  toggleRegistration: (id: number, open: boolean) =>
+    request(`/events/${id}/registration`, { method: "PUT", body: JSON.stringify({ registration_open: open }) }),
+  markAttendance: (eventId: number, records: { app_id: number; attendance_status: string }[]) =>
+    request(`/event-applications/event/${eventId}/attendance`, { method: "POST", body: JSON.stringify({ records }) }),
 
   // Activities
   getActivities: (params?: Record<string, string>) => {

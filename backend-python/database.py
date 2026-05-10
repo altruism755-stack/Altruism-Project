@@ -259,7 +259,6 @@ def init_schema():
                 id                   SERIAL PRIMARY KEY,
                 org_id               INTEGER NOT NULL REFERENCES organizations(id),
                 volunteer_id         INTEGER NOT NULL REFERENCES volunteers(id),
-                supervisor_id        INTEGER REFERENCES supervisors(id),
                 department           TEXT,
                 status               TEXT DEFAULT 'Pending'
                                          CHECK(status IN ('Active','Pending','Inactive','Rejected')),
@@ -294,6 +293,8 @@ def init_schema():
                 status              TEXT DEFAULT 'Upcoming'
                                         CHECK(status IN ('Upcoming','Active','Completed')),
                 acceptance_mode     TEXT NOT NULL DEFAULT 'manual',
+                registration_open   BOOLEAN NOT NULL DEFAULT TRUE,
+                created_by_supervisor_id INTEGER REFERENCES supervisors(id) ON DELETE SET NULL,
                 created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
@@ -336,10 +337,11 @@ def init_schema():
                 volunteer_id   INTEGER NOT NULL REFERENCES volunteers(id),
                 event_id       INTEGER NOT NULL REFERENCES events(id),
                 org_id         INTEGER NOT NULL REFERENCES organizations(id),
-                status         TEXT DEFAULT 'Pending'
-                                   CHECK(status IN ('Pending','Approved','Rejected','Waitlisted')),
-                applied_date   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                cancelled_at   TIMESTAMPTZ
+                status             TEXT DEFAULT 'Pending'
+                                       CHECK(status IN ('Pending','Approved','Rejected','Waitlisted')),
+                attendance_status  TEXT CHECK(attendance_status IN ('Attended','Absent')),
+                applied_date       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                cancelled_at       TIMESTAMPTZ
             )
         """)
 
@@ -503,9 +505,9 @@ def init_schema():
             "CREATE INDEX IF NOT EXISTS idx_organizations_admin_user_id ON organizations(admin_user_id)",
             "CREATE INDEX IF NOT EXISTS idx_organizations_status ON organizations(status)",
             "CREATE INDEX IF NOT EXISTS idx_org_volunteers_volunteer_id ON org_volunteers(volunteer_id)",
-            "CREATE INDEX IF NOT EXISTS idx_org_volunteers_supervisor_id ON org_volunteers(supervisor_id)",
             "CREATE INDEX IF NOT EXISTS idx_org_volunteers_org_status ON org_volunteers(org_id, status)",
             "CREATE INDEX IF NOT EXISTS idx_events_org_id ON events(org_id)",
+            "CREATE INDEX IF NOT EXISTS idx_events_created_by_supervisor ON events(created_by_supervisor_id)",
             "CREATE INDEX IF NOT EXISTS idx_events_status_date ON events(status, date)",
             "CREATE INDEX IF NOT EXISTS idx_activities_volunteer_id ON activities(volunteer_id, date DESC)",
             "CREATE INDEX IF NOT EXISTS idx_activities_event_id ON activities(event_id)",

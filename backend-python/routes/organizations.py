@@ -569,7 +569,6 @@ def _fetch_export_rows(db, org_id: int) -> list[dict]:
             v.languages, v.skills, v.cause_areas, v.availability,
             v.hours_per_week, v.prior_experience, v.prior_org, v.experiences, v.about_me,
             ov.department,
-            s.name AS supervisor_name,
             ov.status AS membership_status,
             COALESCE(ov.join_source, 'other') AS join_source,
             COALESCE(ov.channel_detail, '') AS channel_detail,
@@ -578,7 +577,6 @@ def _fetch_export_rows(db, org_id: int) -> list[dict]:
             COALESCE(ov.is_active, 0) AS is_active
         FROM volunteers v
         JOIN org_volunteers ov ON v.id = ov.volunteer_id
-        LEFT JOIN supervisors s ON ov.supervisor_id = s.id
         WHERE ov.org_id = %s
         ORDER BY v.name ASC
         """,
@@ -777,9 +775,9 @@ def get_org_members(org_id: int, current_user: dict = Depends(require_roles("org
             "SELECT v.id, v.name, v.email, v.phone, v.city, v.skills, v.status, "
             "v.gender, v.education_level, v.cause_areas, "
             "ov.department, ov.status as org_status, ov.joined_date, "
-            "ov.join_source, ov.supervisor_id, s.name as supervisor_name "
+            "ov.join_source "
             "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "LEFT JOIN supervisors s ON ov.supervisor_id = s.id WHERE ov.org_id = %s",
+            "WHERE ov.org_id = %s",
             (org_id,),
         ).fetchall())
 
@@ -852,17 +850,6 @@ def approve_org_member(
     with get_db() as db:
         _assert_org_access(db, org_id, current_user["id"])
 
-        supervisor_id = body.get("supervisor_id")
-        # Require a supervisor assignment when the org has active supervisors,
-        # otherwise approved volunteers end up invisible to all supervisor queues.
-        if supervisor_id is None:
-            has_supervisors = db.execute(
-                "SELECT 1 FROM supervisors WHERE org_id = %s AND status = 'Active' LIMIT 1",
-                (org_id,),
-            ).fetchone()
-            if has_supervisors:
-                raise HTTPException(400, "A supervisor must be assigned before approving this volunteer")
-
         vol = dict_row(db.execute(
             "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
             "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = %s", (vol_id,)
@@ -870,12 +857,12 @@ def approve_org_member(
         gov_snap = (vol or {}).get("governorate") or ""
         city_snap = (vol or {}).get("city") or ""
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', is_active = %s, supervisor_id = %s, department = %s, "
+            "UPDATE org_volunteers SET status = 'Active', is_active = %s, department = %s, "
             "joined_at = NOW(), "
             "approved_at = NOW(), "
             "governorate_snapshot = %s, city_snapshot = %s "
             "WHERE org_id = %s AND volunteer_id = %s",
-            (_is_active("Active"), supervisor_id, body.get("department"),
+            (_is_active("Active"), body.get("department"),
              gov_snap, city_snap, org_id, vol_id),
         )
         # Notify volunteer

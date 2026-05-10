@@ -12,7 +12,6 @@ import { SupervisorManagement } from "./pages/SupervisorManagement";
 import { EventManagement } from "./pages/EventManagement";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SupervisorDashboard } from "./pages/SupervisorDashboard";
-import { VolunteerDetail } from "./pages/VolunteerDetail";
 import { ProfilePage } from "./pages/ProfilePage";
 import { VolunteerOrgDashboard } from "./pages/VolunteerOrgDashboard";
 import { VolunteerOrgProfile } from "./pages/VolunteerOrgProfile";
@@ -84,7 +83,6 @@ export const router = createBrowserRouter([
 
       // Supervisor routes
       { path: "/supervisor", element: <ProtectedRoute allowedRoles={["supervisor"]}><SupervisorDashboard /></ProtectedRoute> },
-      { path: "/supervisor/volunteer/:id", element: <ProtectedRoute allowedRoles={["supervisor"]}><VolunteerDetail /></ProtectedRoute> },
       { path: "/supervisor/notifications", element: <ProtectedRoute allowedRoles={["supervisor"]}><NotificationsPage /></ProtectedRoute> },
 
       // Volunteer routes

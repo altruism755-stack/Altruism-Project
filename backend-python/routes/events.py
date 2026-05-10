@@ -55,7 +55,7 @@ def list_events(
         query = (
             "SELECT e.id, e.org_id, e.name, e.description, e.location, e.date, e.time, "
             "e.duration, e.max_volunteers, e.required_skills, e.status, "
-            "e.acceptance_mode, e.created_at, "
+            "e.acceptance_mode, e.registration_open, e.created_at, "
             "o.name as org_name, o.student_only as org_student_only, "
             "o.initials as org_initials, o.color as org_color, "
             "(SELECT COUNT(*) FROM event_applications ea "
@@ -88,7 +88,7 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
         event = dict_row(db.execute(
             "SELECT e.id, e.org_id, e.name, e.description, e.location, e.date, e.time, "
             "e.duration, e.max_volunteers, e.required_skills, e.status, "
-            "e.acceptance_mode, e.created_at, "
+            "e.acceptance_mode, e.registration_open, e.created_at, "
             "o.name as org_name, "
             "(SELECT COUNT(*) FROM event_applications ea "
             " WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
@@ -111,17 +111,15 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
             ).fetchone()
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
-            sup_id = sup["id"]
-            # Supervisors see approved participants assigned to them, with attendance status.
+            # Supervisors see all approved participants for this event (org-wide, no ownership filter).
             participants = dict_rows(db.execute(
                 "SELECT v.id, v.name, v.email, "
                 "a.id as activity_id, a.status as activity_status, a.hours "
                 "FROM event_applications ea "
                 "JOIN volunteers v ON ea.volunteer_id = v.id "
-                "JOIN org_volunteers ov ON v.id = ov.volunteer_id AND ov.supervisor_id = %s "
                 "LEFT JOIN activities a ON a.volunteer_id = v.id AND a.event_id = ea.event_id "
                 "WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
-                (sup_id, event_id),
+                (event_id,),
             ).fetchall())
         elif role == "org_admin":
             org = get_org_for_admin(db, current_user["id"])
@@ -161,8 +159,8 @@ def create_event(body: dict, current_user: dict = Depends(require_roles("org_adm
         row = db.execute(
             "INSERT INTO events "
             "(org_id, name, description, location, date, time, duration, max_volunteers, "
-            "required_skills, status, acceptance_mode) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Upcoming', %s) RETURNING id",
+            "required_skills, status, acceptance_mode, registration_open) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Upcoming', %s, TRUE) RETURNING id",
             (
                 org["id"], name, body.get("description", ""), body.get("location", ""),
                 date, body.get("time", ""), body.get("duration", 0),
@@ -199,6 +197,8 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
         if acceptance_mode is not None and acceptance_mode not in ("manual", "auto"):
             acceptance_mode = None
 
+        registration_open = body.get("registration_open")  # bool or None
+
         db.execute(
             "UPDATE events SET "
             "name = COALESCE(%s, name), description = COALESCE(%s, description), "
@@ -207,12 +207,15 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
             "max_volunteers = COALESCE(%s, max_volunteers), "
             "required_skills = COALESCE(%s, required_skills), "
             "status = COALESCE(%s, status), "
-            "acceptance_mode = COALESCE(%s, acceptance_mode) WHERE id = %s",
+            "acceptance_mode = COALESCE(%s, acceptance_mode), "
+            "registration_open = CASE WHEN %s IS NOT NULL THEN %s ELSE registration_open END "
+            "WHERE id = %s",
             (
                 body.get("name"), body.get("description"), body.get("location"),
                 body.get("date"), body.get("time"), body.get("duration"),
                 body.get("max_volunteers"), body.get("required_skills"),
-                new_status, acceptance_mode, event_id,
+                new_status, acceptance_mode,
+                registration_open, registration_open, event_id,
             ),
         )
         log_action(db, current_user["id"], current_user["role"], "update_event",
@@ -237,6 +240,82 @@ def delete_event(event_id: int, current_user: dict = Depends(require_roles("org_
         return {"message": "Event deleted"}
 
 
+@router.post("/{event_id}/activate")
+def activate_event(event_id: int, current_user: dict = Depends(require_roles("org_admin", "supervisor"))):
+    """
+    Transition an Upcoming event to Active.
+    Called by the frontend when the clock reaches event start time (auto) or manually by supervisor.
+    Supervisor must own the event; org_admin must own the org.
+    Also closes registration automatically on activation.
+    """
+    with get_db() as db:
+        event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+        if not event:
+            raise HTTPException(404, "Event not found")
+        if event["status"] != "Upcoming":
+            # Idempotent — already active or completed, just return current state.
+            return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+
+        if current_user["role"] == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup or sup["org_id"] != event["org_id"]:
+                raise HTTPException(403, FORBIDDEN)
+            if event.get("created_by_supervisor_id") != sup["id"]:
+                raise HTTPException(403, "You can only activate events you manage")
+        else:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
+                raise HTTPException(403, FORBIDDEN)
+
+        db.execute(
+            "UPDATE events SET status = 'Active', registration_open = FALSE WHERE id = %s",
+            (event_id,),
+        )
+        log_action(db, current_user["id"], current_user["role"], "activate_event",
+                   "event", event_id, {})
+        return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+
+
+@router.put("/{event_id}/registration")
+def toggle_registration(
+    event_id: int,
+    body: dict,
+    current_user: dict = Depends(require_roles("org_admin", "supervisor")),
+):
+    """Open or close volunteer registration for an Upcoming event."""
+    with get_db() as db:
+        event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+        if not event:
+            raise HTTPException(404, "Event not found")
+        if event["status"] != "Upcoming":
+            raise HTTPException(409, "Registration can only be toggled for Upcoming events")
+
+        if current_user["role"] == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup or sup["org_id"] != event["org_id"]:
+                raise HTTPException(403, FORBIDDEN)
+            if event.get("created_by_supervisor_id") != sup["id"]:
+                raise HTTPException(403, "You can only manage registration for events you own")
+        else:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
+                raise HTTPException(403, FORBIDDEN)
+
+        open_val = body.get("registration_open")
+        if not isinstance(open_val, bool):
+            raise HTTPException(400, "registration_open must be a boolean")
+
+        db.execute("UPDATE events SET registration_open = %s WHERE id = %s", (open_val, event_id))
+        log_action(db, current_user["id"], current_user["role"],
+                   "open_registration" if open_val else "close_registration",
+                   "event", event_id, {})
+        return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+
+
 @router.post("/{event_id}/attendance", status_code=201)
 def bulk_mark_attendance(
     event_id: int,
@@ -246,7 +325,7 @@ def bulk_mark_attendance(
     """
     Mark attendance for a list of approved participants.
     Allowed when the event is Active or Completed.
-    Supervisors may only mark attendance for their assigned volunteers.
+    Supervisors may only mark attendance for events they own (created_by_supervisor_id).
     Idempotent: updates existing activity records rather than duplicating.
     """
     with exclusive_db() as db:
@@ -263,15 +342,15 @@ def bulk_mark_attendance(
                 f"Attendance can only be recorded for Active or Completed events (current: {event['status']})",
             )
 
-        # Resolve caller org and optional supervisor id.
-        supervisor_id = None
+        # Resolve caller org; supervisors must own this event.
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
                 "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
             ).fetchone())
             if not sup or sup["org_id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
-            supervisor_id = sup["id"]
+            if event.get("created_by_supervisor_id") != sup["id"]:
+                raise HTTPException(403, "You can only record attendance for events you manage")
             caller_org_id = sup["org_id"]
         else:
             org = get_org_for_admin(db, current_user["id"])
@@ -305,44 +384,23 @@ def bulk_mark_attendance(
             hours = None
             act_status = "Completed"
 
-        # Resolve the eligible volunteer IDs in one query:
-        # volunteers who have an Approved application, are Active org members,
-        # and (if supervisor) are assigned to this supervisor.
-        if supervisor_id:
-            eligible_rows = db.execute(
-                """
-                SELECT ea.volunteer_id, v.user_id
-                FROM event_applications ea
-                JOIN org_volunteers ov
-                    ON ov.volunteer_id = ea.volunteer_id
-                    AND ov.org_id = %s
-                    AND ov.status = 'Active'
-                    AND ov.supervisor_id = %s
-                JOIN volunteers v ON v.id = ea.volunteer_id
-                WHERE ea.event_id = %s
-                  AND ea.status = 'Approved'
-                  AND ea.cancelled_at IS NULL
-                  AND ea.volunteer_id = ANY(%s)
-                """,
-                (caller_org_id, supervisor_id, event_id, list(volunteer_ids)),
-            ).fetchall()
-        else:
-            eligible_rows = db.execute(
-                """
-                SELECT ea.volunteer_id, v.user_id
-                FROM event_applications ea
-                JOIN org_volunteers ov
-                    ON ov.volunteer_id = ea.volunteer_id
-                    AND ov.org_id = %s
-                    AND ov.status = 'Active'
-                JOIN volunteers v ON v.id = ea.volunteer_id
-                WHERE ea.event_id = %s
-                  AND ea.status = 'Approved'
-                  AND ea.cancelled_at IS NULL
-                  AND ea.volunteer_id = ANY(%s)
-                """,
-                (caller_org_id, event_id, list(volunteer_ids)),
-            ).fetchall()
+        # Resolve eligible volunteer IDs: Approved applicants who are Active org members.
+        eligible_rows = db.execute(
+            """
+            SELECT ea.volunteer_id, v.user_id
+            FROM event_applications ea
+            JOIN org_volunteers ov
+                ON ov.volunteer_id = ea.volunteer_id
+                AND ov.org_id = %s
+                AND ov.status = 'Active'
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            WHERE ea.event_id = %s
+              AND ea.status = 'Approved'
+              AND ea.cancelled_at IS NULL
+              AND ea.volunteer_id = ANY(%s)
+            """,
+            (caller_org_id, event_id, list(volunteer_ids)),
+        ).fetchall()
 
         eligible_map = {r["volunteer_id"]: r["user_id"] for r in eligible_rows}
         skipped_count = len(volunteer_ids) - len(eligible_map)

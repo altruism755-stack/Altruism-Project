@@ -143,9 +143,11 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
         if not event:
             raise HTTPException(404, "Event not found")
 
-        # Applications only allowed when event is Upcoming.
+        # Applications only allowed when event is Upcoming and registration is open.
         if event.get("status") != "Upcoming":
             raise HTTPException(409, "Applications are only accepted for upcoming events")
+        if not event.get("registration_open", True):
+            raise HTTPException(409, "Registration for this event is currently closed")
 
         # Student-only eligibility check
         org = dict_row(db.execute(
@@ -343,7 +345,7 @@ def list_org_applications(
     with get_db() as db:
         apps = dict_rows(db.execute(
             "SELECT ea.*, v.name as volunteer_name, v.email as volunteer_email, "
-            "e.name as event_name, e.status as event_status, e.acceptance_mode "
+            "e.name as event_name, e.status as event_status, e.acceptance_mode, e.registration_open "
             "FROM event_applications ea "
             "JOIN volunteers v ON ea.volunteer_id = v.id "
             "JOIN events e ON ea.event_id = e.id "
@@ -548,3 +550,61 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
                 "/dashboard/profile",
             )
         return {"message": "Application rejected"}
+
+
+@router.post("/event/{event_id}/attendance")
+def mark_attendance(
+    event_id: int,
+    body: dict,
+    current_user: dict = Depends(require_roles("org_admin", "supervisor")),
+):
+    """
+    Bulk-set attendance_status (Attended | Absent) for approved applicants.
+    Accepts: { records: [{app_id: int, attendance_status: "Attended"|"Absent"}, ...] }
+    Only valid when event is Active or Completed.
+    Supervisors must own the event.
+    """
+    with get_db() as db:
+        event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+        if not event:
+            raise HTTPException(404, "Event not found")
+        if event["status"] not in ("Active", "Completed"):
+            raise HTTPException(409, "Attendance can only be marked for Active or Completed events")
+
+        if current_user["role"] == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup or sup["org_id"] != event["org_id"]:
+                raise HTTPException(403, "You do not have permission to access this resource")
+            if event.get("created_by_supervisor_id") != sup["id"]:
+                raise HTTPException(403, "You can only mark attendance for events you manage")
+        else:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != event["org_id"]:
+                raise HTTPException(403, "You do not have permission to access this resource")
+
+        records = body.get("records") or []
+        if not records:
+            raise HTTPException(400, "records list is required")
+
+        updated = 0
+        for rec in records:
+            app_id = rec.get("app_id")
+            att_status = rec.get("attendance_status")
+            if att_status not in ("Attended", "Absent"):
+                continue
+            result = db.execute(
+                """
+                UPDATE event_applications
+                SET attendance_status = %s
+                WHERE id = %s AND event_id = %s
+                  AND status = 'Approved' AND cancelled_at IS NULL
+                """,
+                (att_status, app_id, event_id),
+            )
+            updated += result.rowcount
+
+        log_action(db, current_user["id"], current_user["role"], "mark_attendance",
+                   "event", event_id, {"records_submitted": len(records), "updated": updated})
+        return {"updated": updated}

@@ -220,42 +220,44 @@ def compute_org_lifecycle(db, org_id: int) -> dict:
 
 # ── Supervisor lifecycle ──────────────────────────────────────────────────────
 
-def compute_supervisor_lifecycle(volunteers_count: int, pending_activities_count: int) -> dict:
-    """Review-pipeline lifecycle for a supervisor."""
+def compute_supervisor_lifecycle(events_count: int, pending_activities_count: int) -> dict:
+    """Event-management lifecycle for a supervisor."""
     steps = [
         _step(
-            "Volunteers Joined",
-            "done" if volunteers_count > 0 else "pending",
+            "Create Event",
+            "done" if events_count > 0 else "active",
+            "📅",
+            f"{events_count} event{'s' if events_count != 1 else ''} created"
+            if events_count > 0
+            else "Create your first event to get started",
+            "create_event",
+        ),
+        _step(
+            "Volunteers Join",
+            "done" if (events_count > 0 and pending_activities_count >= 0) else "pending",
             "👥",
-            f"{volunteers_count} active volunteer{'s' if volunteers_count != 1 else ''} in your team",
-            "goto_volunteers",
+            "Volunteers in your org can browse and join your events",
         ),
         _step(
-            "Hours Logged",
-            "done" if pending_activities_count > 0
-            else ("active" if volunteers_count > 0 else "pending"),
-            "⏱",
-            f"{pending_activities_count} submission{'s' if pending_activities_count != 1 else ''} ready for review"
+            "Mark Attendance",
+            "done" if pending_activities_count > 0 else ("active" if events_count > 0 else "pending"),
+            "✅",
+            f"{pending_activities_count} attendance record{'s' if pending_activities_count != 1 else ''} awaiting review"
             if pending_activities_count > 0
-            else "Waiting for volunteers to submit hours",
+            else "Record attendance after each event",
+            "goto_activities",
         ),
         _step(
-            "Under Review",
+            "Approve Hours",
             "active" if pending_activities_count > 0 else "pending",
-            "🔍",
+            "⏱",
             f"{pending_activities_count} pending — approve or reject below"
             if pending_activities_count > 0
             else "No pending submissions",
         ),
         _step(
-            "Approved",
-            "done" if (pending_activities_count == 0 and volunteers_count > 0) else "pending",
-            "✅",
-            "Hours approved and recorded",
-        ),
-        _step(
-            "Certificate",
-            "active" if (pending_activities_count == 0 and volunteers_count > 0) else "pending",
+            "Issue Certificate",
+            "active" if (pending_activities_count == 0 and events_count > 0) else "pending",
             "🏆",
             "Issue via '+ Certificate' alongside each activity approval",
         ),
@@ -266,8 +268,8 @@ def compute_supervisor_lifecycle(volunteers_count: int, pending_activities_count
             f"{pending_activities_count} submission"
             f"{'s' if pending_activities_count != 1 else ''} waiting for your review."
         )
-    elif volunteers_count == 0:
-        stuck = "No volunteers assigned yet — accept pending requests first."
+    elif events_count == 0:
+        stuck = "No events yet — create your first event."
     else:
         stuck = None
 
@@ -277,7 +279,7 @@ def compute_supervisor_lifecycle(volunteers_count: int, pending_activities_count
         "steps": steps,
         "current_step": current,
         "state": "SUPERVISOR_PIPELINE",
-        "volunteers_count": volunteers_count,
+        "events_count": events_count,
         "pending_activities": pending_activities_count,
         "stuck_msg": stuck,
     }
@@ -300,15 +302,14 @@ def get_supervisor_lifecycle(current_user: dict = Depends(require_roles("supervi
         ).fetchone())
         if not sup:
             raise HTTPException(404, "Supervisor not found")
-        volunteers_count = db.execute(
-            "SELECT COUNT(*) c FROM org_volunteers "
-            "WHERE org_id = %s AND supervisor_id = %s AND status = 'Active'",
+        events_count = db.execute(
+            "SELECT COUNT(*) c FROM events WHERE org_id = %s AND created_by_supervisor_id = %s",
             (sup["org_id"], sup["id"]),
         ).fetchone()["c"]
         pending_acts = db.execute(
             "SELECT COUNT(*) c FROM activities a "
-            "JOIN org_volunteers ov ON ov.volunteer_id = a.volunteer_id AND ov.supervisor_id = %s "
+            "JOIN events e ON e.id = a.event_id AND e.created_by_supervisor_id = %s "
             "WHERE a.org_id = %s AND a.status = 'Pending'",
             (sup["id"], sup["org_id"]),
         ).fetchone()["c"]
-        return {"lifecycle": compute_supervisor_lifecycle(volunteers_count, pending_acts)}
+        return {"lifecycle": compute_supervisor_lifecycle(events_count, pending_acts)}

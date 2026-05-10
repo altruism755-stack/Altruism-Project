@@ -323,7 +323,6 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     ov.id                                                            AS membership_id,
                     ov.volunteer_id,
                     ov.org_id                                                        AS organization_id,
-                    COALESCE(ov.supervisor_id, -1)                                   AS supervisor_id,
                     COALESCE(ov.department, '')                                      AS department,
                     ov.status                                                        AS membership_status,
                     ov.join_source,

@@ -29,9 +29,13 @@ def _resolve_org_admin(db, user_id: int) -> dict:
 
 
 def _assert_supervisor_volunteer(db, supervisor_id: int, volunteer_id: int) -> None:
+    """Verify volunteer is an active org member of the supervisor's org."""
+    sup = dict_row(db.execute("SELECT org_id FROM supervisors WHERE id = %s", (supervisor_id,)).fetchone())
+    if not sup:
+        raise HTTPException(403, FORBIDDEN)
     row = db.execute(
-        "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
-        (volunteer_id, supervisor_id),
+        "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'Active'",
+        (volunteer_id, sup["org_id"]),
     ).fetchone()
     if not row:
         raise HTTPException(403, FORBIDDEN)
@@ -49,36 +53,26 @@ def _assert_org_volunteer(db, org_id: int, volunteer_id: int) -> None:
 @router.get("")
 def list_volunteers(
     status: Optional[str] = None,
-    supervisor: Optional[str] = None,
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    current_user: dict = Depends(require_roles("org_admin", "supervisor")),
+    current_user: dict = Depends(require_roles("org_admin")),
 ):
     with get_db() as db:
         _joins = (
             "FROM volunteers v "
-            "LEFT JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "LEFT JOIN supervisors s ON ov.supervisor_id = s.id"
+            "LEFT JOIN org_volunteers ov ON v.id = ov.volunteer_id"
         )
         filters: list[str] = []
         params: list = []
 
-        if current_user["role"] == "supervisor":
-            sup = _resolve_supervisor(db, current_user["id"])
-            filters.append("ov.supervisor_id = %s")
-            params.append(sup["id"])
-        else:
-            org = _resolve_org_admin(db, current_user["id"])
-            filters.append("ov.org_id = %s")
-            params.append(org["id"])
+        org = _resolve_org_admin(db, current_user["id"])
+        filters.append("ov.org_id = %s")
+        params.append(org["id"])
 
         if status:
             filters.append("v.status = %s")
             params.append(status)
-        if supervisor:
-            filters.append("s.name = %s")
-            params.append(supervisor)
         if search:
             filters.append("(v.name ILIKE %s OR v.email ILIKE %s)")
             params.extend([f"%{search}%", f"%{search}%"])
@@ -88,14 +82,14 @@ def list_volunteers(
         total = db.execute(f"SELECT COUNT(*) as total {_joins}{where}", params).fetchone()["total"]
 
         offset = (page - 1) * limit
-        query = f"SELECT v.*, ov.department, ov.supervisor_id, s.name as supervisor_name {_joins}{where} LIMIT %s OFFSET %s"
+        query = f"SELECT v.*, ov.department {_joins}{where} LIMIT %s OFFSET %s"
         volunteers = dict_rows(db.execute(query, params + [limit, offset]).fetchall())
 
         return {
             "volunteers": volunteers,
             "total": total,
             "page": page,
-            "totalPages": -(-total // limit),  # ceil division
+            "totalPages": -(-total // limit),
         }
 
 

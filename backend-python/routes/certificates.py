@@ -40,12 +40,7 @@ def list_certificates(
             ).fetchone())
             if not sup:
                 raise HTTPException(403, "You do not have permission to access this resource")
-            # Only certs for volunteers assigned to this supervisor, within their org.
-            extra_join = (
-                " JOIN org_volunteers ov ON c.volunteer_id = ov.volunteer_id"
-                " AND ov.supervisor_id = %s"
-            )
-            params.append(sup["id"])
+            # Certs for any volunteer in the supervisor's org.
             clauses.append("c.org_id = %s")
             params.append(sup["org_id"])
         elif role == "org_admin":
@@ -91,14 +86,14 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
         if not certificate_title:
             raise HTTPException(400, "certificate_title is required")
 
-        # Supervisors may only issue certificates for their assigned volunteers.
+        # Supervisors may issue certificates for any volunteer in their org.
         if current_user["role"] == "supervisor" and sup_record:
-            assignment = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
-                (volunteer_id, sup_record["id"]),
+            membership = db.execute(
+                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'Active'",
+                (volunteer_id, sup_record["org_id"]),
             ).fetchone()
-            if not assignment:
-                raise HTTPException(403, "You do not have permission to access this resource")
+            if not membership:
+                raise HTTPException(403, "Volunteer is not an active member of your organization")
 
         row = db.execute(
             "INSERT INTO certificates (volunteer_id, org_id, event_id, certificate_title) VALUES (%s, %s, %s, %s) RETURNING id",
@@ -154,12 +149,6 @@ async def upload_certificate_file(
             ).fetchone())
             if not sup or sup["org_id"] != cert["org_id"]:
                 raise HTTPException(403, "Not authorized for this certificate's organization")
-            assignment = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND supervisor_id = %s",
-                (cert["volunteer_id"], sup["id"]),
-            ).fetchone()
-            if not assignment:
-                raise HTTPException(403, "You do not have permission to access this resource")
         else:
             org = get_org_for_admin(db, current_user["id"])
             if org["id"] != cert["org_id"]:

@@ -1,42 +1,33 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { WorkflowPanel, type WorkflowAction } from "../components/WorkflowPanel";
-import { LifecycleStepper, MiniLifecycleStepper } from "../components/StatusPill";
-import { resolveStepActions, buildEventMiniSteps, type BackendLifecycle } from "../lib/lifecycle";
-import { EVENT_STATUS, ACTIVITY_STATUS } from "../types";
+import { MiniLifecycleStepper } from "../components/StatusPill";
+import { buildEventMiniSteps } from "../lib/lifecycle";
+import { ACTIVITY_STATUS } from "../types";
 import { Pagination, usePagination } from "../components/Pagination";
+import { EventDetailModal } from "../components/EventDetailModal";
 
 const GREEN = "#16A34A";
 
-type DashTab = "volunteers" | "pending" | "activities" | "events";
+type DashTab = "my-events" | "applications" | "activities" | "org-events";
 
 export function SupervisorDashboard() {
-  const navigate = useNavigate();
   const { profile } = useAuth();
   const supName = profile?.name || "Supervisor";
 
   const [org, setOrg] = useState<any>(null);
-  const [volunteers, setVolunteers] = useState<any[]>([]);
-  const [pending, setPending] = useState<any[]>([]);
+  const [myEvents, setMyEvents] = useState<any[]>([]);
+  const [orgEvents, setOrgEvents] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<DashTab>("volunteers");
-  const [supLifecycle, setSupLifecycle] = useState<BackendLifecycle | null>(null);
-
-  // Pending requests modal state
-  const [selectedVol, setSelectedVol] = useState<any | null>(null);
-  const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
+  const [tab, setTab] = useState<DashTab>("my-events");
 
   // Certificate modal state
   const [certActivity, setCertActivity] = useState<any | null>(null);
   const [certForm, setCertForm] = useState({ title: "" });
   const [certBusy, setCertBusy] = useState(false);
-  // After issuing, hold the new cert ID so we can attach a file
   const [issuedCertId, setIssuedCertId] = useState<number | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [certUploadBusy, setCertUploadBusy] = useState(false);
@@ -48,64 +39,78 @@ export function SupervisorDashboard() {
   const [logBusy, setLogBusy] = useState(false);
   const [logError, setLogError] = useState("");
 
-  // Create activity panel state
-  const emptyActivityForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming", acceptanceMode: "manual" as "manual" | "auto" };
-  const [showCreateActivity, setShowCreateActivity] = useState(false);
-  const [activityForm, setActivityForm] = useState(emptyActivityForm);
-  const [activitySaving, setActivitySaving] = useState(false);
+  // Create event panel state
+  const emptyEventForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", acceptanceMode: "manual" as "manual" | "auto" };
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [eventForm, setEventForm] = useState(emptyEventForm);
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventError, setEventError] = useState("");
+
+  // Event detail modal
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+
+  // Org-level volunteer list for "Log Activity" dropdown (all active org members)
+  const [orgVolunteers, setOrgVolunteers] = useState<any[]>([]);
 
   const tracksHours = org != null && org.tracks_hours !== false && org.tracks_hours !== 0;
 
-  const { page: volsPage, setPage: setVolsPage, totalPages: volsTotalPages, pageItems: pageVolunteers, reset: resetVolsPage } = usePagination(volunteers);
-  const { page: pendPage, setPage: setPendPage, totalPages: pendTotalPages, pageItems: pagePending, reset: resetPendPage } = usePagination(pending);
+  const { page: myEvtsPage, setPage: setMyEvtsPage, totalPages: myEvtsTotalPages, pageItems: pageMyEvents, reset: resetMyEvtsPage } = usePagination(myEvents, 12);
+  const { page: appsPage, setPage: setAppsPage, totalPages: appsTotalPages, pageItems: pageApplications, reset: resetAppsPage } = usePagination(applications);
   const { page: actsPage, setPage: setActsPage, totalPages: actsTotalPages, pageItems: pageActivities, reset: resetActsPage } = usePagination(activities);
-  const { page: evtsPage, setPage: setEvtsPage, totalPages: evtsTotalPages, pageItems: pageEvents, reset: resetEvtsPage } = usePagination(events, 12);
+  const { page: orgEvtsPage, setPage: setOrgEvtsPage, totalPages: orgEvtsTotalPages, pageItems: pageOrgEvents, reset: resetOrgEvtsPage } = usePagination(orgEvents, 12);
+
   useEffect(() => {
-    resetVolsPage(); resetPendPage(); resetActsPage(); resetEvtsPage();
+    resetMyEvtsPage(); resetAppsPage(); resetActsPage(); resetOrgEvtsPage();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   const loadAll = useCallback(async () => {
     try {
-      const [profileRes, volsRes, pendingRes, actsRes, evtsRes, lcRes] = await Promise.all([
+      const [profileRes, myEvtsRes, appsRes, actsRes, orgEvtsRes] = await Promise.all([
         api.getMyProfile(),
-        api.getMyVolunteers(),
-        api.getMyPendingRequests(),
-        api.getMyActivities(),
         api.getMyEvents(),
-        api.getSupervisorLifecycle(),
+        api.getMyApplications("Pending"),
+        api.getMyActivities("Pending"),
+        api.getMyOrgEvents(),
       ]);
       setOrg(profileRes.organization);
-      setVolunteers(volsRes.volunteers || []);
-      setPending(pendingRes.pending || []);
+      setMyEvents(myEvtsRes.events || []);
+      setApplications(appsRes.applications || []);
       setActivities(actsRes.activities || []);
-      setEvents(evtsRes.events || []);
-      setSupLifecycle(lcRes.lifecycle || null);
+      setOrgEvents(orgEvtsRes.events || []);
+
+      // Load all active org volunteers for the log-activity dropdown.
+      // We reuse the org events participants or fetch separately via activities endpoint scoped to org.
+      // Simpler: pull from the org events list and deduplicate — but we need a volunteer list.
+      // For now, we keep a lightweight fetch via the activities list's volunteer names or store separately.
     } catch (e) { console.error("Failed to load supervisor dashboard:", e); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
-
-  const handleApproveRequest = async (volId: number) => {
+  // Fetch org volunteers for the log-activity dropdown (org members).
+  const loadOrgVolunteers = useCallback(async () => {
     try {
-      await api.approveMyRequest(volId, {});
-      setSelectedVol(null);
-      setPending((prev) => prev.filter((v) => v.id !== volId));
-      setSuccessMsg("Volunteer assigned to you");
-      setTimeout(() => setSuccessMsg(""), 3500);
-    } catch (e: any) {
-      alert(e?.message || "Failed to accept volunteer");
-    }
+      // Use the org-wide activities endpoint to collect unique volunteers — or call a dedicated endpoint if available.
+      // Since we have no /supervisors/me/org-volunteers, we derive from the org events participant list lazily.
+      // Alternatively, store volunteers seen in activities. For robustness, we skip auto-fill and let the supervisor
+      // type the volunteer ID. A future endpoint can provide this list.
+    } catch (e) { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadAll(); loadOrgVolunteers(); }, [loadAll, loadOrgVolunteers]);
+
+  const handleApproveApplication = async (id: number) => {
+    try {
+      await api.approveMyApplication(id);
+      setApplications((a) => a.filter((app) => app.id !== id));
+    } catch (e) { console.error("Approve application failed:", e); }
   };
 
-  const handleRejectRequest = async (volId: number) => {
+  const handleRejectApplication = async (id: number) => {
     try {
-      await api.rejectMyRequest(volId);
-      setRejectConfirm(null);
-      setSelectedVol(null);
-      setPending((prev) => prev.filter((v) => v.id !== volId));
-    } catch (e) { console.error("Reject failed:", e); }
+      await api.rejectMyApplication(id);
+      setApplications((a) => a.filter((app) => app.id !== id));
+    } catch (e) { console.error("Reject application failed:", e); }
   };
 
   const handleApproveActivity = async (id: number) => {
@@ -120,7 +125,6 @@ export function SupervisorDashboard() {
     if (!certForm.title.trim()) return;
     setCertBusy(true);
     try {
-      // Only call approve for hour-based activities; participation ones are already Completed.
       if (certActivity.status !== ACTIVITY_STATUS.Completed) {
         await api.approveActivity(certActivity.id);
       }
@@ -161,33 +165,34 @@ export function SupervisorDashboard() {
     } catch (e) { console.error("Reject activity failed:", e); }
   };
 
-  const handleCreateActivity = async () => {
-    setActivitySaving(true);
-    const data = {
-      name: activityForm.name,
-      description: activityForm.description,
-      location: activityForm.location,
-      date: activityForm.date,
-      time: activityForm.time,
-      duration: Number(activityForm.duration) || undefined,
-      max_volunteers: Number(activityForm.maxVolunteers) || undefined,
-      required_skills: activityForm.requiredSkills,
-      status: activityForm.status,
-      acceptance_mode: activityForm.acceptanceMode,
-      org_id: org?.id,
-    };
+  const handleCreateEvent = async () => {
+    setEventSaving(true);
+    setEventError("");
     try {
-      await api.createEvent(data);
-      setShowCreateActivity(false);
-      setActivityForm(emptyActivityForm);
+      await api.createMyEvent({
+        name: eventForm.name,
+        description: eventForm.description,
+        location: eventForm.location,
+        date: eventForm.date,
+        time: eventForm.time,
+        duration: Number(eventForm.duration) || undefined,
+        max_volunteers: Number(eventForm.maxVolunteers) || undefined,
+        required_skills: eventForm.requiredSkills,
+        acceptance_mode: eventForm.acceptanceMode,
+      });
+      setShowCreateEvent(false);
+      setEventForm(emptyEventForm);
+      setEventError("");
       loadAll();
-    } catch (e) { console.error("Failed to create activity:", e); }
-    finally { setActivitySaving(false); }
+    } catch (e: any) {
+      setEventError(e?.message || "Failed to create event. Please try again.");
+    }
+    finally { setEventSaving(false); }
   };
 
   const handleLogActivity = async () => {
     if (!logForm.volunteer_id || !logForm.date) {
-      setLogError("Volunteer and date are required.");
+      setLogError("Volunteer ID and date are required.");
       return;
     }
     if (tracksHours && !logForm.hours) {
@@ -215,68 +220,6 @@ export function SupervisorDashboard() {
     }
   };
 
-  const upcomingEvents = events.filter((e) => e.status === EVENT_STATUS.Upcoming || e.status === EVENT_STATUS.Active);
-
-  // Next Best Action cards
-  const nextActions: WorkflowAction[] = [];
-  if (pending.length > 0) {
-    nextActions.push({
-      priority: "urgent",
-      icon: "👥",
-      title: "Pending Requests",
-      desc: `${pending.length} volunteer${pending.length > 1 ? "s" : ""} applied to join. Accept or reject their requests.`,
-      cta: "Review Requests",
-      badge: pending.length,
-      onClick: () => setTab("pending"),
-    });
-  }
-  if (activities.length > 0) {
-    nextActions.push({
-      priority: "urgent",
-      icon: "📋",
-      title: "Activity Logs Pending",
-      desc: `${activities.length} volunteer hour submission${activities.length > 1 ? "s" : ""} waiting for your approval.`,
-      cta: "Review Hours",
-      badge: activities.length,
-      onClick: () => setTab("activities"),
-    });
-  }
-  if (upcomingEvents.length > 0 && pending.length === 0 && activities.length === 0) {
-    nextActions.push({
-      priority: "normal",
-      icon: "📅",
-      title: "Upcoming Events",
-      desc: `${upcomingEvents.length} event${upcomingEvents.length > 1 ? "s" : ""} scheduled. Ensure volunteers are prepared${tracksHours ? " and will log hours after" : ""}.`,
-      cta: "View Events",
-      onClick: () => setTab("events"),
-    });
-  }
-  if (volunteers.length > 0 && nextActions.length < 3) {
-    nextActions.push({
-      priority: "info",
-      icon: "👤",
-      title: "Your Volunteers",
-      desc: `${volunteers.length} active volunteer${volunteers.length > 1 ? "s" : ""} in ${org?.name || "your organization"}. Review their progress.`,
-      cta: "View Volunteers",
-      onClick: () => setTab("volunteers"),
-    });
-  }
-  if (nextActions.length === 0) {
-    nextActions.push({
-      priority: "success",
-      icon: "✅",
-      title: "All caught up!",
-      desc: tracksHours ? "No pending actions. Volunteers will submit hours after upcoming events." : "No pending actions. Log volunteer participation after upcoming events.",
-      cta: "View Events",
-      onClick: () => setTab("events"),
-    });
-  }
-
-  const supPipelineSteps = resolveStepActions(supLifecycle?.steps ?? [], {
-    goto_volunteers: () => setTab("volunteers"),
-    goto_activities: () => setTab("pending"),
-  });
-  const supStuckMsg = supLifecycle?.stuck_msg ?? undefined;
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -286,10 +229,10 @@ export function SupervisorDashboard() {
   );
 
   const tabs: { key: DashTab; label: string; badge?: number }[] = [
-    { key: "volunteers", label: "Volunteers", badge: volunteers.length || undefined },
-    { key: "pending", label: "Pending Requests", badge: pending.length || undefined },
+    { key: "my-events", label: "My Events", badge: myEvents.length || undefined },
+    { key: "applications", label: "Applications", badge: applications.length || undefined },
     { key: "activities", label: "Activity Approvals", badge: activities.length || undefined },
-    { key: "events", label: "Events" },
+    { key: "org-events", label: "All Org Events" },
   ];
 
   return (
@@ -304,17 +247,16 @@ export function SupervisorDashboard() {
             {supName}
           </h1>
           <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
-            {org?.name || "—"} · Supervisor
+            {org?.name || "—"} · Event Supervisor
           </p>
         </div>
 
         {/* Stat cards */}
-        <div className="grid grid-cols-4 gap-4" style={{ marginBottom: 24 }}>
+        <div className="grid grid-cols-3 gap-4" style={{ marginBottom: 24 }}>
           {[
-            { label: "Volunteers in Org", value: volunteers.length, gradient: "linear-gradient(135deg,#16A34A,#22C55E)", onClick: () => setTab("volunteers") },
-            { label: "Pending Requests", value: pending.length, gradient: pending.length > 0 ? "linear-gradient(135deg,#D97706,#F59E0B)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)", onClick: () => setTab("pending") },
-            { label: "Awaiting Approval", value: activities.length, gradient: activities.length > 0 ? "linear-gradient(135deg,#2563EB,#3B82F6)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)", onClick: () => setTab("activities") },
-            { label: "Upcoming Events", value: upcomingEvents.length, gradient: "linear-gradient(135deg,#0891B2,#06B6D4)", onClick: () => setTab("events") },
+            { label: "My Events", value: myEvents.length, gradient: "linear-gradient(135deg,#16A34A,#22C55E)", onClick: () => setTab("my-events") },
+            { label: "Pending Applications", value: applications.length, gradient: applications.length > 0 ? "linear-gradient(135deg,#D97706,#F59E0B)" : "linear-gradient(135deg,#94A3B8,#CBD5E1)", onClick: () => setTab("applications") },
+            { label: "Total Org Events", value: orgEvents.length, gradient: "linear-gradient(135deg,#0891B2,#06B6D4)", onClick: () => setTab("org-events") },
           ].map((s) => (
             <div
               key={s.label}
@@ -361,218 +303,86 @@ export function SupervisorDashboard() {
           </div>
 
           <div style={{ padding: 24 }}>
-            {/* Volunteers tab */}
-            {tab === "volunteers" && (
+
+            {/* My Events tab */}
+            {tab === "my-events" && (
               <div>
-                <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
-                  All active volunteers in <strong>{org?.name}</strong>. Click a volunteer to view their profile.
+                <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, color: "#64748B" }}>
+                    Events you created in <strong>{org?.name}</strong>. All org volunteers can browse and join these.
+                  </div>
+                  <button
+                    onClick={() => { setEventForm(emptyEventForm); setShowCreateEvent(true); }}
+                    style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    + New Event
+                  </button>
                 </div>
-                {volunteers.length === 0 ? (
-                  <EmptyState label="No active volunteers yet. Accept pending requests to onboard your first volunteers." />
+                {myEvents.length === 0 ? (
+                  <EmptyState label="No events yet. Create your first event so volunteers can join." />
                 ) : (
                   <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-                    {pageVolunteers.map((v) => (
-                      <div
-                        key={v.id}
-                        onClick={() => navigate(`/supervisor/volunteer/${v.id}`)}
-                        style={{
-                          border: "1px solid #E2E8F0", borderRadius: 10, padding: 16,
-                          cursor: "pointer", transition: "box-shadow 140ms, border-color 140ms",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#CBD5E1"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.boxShadow = ""; }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: GREEN, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-                            {(v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                            <div style={{ fontSize: 12, color: "#94A3B8" }}>
-                              {v.department || "—"} · {Number(v.total_hours || 0).toFixed(0)} hrs
+                  <div className="flex flex-col gap-3">
+                    {pageMyEvents.map((e) => <EventCard key={e.id} event={e} onViewActivities={() => setTab("activities")} isOwned onOpen={setSelectedEventId} />)}
+                  </div>
+                  <Pagination page={myEvtsPage} totalPages={myEvtsTotalPages} onPage={setMyEvtsPage} totalItems={myEvents.length} pageSize={12} />
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Applications tab */}
+            {tab === "applications" && (
+              <div>
+                <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
+                  Volunteer applications to join events you manage in <strong>{org?.name}</strong>.
+                </div>
+                {applications.length === 0 ? (
+                  <EmptyState label="No pending applications for your events." />
+                ) : (
+                  <>
+                  <div className="flex flex-col gap-3">
+                    {pageApplications.map((app) => (
+                      <div key={app.id} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 16 }}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{app.volunteer_name}</div>
+                            <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
+                              {app.event_name} · Applied {new Date(app.applied_date).toLocaleDateString()}
+                              {app.event_date ? ` · ${app.event_date}${app.event_time ? ` ${fmt12h(app.event_time)}` : ""}` : ""}
                             </div>
+                            {app.max_volunteers > 0 && (
+                              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>
+                                {app.approved_count} / {app.max_volunteers} spots filled
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2" style={{ flexShrink: 0 }}>
+                            <button
+                              onClick={() => handleApproveApplication(app.id)}
+                              style={{ height: 32, padding: "0 14px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                            >Approve</button>
+                            <button
+                              onClick={() => handleRejectApplication(app.id)}
+                              style={{ height: 32, padding: "0 14px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+                            >Reject</button>
                           </div>
                         </div>
-                        {v.supervisor_name && (
-                          <div style={{ fontSize: 11, color: "#64748B", marginTop: 8 }}>Supervisor: {v.supervisor_name}</div>
-                        )}
                       </div>
                     ))}
                   </div>
-                  <Pagination page={volsPage} totalPages={volsTotalPages} onPage={setVolsPage} totalItems={volunteers.length} />
+                  <Pagination page={appsPage} totalPages={appsTotalPages} onPage={setAppsPage} totalItems={applications.length} />
                   </>
                 )}
               </div>
             )}
 
-            {/* Pending requests tab */}
-            {tab === "pending" && (
-              <div>
-                {/* Success toast */}
-                {successMsg && (
-                  <div style={{ marginBottom: 16, padding: "10px 16px", backgroundColor: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#15803D" }}>
-                    ✓ {successMsg}
-                  </div>
-                )}
-                <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
-                  Volunteers who applied to join <strong>{org?.name}</strong>. Click a card to review and accept.
-                </div>
-                {pending.length === 0 ? (
-                  <EmptyState label="No pending requests." />
-                ) : (
-                  <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-                    {pagePending.map((v) => {
-                      let skills: string[] = [];
-                      try { skills = JSON.parse(v.skills || "[]"); } catch {}
-                      const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
-                      return (
-                        <div
-                          key={v.id}
-                          onClick={() => setSelectedVol(v)}
-                          style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 16, cursor: "pointer", backgroundColor: "#fff", transition: "box-shadow 140ms, border-color 140ms" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#CBD5E1"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.boxShadow = ""; }}
-                        >
-                          <div className="flex items-center gap-3" style={{ marginBottom: 10 }}>
-                            <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: GREEN, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-                              {initials}
-                            </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 700, color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                              <div style={{ fontSize: 12, color: "#94A3B8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.email}</div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: 11, color: "#64748B", marginBottom: 8 }}>Applied {v.joined_date || "—"}</div>
-                          {skills.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {skills.slice(0, 3).map((s) => (
-                                <span key={s} style={{ fontSize: 11, backgroundColor: "#F1F5F9", color: "#475569", borderRadius: 4, padding: "2px 7px" }}>{s}</span>
-                              ))}
-                              {skills.length > 3 && <span style={{ fontSize: 11, color: "#94A3B8" }}>+{skills.length - 3} more</span>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <Pagination page={pendPage} totalPages={pendTotalPages} onPage={setPendPage} totalItems={pending.length} />
-                  </>
-                )}
-
-                {/* Volunteer detail modal */}
-                {selectedVol && (() => {
-                  const v = selectedVol;
-                  let skills: string[] = [];
-                  let languages: string[] = [];
-                  let availability: string[] = [];
-                  try { skills = JSON.parse(v.skills || "[]"); } catch {}
-                  try { languages = JSON.parse(v.languages || "[]"); } catch {}
-                  try { availability = JSON.parse(v.availability || "[]"); } catch {}
-                  const initials = (v.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2);
-                  return (
-                    <>
-                      <div onClick={() => { setSelectedVol(null); setRejectConfirm(null); }} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.5)", zIndex: 50 }} />
-                      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 440, backgroundColor: "#fff", zIndex: 51, overflowY: "auto", boxShadow: "-4px 0 32px rgba(0,0,0,0.12)" }}>
-                        {/* Header */}
-                        <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #E2E8F0" }}>
-                          <div className="flex items-center gap-3" style={{ marginBottom: 4 }}>
-                            <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: GREEN, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-                              {initials}
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: "#1E293B" }}>{v.name}</div>
-                              <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 8 }}>Applied {v.joined_date || "—"}</div>
-                        </div>
-
-                        {/* Details */}
-                        <div style={{ padding: "20px 24px" }}>
-                          {[
-                            ["Phone", v.phone],
-                            ["City", v.city],
-                            ["Governorate", v.governorate],
-                            ["Gender", v.gender],
-                            ["Date of Birth", v.date_of_birth],
-                            ["Nationality", v.nationality],
-                            ["Education", v.education_level],
-                            ["University", v.university_name],
-                            ["Faculty", v.faculty],
-                            ["Field of Study", v.field_of_study],
-                            ["Study Year", v.study_year],
-                            ["Hours/Week", v.hours_per_week ? `${v.hours_per_week} hrs` : null],
-                            ["Prior Experience", v.prior_experience ? "Yes" : v.prior_experience === 0 ? "No" : null],
-                            ["Prior Org", v.prior_org],
-                          ].filter(([, val]) => val).map(([label, val]) => (
-                            <div key={label as string} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: "#64748B", minWidth: 120 }}>{label}</span>
-                              <span style={{ fontSize: 13, color: "#1E293B" }}>{val}</span>
-                            </div>
-                          ))}
-
-                          {skills.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>Skills</div>
-                              <div className="flex flex-wrap gap-1">
-                                {skills.map((s) => <span key={s} style={{ fontSize: 12, backgroundColor: "#F1F5F9", color: "#475569", borderRadius: 4, padding: "3px 8px" }}>{s}</span>)}
-                              </div>
-                            </div>
-                          )}
-                          {languages.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>Languages</div>
-                              <div className="flex flex-wrap gap-1">
-                                {languages.map((l: any, i: number) => { const label = typeof l === "string" ? l : l?.language || ""; const prof = l?.proficiency; return <span key={i} style={{ fontSize: 12, backgroundColor: "#EFF6FF", color: "#1D4ED8", borderRadius: 4, padding: "3px 8px" }}>{label}{prof ? ` · ${prof}` : ""}</span>; })}
-                              </div>
-                            </div>
-                          )}
-                          {availability.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6 }}>Availability</div>
-                              <div style={{ fontSize: 13, color: "#1E293B" }}>{availability.join(", ")}</div>
-                            </div>
-                          )}
-                          {v.health_notes && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 4 }}>Health Notes</div>
-                              <div style={{ fontSize: 13, color: "#1E293B" }}>{v.health_notes}</div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Actions */}
-                        <div style={{ padding: "16px 24px", borderTop: "1px solid #E2E8F0", position: "sticky", bottom: 0, backgroundColor: "#fff" }}>
-                          {rejectConfirm === v.id ? (
-                            <div style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: 14 }}>
-                              <div style={{ fontSize: 13, color: "#991B1B", marginBottom: 10 }}>Reject this volunteer's request?</div>
-                              <div className="flex gap-2">
-                                <button onClick={() => setRejectConfirm(null)} style={{ flex: 1, height: 36, backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                                <button onClick={() => handleRejectRequest(v.id)} style={{ flex: 1, height: 36, backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Confirm Reject</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex gap-2">
-                              <button onClick={() => setRejectConfirm(v.id)} style={{ flex: 1, height: 40, backgroundColor: "#fff", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Reject</button>
-                              <button onClick={() => handleApproveRequest(v.id)} style={{ flex: 2, height: 40, backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Accept & Assign to Me</button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Activity approvals tab */}
+            {/* Activity Approvals tab */}
             {tab === "activities" && (
               <div>
                 <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 14, color: "#64748B" }}>
-                    Activity logs for volunteers in <strong>{org?.name}</strong>. You can also log hours on behalf of a volunteer.
+                    Activity logs for your events in <strong>{org?.name}</strong>. You can also log hours on behalf of a volunteer.
                   </div>
                   <button
                     onClick={() => { setShowLogActivity(true); setLogError(""); }}
@@ -582,7 +392,7 @@ export function SupervisorDashboard() {
                   </button>
                 </div>
                 {activities.length === 0 ? (
-                  <EmptyState label="No pending activity approvals." />
+                  <EmptyState label="No pending activity approvals for your events." />
                 ) : (
                   <>
                   <div className="flex flex-col gap-3">
@@ -595,7 +405,7 @@ export function SupervisorDashboard() {
                               <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{a.volunteer_name}</div>
                               <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
                                 {a.event_name ? `Event: ${a.event_name} · ` : ""}
-                                {a.hours != null && a.hours > 0 ? `${a.hours} hrs contributed · ` : "Participated · "}
+                                {a.hours != null && a.hours > 0 ? `${a.hours} hrs · ` : "Participated · "}
                                 {a.date}
                               </div>
                               {a.description && (
@@ -608,7 +418,6 @@ export function SupervisorDashboard() {
                               )}
                               <button
                                 onClick={() => { setCertActivity(a); setCertForm({ title: "" }); }}
-                                title="Issue certificate"
                                 style={{ height: 32, padding: "0 14px", backgroundColor: "#0891B2", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                               >+ Certificate</button>
                               {!isParticipation && (
@@ -626,86 +435,25 @@ export function SupervisorDashboard() {
               </div>
             )}
 
-            {/* Events tab */}
-            {tab === "events" && (
+            {/* All Org Events tab */}
+            {tab === "org-events" && (
               <div>
-                <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 14, color: "#64748B" }}>
-                    Events for <strong>{org?.name}</strong>. Volunteers who attend should log their hours after each event.
-                  </div>
-                  <button
-                    onClick={() => { setActivityForm(emptyActivityForm); setShowCreateActivity(true); }}
-                    style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-                  >
-                    + New Activity
-                  </button>
+                <div style={{ fontSize: 14, color: "#64748B", marginBottom: 16 }}>
+                  All events in <strong>{org?.name}</strong> — visible to every volunteer in the organization.
                 </div>
-                {events.length === 0 ? (
+                {orgEvents.length === 0 ? (
                   <EmptyState label="No events found for your organization." />
                 ) : (
                   <>
                   <div className="flex flex-col gap-3">
-                    {pageEvents.map((e) => {
-                      const statusStyle: Record<string, { bg: string; color: string; band: string }> = {
-                        Upcoming: { bg: "#DBEAFE", color: "#1D4ED8", band: "#2563EB" },
-                        Active:   { bg: "#DCFCE7", color: "#15803D", band: GREEN },
-                        Completed:{ bg: "#F1F5F9", color: "#475569", band: "#94A3B8" },
-                      };
-                      const st = statusStyle[e.status] || statusStyle.Upcoming;
-                      const fillPct = e.max_volunteers > 0 ? Math.min(100, Math.round(((e.current_volunteers || 0) / e.max_volunteers) * 100)) : 0;
-                      const eventMiniSteps = buildEventMiniSteps({
-                        status: e.status,
-                        current_volunteers: e.current_volunteers || 0,
-                        onViewActivities: () => setTab("activities"),
-                      });
-                      return (
-                        <div key={e.id} style={{ border: "1px solid #E2E8F0", borderLeft: `4px solid ${st.band}`, borderRadius: 10, padding: 16 }}>
-                          <div className="flex items-start justify-between gap-4">
-                            <div style={{ flex: 1 }}>
-                              <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
-                                <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{e.name}</div>
-                                <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: st.bg, color: st.color, borderRadius: 4, padding: "2px 8px" }}>{e.status}</span>
-                              </div>
-                              <div style={{ fontSize: 13, color: "#64748B" }}>
-                                {e.date}{e.time ? ` · ${e.time}` : ""}
-                                {e.location ? ` · 📍 ${e.location}` : ""}
-                                {e.duration ? ` · ${e.duration} hrs` : ""}
-                              </div>
-                              {e.description && (
-                                <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6 }}>{e.description.slice(0, 120)}{e.description.length > 120 ? "…" : ""}</div>
-                              )}
-                              {e.max_volunteers > 0 && (
-                                <div style={{ marginTop: 10 }}>
-                                  <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
-                                    <span style={{ fontSize: 12, color: "#64748B" }}>Volunteer Capacity</span>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}>{e.current_volunteers || 0} / {e.max_volunteers}</span>
-                                  </div>
-                                  <div style={{ height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}>
-                                    <div style={{ height: "100%", width: `${fillPct}%`, backgroundColor: fillPct >= 90 ? "#DC2626" : fillPct >= 60 ? "#D97706" : GREEN, borderRadius: 3, transition: "width 300ms" }} />
-                                  </div>
-                                </div>
-                              )}
-                              {/* Event lifecycle mini stepper */}
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-                                <span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 500, whiteSpace: "nowrap" }}>Event flow:</span>
-                                <MiniLifecycleStepper steps={eventMiniSteps} />
-                              </div>
-                            </div>
-                            {e.status === "Active" && (
-                              <div style={{ flexShrink: 0 }}>
-                                <span style={{ fontSize: 11, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 6, padding: "4px 10px", fontWeight: 600 }}>Ongoing — review activity logs</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {pageOrgEvents.map((e) => <EventCard key={e.id} event={e} onViewActivities={() => setTab("activities")} />)}
                   </div>
-                  <Pagination page={evtsPage} totalPages={evtsTotalPages} onPage={setEvtsPage} totalItems={events.length} pageSize={12} />
+                  <Pagination page={orgEvtsPage} totalPages={orgEvtsTotalPages} onPage={setOrgEvtsPage} totalItems={orgEvents.length} pageSize={12} />
                   </>
                 )}
               </div>
             )}
+
           </div>
         </div>
       </div>
@@ -717,16 +465,13 @@ export function SupervisorDashboard() {
           style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 460, padding: 28 }}>
-
-            {/* Step 1 — Certificate title */}
             {!issuedCertId ? (
               <>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>
                   {certActivity.status !== ACTIVITY_STATUS.Completed ? "Approve & Issue Certificate" : "Issue Certificate"}
                 </div>
                 <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
-                  For <strong>{certActivity.volunteer_name}</strong>
-                  {certActivity.event_name ? <> — {certActivity.event_name}</> : null}.
+                  For <strong>{certActivity.volunteer_name}</strong>{certActivity.event_name ? <> — {certActivity.event_name}</> : null}.
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>
@@ -756,16 +501,14 @@ export function SupervisorDashboard() {
                 </div>
               </>
             ) : (
-              /* Step 2 — File upload */
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>✅</div>
                   <div style={{ fontSize: 17, fontWeight: 600, color: "#1E293B" }}>Certificate Issued!</div>
                 </div>
                 <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
-                  Upload the certificate file so <strong>{certActivity.volunteer_name}</strong> can view and download it from their profile.
+                  Upload the certificate file so <strong>{certActivity.volunteer_name}</strong> can download it from their profile.
                 </div>
-
                 <div
                   style={{ border: "2px dashed #E2E8F0", borderRadius: 10, padding: "20px 16px", textAlign: "center", marginBottom: 16, backgroundColor: certFile ? "#F0FDF4" : "#FAFAFA", cursor: "pointer" }}
                   onClick={() => document.getElementById("cert-file-input")?.click()}
@@ -789,23 +532,12 @@ export function SupervisorDashboard() {
                     </>
                   )}
                 </div>
-
                 {certUploadError && (
                   <div style={{ fontSize: 12, color: "#B91C1C", backgroundColor: "#FEE2E2", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>{certUploadError}</div>
                 )}
-
                 <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
-                  <button
-                    onClick={() => { setIssuedCertId(null); setCertActivity(null); setCertFile(null); }}
-                    style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
-                  >
-                    Skip for now
-                  </button>
-                  <button
-                    onClick={handleCertFileUpload}
-                    disabled={!certFile || certUploadBusy}
-                    style={{ height: 36, padding: "0 18px", backgroundColor: (!certFile || certUploadBusy) ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!certFile || certUploadBusy) ? "not-allowed" : "pointer" }}
-                  >
+                  <button onClick={() => { setIssuedCertId(null); setCertActivity(null); setCertFile(null); }} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Skip for now</button>
+                  <button onClick={handleCertFileUpload} disabled={!certFile || certUploadBusy} style={{ height: 36, padding: "0 18px", backgroundColor: (!certFile || certUploadBusy) ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!certFile || certUploadBusy) ? "not-allowed" : "pointer" }}>
                     {certUploadBusy ? "Uploading…" : "Upload File"}
                   </button>
                 </div>
@@ -815,91 +547,77 @@ export function SupervisorDashboard() {
         </div>
       )}
 
-      {/* Create Activity side panel */}
-      {showCreateActivity && (() => {
+      {/* Create Event side panel */}
+      {showCreateEvent && (() => {
         const inputStyle = { width: "100%", height: 42, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none", boxSizing: "border-box" as const };
         const labelStyle = { fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 };
         return (
           <>
-            <div onClick={() => setShowCreateActivity(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.3)", zIndex: 50 }} />
+            <div onClick={() => { setShowCreateEvent(false); setEventError(""); }} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.3)", zIndex: 50 }} />
             <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 500, backgroundColor: "#fff", zIndex: 51, boxShadow: "-8px 0 32px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column" }}>
               <div className="flex items-center justify-between px-6" style={{ height: 64, borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", margin: 0 }}>New Activity</h3>
-                <button onClick={() => setShowCreateActivity(false)} style={{ background: "none", border: "none", fontSize: 22, color: "#94A3B8", cursor: "pointer" }}>×</button>
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", margin: 0 }}>New Event</h3>
+                <button onClick={() => { setShowCreateEvent(false); setEventError(""); }} style={{ background: "none", border: "none", fontSize: 22, color: "#94A3B8", cursor: "pointer" }}>×</button>
               </div>
-
               <div className="flex-1 overflow-y-auto" style={{ padding: 24 }}>
+                {eventError && (
+                  <div style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{eventError}</div>
+                )}
                 <div className="flex flex-col gap-4">
                   <div>
-                    <label style={labelStyle}>Activity Name *</label>
-                    <input value={activityForm.name} onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Youth Leadership Workshop" style={inputStyle} />
+                    <label style={labelStyle}>Event Name *</label>
+                    <input value={eventForm.name} onChange={(e) => setEventForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Youth Leadership Workshop" style={inputStyle} />
                   </div>
-
                   <div>
                     <label style={labelStyle}>Description</label>
-                    <textarea value={activityForm.description} onChange={(e) => setActivityForm((f) => ({ ...f, description: e.target.value }))} placeholder="What will volunteers be doing?" style={{ ...inputStyle, height: 90, padding: "10px 12px", resize: "vertical" as const }} />
+                    <textarea value={eventForm.description} onChange={(e) => setEventForm((f) => ({ ...f, description: e.target.value }))} placeholder="What will volunteers be doing?" style={{ ...inputStyle, height: 90, padding: "10px 12px", resize: "vertical" as const }} />
                   </div>
-
                   <div>
                     <label style={labelStyle}>Location</label>
-                    <input value={activityForm.location} onChange={(e) => setActivityForm((f) => ({ ...f, location: e.target.value }))} placeholder="e.g. Cairo Community Center" style={inputStyle} />
+                    <input value={eventForm.location} onChange={(e) => setEventForm((f) => ({ ...f, location: e.target.value }))} placeholder="e.g. Cairo Community Center" style={inputStyle} />
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label style={labelStyle}>Date *</label>
-                      <input type="date" value={activityForm.date} onChange={(e) => setActivityForm((f) => ({ ...f, date: e.target.value }))} style={inputStyle} />
+                      <input type="date" value={eventForm.date} onChange={(e) => setEventForm((f) => ({ ...f, date: e.target.value }))} style={inputStyle} />
                     </div>
                     <div>
                       <label style={labelStyle}>Time</label>
-                      <input type="time" value={activityForm.time} onChange={(e) => setActivityForm((f) => ({ ...f, time: e.target.value }))} style={inputStyle} />
+                      <input type="time" value={eventForm.time} onChange={(e) => setEventForm((f) => ({ ...f, time: e.target.value }))} style={inputStyle} />
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label style={labelStyle}>Duration (hours)</label>
-                      <input type="number" min="0" step="0.5" value={activityForm.duration} onChange={(e) => setActivityForm((f) => ({ ...f, duration: e.target.value }))} style={inputStyle} />
+                      <input type="number" min="0" step="0.5" value={eventForm.duration} onChange={(e) => setEventForm((f) => ({ ...f, duration: e.target.value }))} style={inputStyle} />
                     </div>
                     <div>
                       <label style={labelStyle}>Max Volunteers</label>
-                      <input type="number" min="0" value={activityForm.maxVolunteers} onChange={(e) => setActivityForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={inputStyle} />
+                      <input type="number" min="0" value={eventForm.maxVolunteers} onChange={(e) => setEventForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={inputStyle} />
                     </div>
                   </div>
-
                   <div>
                     <label style={labelStyle}>Required Skills</label>
-                    <input value={activityForm.requiredSkills} onChange={(e) => setActivityForm((f) => ({ ...f, requiredSkills: e.target.value }))} placeholder="e.g. Communication, Fieldwork (comma separated)" style={inputStyle} />
+                    <input value={eventForm.requiredSkills} onChange={(e) => setEventForm((f) => ({ ...f, requiredSkills: e.target.value }))} placeholder="e.g. Communication, Fieldwork (comma separated)" style={inputStyle} />
                   </div>
-
-                  <div>
-                    <label style={labelStyle}>Status</label>
-                    <select value={activityForm.status} onChange={(e) => setActivityForm((f) => ({ ...f, status: e.target.value }))} style={inputStyle}>
-                      <option value="Upcoming">Upcoming</option>
-                      <option value="Active">Ongoing</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                  </div>
-
                   <div>
                     <label style={labelStyle}>Acceptance Mode</label>
-                    <select value={activityForm.acceptanceMode} onChange={(e) => setActivityForm((f) => ({ ...f, acceptanceMode: e.target.value as "manual" | "auto" }))} style={inputStyle}>
+                    <select value={eventForm.acceptanceMode} onChange={(e) => setEventForm((f) => ({ ...f, acceptanceMode: e.target.value as "manual" | "auto" }))} style={inputStyle}>
                       <option value="manual">✋ Manual Approval — you review each application</option>
                       <option value="auto">⚡ Auto Accept — first come, first served</option>
                     </select>
                     <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, marginBottom: 0 }}>
-                      {activityForm.acceptanceMode === "auto"
+                      {eventForm.acceptanceMode === "auto"
                         ? "Volunteers are accepted instantly up to the capacity limit."
                         : "You manually approve or reject each application."}
                     </p>
                   </div>
                 </div>
               </div>
-
               <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid #E2E8F0", flexShrink: 0 }}>
-                <button onClick={() => setShowCreateActivity(false)} style={{ flex: 1, height: 42, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
-                <button onClick={handleCreateActivity} disabled={activitySaving || !activityForm.name || !activityForm.date} style={{ flex: 1, height: 42, backgroundColor: activitySaving || !activityForm.name || !activityForm.date ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: activitySaving ? "not-allowed" : "pointer" }}>
-                  {activitySaving ? "Saving…" : "Create Activity"}
+                <button onClick={() => { setShowCreateEvent(false); setEventError(""); }} style={{ flex: 1, height: 42, backgroundColor: "#fff", color: "#64748B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                <button onClick={handleCreateEvent} disabled={eventSaving || !eventForm.name || !eventForm.date} style={{ flex: 1, height: 42, backgroundColor: eventSaving || !eventForm.name || !eventForm.date ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: eventSaving ? "not-allowed" : "pointer" }}>
+                  {eventSaving ? "Saving…" : "Create Event"}
                 </button>
               </div>
             </div>
@@ -914,8 +632,8 @@ export function SupervisorDashboard() {
             <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Log Activity for Volunteer</div>
             <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
               {tracksHours
-                ? `Record volunteer hours on behalf of a member of ${org?.name}.`
-                : `Record volunteer participation on behalf of a member of ${org?.name}.`}
+                ? `Record volunteer hours for an event you manage in ${org?.name}.`
+                : `Record volunteer participation for an event you manage in ${org?.name}.`}
             </div>
 
             {logError && (
@@ -924,17 +642,14 @@ export function SupervisorDashboard() {
 
             <div className="flex flex-col gap-4">
               <div>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Volunteer <span style={{ color: "#DC2626" }}>*</span></label>
-                <select
+                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Volunteer ID <span style={{ color: "#DC2626" }}>*</span></label>
+                <input
+                  type="number"
                   value={logForm.volunteer_id}
                   onChange={(e) => setLogForm((f) => ({ ...f, volunteer_id: e.target.value }))}
-                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
-                >
-                  <option value="">Select volunteer…</option>
-                  {volunteers.map((v) => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-                </select>
+                  placeholder="Enter volunteer ID"
+                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+                />
               </div>
 
               <div>
@@ -945,10 +660,11 @@ export function SupervisorDashboard() {
                   style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
                 >
                   <option value="">No specific event</option>
-                  {events.map((ev) => (
+                  {myEvents.map((ev) => (
                     <option key={ev.id} value={ev.id}>{ev.name}</option>
                   ))}
                 </select>
+                <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 3, marginBottom: 0 }}>Only your own events are listed — you may only log activities for events you manage.</p>
               </div>
 
               <div className="flex gap-3">
@@ -958,7 +674,7 @@ export function SupervisorDashboard() {
                     type="date"
                     value={logForm.date}
                     onChange={(e) => setLogForm((f) => ({ ...f, date: e.target.value }))}
-                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
                   />
                 </div>
                 {tracksHours && (
@@ -971,7 +687,7 @@ export function SupervisorDashboard() {
                       value={logForm.hours}
                       onChange={(e) => setLogForm((f) => ({ ...f, hours: e.target.value }))}
                       placeholder="e.g. 3"
-                      style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                      style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
                     />
                   </div>
                 )}
@@ -999,7 +715,7 @@ export function SupervisorDashboard() {
                   onChange={(e) => setLogForm((f) => ({ ...f, description: e.target.value }))}
                   rows={3}
                   placeholder="Brief notes about the activity…"
-                  style={{ width: "100%", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                  style={{ width: "100%", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", resize: "vertical", boxSizing: "border-box" as const }}
                 />
               </div>
 
@@ -1014,6 +730,98 @@ export function SupervisorDashboard() {
         </div>
       )}
 
+      {/* Event detail modal */}
+      {selectedEventId !== null && (
+        <EventDetailModal
+          eventId={selectedEventId}
+          onClose={() => setSelectedEventId(null)}
+          onEventUpdated={loadAll}
+        />
+      )}
+
+    </div>
+  );
+}
+
+function fmt12h(time?: string): string {
+  if (!time) return "";
+  const [hStr, mStr] = time.split(":");
+  const h = parseInt(hStr, 10);
+  const m = mStr || "00";
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
+
+function EventCard({ event: e, onViewActivities, isOwned, onOpen }: { event: any; onViewActivities: () => void; isOwned?: boolean; onOpen?: (id: number) => void }) {
+  const statusStyle: Record<string, { bg: string; color: string; band: string; label: string }> = {
+    Upcoming:  { bg: "#DBEAFE", color: "#1D4ED8", band: "#2563EB", label: "Upcoming" },
+    Active:    { bg: "#DCFCE7", color: "#15803D", band: GREEN,      label: "Live Now" },
+    Completed: { bg: "#F1F5F9", color: "#475569", band: "#94A3B8",  label: "Completed" },
+  };
+  const st = statusStyle[e.status] || statusStyle.Upcoming;
+  const fillPct = e.max_volunteers > 0 ? Math.min(100, Math.round(((e.current_volunteers || 0) / e.max_volunteers) * 100)) : 0;
+  const eventMiniSteps = buildEventMiniSteps({
+    status: e.status,
+    current_volunteers: e.current_volunteers || 0,
+    onViewActivities,
+  });
+  const clickable = !!onOpen;
+
+  return (
+    <div
+      onClick={clickable ? () => onOpen!(e.id) : undefined}
+      style={{
+        border: "1px solid #E2E8F0", borderLeft: `4px solid ${st.band}`, borderRadius: 10, padding: 16,
+        cursor: clickable ? "pointer" : "default",
+        transition: clickable ? "box-shadow 140ms, transform 140ms" : undefined,
+      }}
+      onMouseEnter={clickable ? (ev) => { ev.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; ev.currentTarget.style.transform = "translateY(-1px)"; } : undefined}
+      onMouseLeave={clickable ? (ev) => { ev.currentTarget.style.boxShadow = ""; ev.currentTarget.style.transform = ""; } : undefined}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div style={{ flex: 1 }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 4, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{e.name}</div>
+            <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: st.bg, color: st.color, borderRadius: 4, padding: "2px 8px" }}>{st.label}</span>
+            {isOwned && (
+              <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", borderRadius: 4, padding: "2px 8px" }}>Yours</span>
+            )}
+            {e.status === "Upcoming" && isOwned && !e.registration_open && (
+              <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#FEF3C7", color: "#92400E", borderRadius: 4, padding: "2px 8px" }}>Reg. Closed</span>
+            )}
+            {e.supervisor_name && !isOwned && (
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>by {e.supervisor_name}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 13, color: "#64748B" }}>
+            {e.date}{e.time ? ` · ${fmt12h(e.time)}` : ""}
+            {e.location ? ` · 📍 ${e.location}` : ""}
+            {e.duration ? ` · ${e.duration} hrs` : ""}
+          </div>
+          {e.description && (
+            <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6 }}>{e.description.slice(0, 120)}{e.description.length > 120 ? "…" : ""}</div>
+          )}
+          {e.max_volunteers > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: "#64748B" }}>Volunteer Capacity</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}>{e.current_volunteers || 0} / {e.max_volunteers}</span>
+              </div>
+              <div style={{ height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${fillPct}%`, backgroundColor: fillPct >= 90 ? "#DC2626" : fillPct >= 60 ? "#D97706" : GREEN, borderRadius: 3, transition: "width 300ms" }} />
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+            <span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 500, whiteSpace: "nowrap" }}>Event flow:</span>
+            <MiniLifecycleStepper steps={eventMiniSteps} />
+          </div>
+          {clickable && (
+            <div style={{ fontSize: 12, color: "#2563EB", marginTop: 8, fontWeight: 500 }}>Click to manage →</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

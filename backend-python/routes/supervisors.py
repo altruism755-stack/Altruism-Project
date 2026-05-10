@@ -3,11 +3,12 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 
-from database import get_db, dict_row, dict_rows
+from database import get_db, exclusive_db, dict_row, dict_rows
 from auth import get_current_user, require_roles, get_org_for_admin
+from routes.notifications import create_notification
+from routes.audit import log_action
 
 router = APIRouter(prefix="/api/supervisors", tags=["supervisors"])
-
 
 
 def _get_supervisor_record(db, user_id: int) -> dict:
@@ -30,9 +31,9 @@ def list_supervisors(current_user: dict = Depends(require_roles("org_admin"))):
         supervisors = dict_rows(db.execute(
             """
             SELECT s.*,
-                   COUNT(ov.id) AS assigned_volunteers
+                   COUNT(e.id) AS managed_events
             FROM supervisors s
-            LEFT JOIN org_volunteers ov ON ov.supervisor_id = s.id
+            LEFT JOIN events e ON e.created_by_supervisor_id = s.id
             WHERE s.org_id = %s
             GROUP BY s.id
             """,
@@ -57,7 +58,6 @@ def create_supervisor(body: dict, current_user: dict = Depends(require_roles("or
 
         existing_user = dict_row(db.execute("SELECT id, role FROM users WHERE email = %s", (email,)).fetchone())
         if existing_user:
-            # Refuse to silently hijack an account that belongs to another role.
             if existing_user["role"] != "supervisor":
                 raise HTTPException(
                     409,
@@ -67,7 +67,6 @@ def create_supervisor(body: dict, current_user: dict = Depends(require_roles("or
             user_id = existing_user["id"]
             invite_token = None
         else:
-            # Issue an invite token — never store a default password.
             invite_token = secrets.token_urlsafe(32)
             invite_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
             row = db.execute(
@@ -104,8 +103,9 @@ def delete_supervisor(supervisor_id: int, current_user: dict = Depends(require_r
         ).fetchone()
         if not result:
             raise HTTPException(404, "Supervisor not found in your organization")
+        # Disown their events so events are not orphaned — org admin retains them.
         db.execute(
-            "UPDATE org_volunteers SET supervisor_id = NULL WHERE supervisor_id = %s",
+            "UPDATE events SET created_by_supervisor_id = NULL WHERE created_by_supervisor_id = %s",
             (supervisor_id,),
         )
         db.execute(
@@ -135,129 +135,298 @@ def get_my_profile(current_user: dict = Depends(require_roles("supervisor"))):
         return {"supervisor": sup, "organization": org}
 
 
-@router.get("/me/volunteers")
-def get_my_volunteers(current_user: dict = Depends(require_roles("supervisor"))):
-    """Volunteers directly assigned to this supervisor."""
-    with get_db() as db:
-        sup = _get_supervisor_record(db, current_user["id"])
-
-        volunteers = dict_rows(db.execute(
-            "SELECT v.*, ov.department, ov.status as org_status, ov.joined_date, "
-            "ov.supervisor_id, s2.name as supervisor_name, "
-            "(SELECT SUM(a.hours) FROM activities a WHERE a.volunteer_id = v.id AND a.status = 'Approved') as total_hours "
-            "FROM volunteers v "
-            "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "LEFT JOIN supervisors s2 ON ov.supervisor_id = s2.id "
-            "WHERE ov.org_id = %s AND ov.supervisor_id = %s AND ov.status = 'Active' "
-            "ORDER BY v.name",
-            (sup["org_id"], sup["id"]),
-        ).fetchall())
-
-        return {"volunteers": volunteers}
-
-
-@router.get("/me/pending-requests")
-def get_pending_requests(current_user: dict = Depends(require_roles("supervisor"))):
-    """Pending volunteer join requests for the supervisor's org."""
-    with get_db() as db:
-        sup = _get_supervisor_record(db, current_user["id"])
-
-        pending = dict_rows(db.execute(
-            "SELECT v.*, ov.id as ov_id, ov.joined_date "
-            "FROM volunteers v "
-            "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-            "WHERE ov.org_id = %s AND ov.status = 'Pending' AND ov.supervisor_id IS NULL "
-            "ORDER BY ov.joined_date DESC",
-            (sup["org_id"],),
-        ).fetchall())
-
-        # Also get supervisors for assignment
-        supervisors = dict_rows(db.execute(
-            "SELECT id, name, team FROM supervisors WHERE org_id = %s AND status = 'Active'",
-            (sup["org_id"],),
-        ).fetchall())
-
-        return {"pending": pending, "supervisors": supervisors}
-
-
-@router.put("/me/requests/{vol_id}/approve")
-def approve_request(vol_id: int, body: dict, current_user: dict = Depends(require_roles("supervisor"))):
-    """Supervisor approves a pending volunteer join request for their org."""
-    with get_db() as db:
-        sup = _get_supervisor_record(db, current_user["id"])
-
-        # Prevent double assignment — FOR UPDATE serializes concurrent approve attempts
-        existing = dict_row(db.execute(
-            "SELECT supervisor_id FROM org_volunteers "
-            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending' FOR UPDATE",
-            (sup["org_id"], vol_id),
-        ).fetchone())
-        if not existing:
-            raise HTTPException(404, "Pending request not found")
-        if existing.get("supervisor_id") is not None:
-            raise HTTPException(409, "This volunteer has already been assigned to a supervisor")
-
-        vol = dict_row(db.execute(
-            "SELECT governorate, city FROM volunteers WHERE id = %s", (vol_id,)
-        ).fetchone())
-        gov_snap = (vol or {}).get("governorate") or ""
-        city_snap = (vol or {}).get("city") or ""
-        db.execute(
-            "UPDATE org_volunteers SET status = 'Active', supervisor_id = %s, department = %s, "
-            "is_active = 1, joined_at = NOW(), "
-            "governorate_snapshot = %s, city_snapshot = %s "
-            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
-            (sup["id"], body.get("department", ""),
-             gov_snap, city_snap, sup["org_id"], vol_id),
-        )
-        return {"message": "Volunteer assigned to you"}
-
-
-@router.put("/me/requests/{vol_id}/reject")
-def reject_request(vol_id: int, current_user: dict = Depends(require_roles("supervisor"))):
-    """Supervisor rejects a pending volunteer join request for their org."""
-    with get_db() as db:
-        sup = _get_supervisor_record(db, current_user["id"])
-        db.execute(
-            "UPDATE org_volunteers SET status = 'Rejected' "
-            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
-            (sup["org_id"], vol_id),
-        )
-        return {"message": "Request rejected"}
-
-
 @router.get("/me/events")
 def get_my_events(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(require_roles("supervisor")),
 ):
-    """Events for the supervisor's org."""
+    """Events created by this supervisor (the ones they manage)."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
         events = dict_rows(db.execute(
-            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC LIMIT %s OFFSET %s",
+            "SELECT * FROM events WHERE org_id = %s AND created_by_supervisor_id = %s "
+            "ORDER BY date DESC LIMIT %s OFFSET %s",
+            (sup["org_id"], sup["id"], limit, offset),
+        ).fetchall())
+        return {"events": events, "limit": limit, "offset": offset}
+
+
+@router.get("/me/org-events")
+def get_org_events(
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict = Depends(require_roles("supervisor")),
+):
+    """All events in the supervisor's organization (visible to all volunteers)."""
+    with get_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+        events = dict_rows(db.execute(
+            "SELECT e.*, s.name as supervisor_name "
+            "FROM events e "
+            "LEFT JOIN supervisors s ON e.created_by_supervisor_id = s.id "
+            "WHERE e.org_id = %s ORDER BY e.date DESC LIMIT %s OFFSET %s",
             (sup["org_id"], limit, offset),
         ).fetchall())
         return {"events": events, "limit": limit, "offset": offset}
 
 
-@router.get("/me/activities")
-def get_my_activities(current_user: dict = Depends(require_roles("supervisor"))):
-    """Pending activity logs for volunteers assigned to this supervisor."""
+@router.get("/me/events/{event_id}")
+def get_my_event_detail(event_id: int, current_user: dict = Depends(require_roles("supervisor"))):
+    """Full event detail including all applicants grouped by status with attendance_status."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
 
+        event = dict_row(db.execute(
+            "SELECT * FROM events WHERE id = %s AND created_by_supervisor_id = %s",
+            (event_id, sup["id"]),
+        ).fetchone())
+        if not event:
+            raise HTTPException(404, "Event not found or you do not own this event")
+
+        applicants = dict_rows(db.execute(
+            """
+            SELECT ea.id as app_id, ea.volunteer_id, ea.status, ea.applied_date,
+                   ea.attendance_status,
+                   v.name as volunteer_name, v.email as volunteer_email
+            FROM event_applications ea
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            WHERE ea.event_id = %s AND ea.cancelled_at IS NULL
+            ORDER BY ea.applied_date ASC
+            """,
+            (event_id,),
+        ).fetchall())
+
+        return {**event, "applicants": applicants}
+
+
+@router.post("/me/events", status_code=201)
+def create_my_event(body: dict, current_user: dict = Depends(require_roles("supervisor"))):
+    """Supervisor creates a new event. They become the owner (created_by_supervisor_id)."""
+    with get_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        name = body.get("name", "").strip()
+        if not name:
+            raise HTTPException(400, "Event name is required")
+        date = body.get("date")
+        if not date:
+            raise HTTPException(400, "Event date is required")
+
+        row = db.execute(
+            "INSERT INTO events (org_id, name, description, location, date, time, duration, "
+            "max_volunteers, required_skills, status, acceptance_mode, registration_open, created_by_supervisor_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id",
+            (
+                sup["org_id"],
+                name,
+                body.get("description", ""),
+                body.get("location", ""),
+                date,
+                body.get("time", ""),
+                body.get("duration") or None,
+                body.get("max_volunteers") or None,
+                body.get("required_skills", ""),
+                body.get("status", "Upcoming"),
+                body.get("acceptance_mode", "manual"),
+                sup["id"],
+            ),
+        ).fetchone()
+
+        event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (row["id"],)).fetchone())
+        return event
+
+
+@router.put("/me/events/{event_id}")
+def update_my_event(event_id: int, body: dict, current_user: dict = Depends(require_roles("supervisor"))):
+    """Supervisor edits one of their own events."""
+    with get_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        event = dict_row(db.execute(
+            "SELECT id FROM events WHERE id = %s AND created_by_supervisor_id = %s",
+            (event_id, sup["id"]),
+        ).fetchone())
+        if not event:
+            raise HTTPException(404, "Event not found or you do not own this event")
+
+        db.execute(
+            "UPDATE events SET name = %s, description = %s, location = %s, date = %s, "
+            "time = %s, duration = %s, max_volunteers = %s, required_skills = %s, "
+            "status = %s, acceptance_mode = %s "
+            "WHERE id = %s",
+            (
+                body.get("name"),
+                body.get("description", ""),
+                body.get("location", ""),
+                body.get("date"),
+                body.get("time", ""),
+                body.get("duration") or None,
+                body.get("max_volunteers") or None,
+                body.get("required_skills", ""),
+                body.get("status", "Upcoming"),
+                body.get("acceptance_mode", "manual"),
+                event_id,
+            ),
+        )
+        updated = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
+        return updated
+
+
+@router.get("/me/applications")
+def get_my_applications(
+    status: str = Query(default="Pending"),
+    current_user: dict = Depends(require_roles("supervisor")),
+):
+    """Pending/all applications for events created by this supervisor."""
+    with get_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        where_status = "AND ea.status = %s" if status and status != "All" else ""
+        params = [sup["id"]]
+        if status and status != "All":
+            params.append(status)
+
+        applications = dict_rows(db.execute(
+            f"""
+            SELECT ea.id, ea.volunteer_id, ea.event_id, ea.org_id, ea.status,
+                   ea.applied_date, ea.attendance_status,
+                   v.name as volunteer_name, v.email as volunteer_email,
+                   e.name as event_name, e.date as event_date, e.time as event_time,
+                   e.max_volunteers, e.acceptance_mode, e.registration_open,
+                   (SELECT COUNT(*) FROM event_applications a2
+                    WHERE a2.event_id = ea.event_id AND a2.status = 'Approved' AND a2.cancelled_at IS NULL
+                   ) AS approved_count
+            FROM event_applications ea
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            JOIN events e ON e.id = ea.event_id
+            WHERE e.created_by_supervisor_id = %s
+              AND ea.cancelled_at IS NULL
+              {where_status}
+            ORDER BY ea.applied_date ASC
+            """,
+            params,
+        ).fetchall())
+
+        return {"applications": applications}
+
+
+@router.put("/me/applications/{app_id}/approve")
+def approve_my_application(app_id: int, current_user: dict = Depends(require_roles("supervisor"))):
+    """Supervisor approves a Pending application on one of their events."""
+    from routes.event_applications import _get_approved_count
+    with exclusive_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        app = dict_row(db.execute(
+            """
+            SELECT ea.volunteer_id, ea.event_id, ea.status,
+                   e.name as event_name, e.max_volunteers, e.status as event_status,
+                   e.created_by_supervisor_id,
+                   v.user_id
+            FROM event_applications ea
+            JOIN events e ON e.id = ea.event_id
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            WHERE ea.id = %s AND ea.cancelled_at IS NULL
+            """,
+            (app_id,),
+        ).fetchone())
+        if not app:
+            raise HTTPException(404, "Application not found")
+        if app["created_by_supervisor_id"] != sup["id"]:
+            raise HTTPException(403, "You can only approve applications for events you manage")
+        if app["status"] == "Approved":
+            raise HTTPException(400, "Application is already approved")
+        if app.get("event_status") != "Upcoming":
+            raise HTTPException(409, "Can only approve applications for upcoming events")
+
+        capacity = app.get("max_volunteers") or 0
+        if capacity > 0:
+            approved_count = _get_approved_count(db, app["event_id"])
+            if approved_count >= capacity:
+                raise HTTPException(409, "Event is at full capacity — cannot approve more volunteers")
+
+        db.execute("UPDATE event_applications SET status = 'Approved' WHERE id = %s", (app_id,))
+        log_action(db, current_user["id"], current_user["role"], "approve_application",
+                   "event_application", app_id,
+                   {"volunteer_id": app["volunteer_id"], "event_id": app["event_id"]})
+
+        if app.get("user_id"):
+            create_notification(
+                db, app["user_id"], "application_approved",
+                "Event Application Approved",
+                f"You have been accepted for '{app.get('event_name', 'the event')}'. See you there!",
+                "/dashboard/profile",
+            )
+        return {"message": "Application approved"}
+
+
+@router.put("/me/applications/{app_id}/reject")
+def reject_my_application(app_id: int, current_user: dict = Depends(require_roles("supervisor"))):
+    """Supervisor rejects a Pending application on one of their events."""
+    with exclusive_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        app = dict_row(db.execute(
+            """
+            SELECT ea.volunteer_id, ea.event_id, ea.status,
+                   e.name as event_name, e.created_by_supervisor_id,
+                   v.user_id
+            FROM event_applications ea
+            JOIN events e ON e.id = ea.event_id
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            WHERE ea.id = %s AND ea.cancelled_at IS NULL
+            """,
+            (app_id,),
+        ).fetchone())
+        if not app:
+            raise HTTPException(404, "Application not found")
+        if app["created_by_supervisor_id"] != sup["id"]:
+            raise HTTPException(403, "You can only reject applications for events you manage")
+        if app["status"] == "Rejected":
+            raise HTTPException(400, "Application is already rejected")
+
+        db.execute("UPDATE event_applications SET status = 'Rejected' WHERE id = %s", (app_id,))
+        log_action(db, current_user["id"], current_user["role"], "reject_application",
+                   "event_application", app_id,
+                   {"volunteer_id": app["volunteer_id"], "event_id": app["event_id"]})
+
+        if app.get("user_id"):
+            create_notification(
+                db, app["user_id"], "application_rejected",
+                "Event Application Declined",
+                f"Your application for '{app.get('event_name', 'the event')}' was not accepted.",
+                "/dashboard/profile",
+            )
+        return {"message": "Application rejected"}
+
+
+@router.get("/me/activities")
+def get_my_activities(
+    status: str = Query(default="Pending"),
+    current_user: dict = Depends(require_roles("supervisor")),
+):
+    """Activity logs for events owned by this supervisor."""
+    with get_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        where_status = "AND a.status = %s" if status and status != "All" else ""
+        params = [sup["id"], sup["org_id"]]
+        if status and status != "All":
+            params.append(status)
+
         activities = dict_rows(db.execute(
-            "SELECT a.*, v.name as volunteer_name, e.name as event_name "
-            "FROM activities a "
-            "LEFT JOIN volunteers v ON a.volunteer_id = v.id "
-            "LEFT JOIN events e ON a.event_id = e.id "
-            "JOIN org_volunteers ov ON a.volunteer_id = ov.volunteer_id "
-            "  AND ov.supervisor_id = %s AND ov.org_id = %s "
-            "WHERE a.org_id = %s AND a.status = 'Pending' "
-            "ORDER BY a.date DESC",
-            (sup["id"], sup["org_id"], sup["org_id"]),
+            f"""
+            SELECT a.*, v.name as volunteer_name, e.name as event_name
+            FROM activities a
+            LEFT JOIN volunteers v ON a.volunteer_id = v.id
+            LEFT JOIN events e ON a.event_id = e.id
+            WHERE e.created_by_supervisor_id = %s
+              AND a.org_id = %s
+              {where_status}
+            ORDER BY a.date DESC
+            """,
+            params,
         ).fetchall())
 
         return {"activities": activities}
