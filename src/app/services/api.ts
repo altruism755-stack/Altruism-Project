@@ -145,7 +145,7 @@ export const api = {
   // Supervisor self-service
   getMyProfile: () => request("/supervisors/me"),
   getMyEvents: () => request("/supervisors/me/events"),
-  getMyEventDetail: (id: number) => request(`/supervisors/me/events/${id}`),
+  getMyEventDetail: (id: number) => request(`/events/${id}/detail`),
   getMyOrgEvents: () => request("/supervisors/me/org-events"),
   getMyActivities: (status?: string) =>
     request(`/supervisors/me/activities${status ? `?status=${status}` : ""}`),

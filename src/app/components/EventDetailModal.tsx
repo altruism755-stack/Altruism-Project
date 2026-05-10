@@ -282,6 +282,17 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
     finally { setBusy(false); }
   };
 
+  const doComplete = async () => {
+    if (!event) return;
+    setBusy(true);
+    try {
+      await api.updateMyEvent(event.id, { status: "Completed" });
+      await load();
+      onEventUpdated();
+    } catch (e: any) { setErr(e?.message || "Failed to complete event"); }
+    finally { setBusy(false); }
+  };
+
   // Staged bulk approve/reject
   const doApplyChanges = async () => {
     if (!event || !pendingAction || selected.size === 0) return;
@@ -410,9 +421,12 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
             </>
           )}
           {isActive && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: GREEN, alignSelf: "center" }}>
-              🟢 Event is Live
-            </span>
+            <>
+              <span style={{ fontSize: 13, fontWeight: 600, color: GREEN, alignSelf: "center" }}>
+                🟢 Event is Live
+              </span>
+              <Btn label="Complete Event" color="#475569" onClick={doComplete} disabled={busy} />
+            </>
           )}
         </div>
       </div>

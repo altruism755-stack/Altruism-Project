@@ -316,6 +316,52 @@ def toggle_registration(
         return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
 
 
+@router.get("/{event_id}/detail")
+def get_event_detail(event_id: int, current_user: dict = Depends(require_roles("org_admin", "supervisor"))):
+    """
+    Full event detail with all applicants and attendance_status.
+    Accessible by org_admin (scoped to their org) and supervisor (scoped to events they created).
+    """
+    with get_db() as db:
+        role = current_user["role"]
+
+        if role == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup:
+                raise HTTPException(403, FORBIDDEN)
+            event = dict_row(db.execute(
+                "SELECT * FROM events WHERE id = %s AND created_by_supervisor_id = %s",
+                (event_id, sup["id"]),
+            ).fetchone())
+            if not event:
+                raise HTTPException(404, "Event not found or you do not own this event")
+        else:
+            org = get_org_for_admin(db, current_user["id"])
+            event = dict_row(db.execute(
+                "SELECT * FROM events WHERE id = %s AND org_id = %s",
+                (event_id, org["id"]),
+            ).fetchone())
+            if not event:
+                raise HTTPException(404, "Event not found")
+
+        applicants = dict_rows(db.execute(
+            """
+            SELECT ea.id as app_id, ea.volunteer_id, ea.status, ea.applied_date,
+                   ea.attendance_status,
+                   v.name as volunteer_name, v.email as volunteer_email
+            FROM event_applications ea
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            WHERE ea.event_id = %s AND ea.cancelled_at IS NULL
+            ORDER BY ea.applied_date ASC
+            """,
+            (event_id,),
+        ).fetchall())
+
+        return {**event, "applicants": applicants}
+
+
 @router.post("/{event_id}/attendance", status_code=201)
 def bulk_mark_attendance(
     event_id: int,

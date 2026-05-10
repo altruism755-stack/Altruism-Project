@@ -3136,3 +3136,23 @@ audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict
 audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
 audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
 audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=approve_application entity=event_application/29: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+WARNING:  WatchFiles detected changes in 'routes\events.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [11668]
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [9516]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
+audit log failed action=mark_attendance entity=event/10: cannot adapt type 'dict' using placeholder '%s' (format: AUTO)
