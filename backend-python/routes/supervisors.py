@@ -1,10 +1,7 @@
-import secrets
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, HTTPException, Depends, Query
 
 from database import get_db, exclusive_db, dict_row, dict_rows
-from auth import get_current_user, require_roles, get_org_for_admin
+from auth import get_current_user, require_roles, get_org_for_admin, hash_password
 from routes.notifications import create_notification
 from routes.audit import log_action
 
@@ -47,38 +44,31 @@ def list_supervisors(current_user: dict = Depends(require_roles("org_admin"))):
 def create_supervisor(body: dict, current_user: dict = Depends(require_roles("org_admin"))):
     name = body.get("name")
     email = body.get("email")
+    password = body.get("password")
     phone = body.get("phone", "")
     team = body.get("team", "")
 
-    if not name or not email:
-        raise HTTPException(400, "Name and email are required")
+    if not name or not email or not password:
+        raise HTTPException(400, "Name, email, and password are required")
+    if len(password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
 
     with get_db() as db:
         org = get_org_for_admin(db, current_user["id"])
 
         existing_user = dict_row(db.execute("SELECT id, role FROM users WHERE email = %s", (email,)).fetchone())
         if existing_user:
-            if existing_user["role"] != "supervisor":
-                raise HTTPException(
-                    409,
-                    f"A user with this email already exists as a '{existing_user['role']}'. "
-                    "Cannot reassign to supervisor.",
-                )
-            user_id = existing_user["id"]
-            invite_token = None
-        else:
-            invite_token = secrets.token_urlsafe(32)
-            invite_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-            row = db.execute(
-                "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
-                "VALUES (%s, '', 'supervisor', %s, %s) RETURNING id",
-                (email, invite_token, invite_expires_at),
-            ).fetchone()
-            user_id = row["id"]
+            raise HTTPException(
+                409,
+                f"A user with this email already exists as a '{existing_user['role']}'.",
+            )
 
-        existing_sup = dict_row(db.execute("SELECT id FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
-        if existing_sup:
-            raise HTTPException(409, "Supervisor already exists for this user")
+        hashed = hash_password(password)
+        row = db.execute(
+            "INSERT INTO users (email, password, role) VALUES (%s, %s, 'supervisor') RETURNING id",
+            (email, hashed),
+        ).fetchone()
+        user_id = row["id"]
 
         db.execute(
             "INSERT INTO supervisors (user_id, name, email, phone, team, org_id, status) "
@@ -87,10 +77,7 @@ def create_supervisor(body: dict, current_user: dict = Depends(require_roles("or
         )
 
         sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
-        response = dict(sup)
-        if invite_token:
-            response["invite_token"] = invite_token
-        return response
+        return sup
 
 
 @router.delete("/{supervisor_id}")

@@ -2,7 +2,6 @@ import base64
 import json
 import os
 import uuid
-from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -70,10 +69,6 @@ class LoginBody(BaseModel):
     email: str
     password: str
 
-
-class AcceptInviteBody(BaseModel):
-    token: str
-    password: str
 
 
 @router.post("/register", status_code=201)
@@ -211,8 +206,6 @@ def login(request: Request, body: LoginBody):
         user = dict_row(db.execute("SELECT * FROM users WHERE email = %s", (body.email,)).fetchone())
         if not user:
             raise HTTPException(401, "Invalid email or password")
-        if not user.get("password"):
-            raise HTTPException(401, "Account not yet activated. Please use your invitation link to set a password.")
         if not verify_password(body.password, user["password"]):
             raise HTTPException(401, "Invalid email or password")
 
@@ -279,55 +272,3 @@ def me(current_user: dict = Depends(get_current_user)):
         return {"user": user, "profile": profile}
 
 
-@router.post("/accept-invite")
-def accept_invite(body: AcceptInviteBody):
-    """Complete account setup from an invite link. Sets a password and activates the account."""
-    if not body.token or not body.password:
-        raise HTTPException(400, "token and password are required")
-    if len(body.password) < 8:
-        raise HTTPException(400, "Password must be at least 8 characters")
-
-    with get_db() as db:
-        user = dict_row(db.execute(
-            "SELECT id, email, role, invite_token, invite_expires_at FROM users WHERE invite_token = %s",
-            (body.token,),
-        ).fetchone())
-        if not user:
-            raise HTTPException(400, "Invalid or already-used invitation link")
-
-        expires_at = user.get("invite_expires_at")
-        if expires_at:
-            try:
-                exp_dt = expires_at if hasattr(expires_at, "tzinfo") else datetime.fromisoformat(str(expires_at))
-                if exp_dt.tzinfo is None:
-                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) > exp_dt:
-                    raise HTTPException(400, "Invitation link has expired. Please ask the organization to re-invite you.")
-            except ValueError:
-                raise HTTPException(400, "Invitation link is invalid. Please request a new one.")
-
-        hashed = hash_password(body.password)
-        db.execute(
-            "UPDATE users SET password = %s, invite_token = NULL, invite_expires_at = NULL WHERE id = %s",
-            (hashed, user["id"]),
-        )
-        # Activate the volunteer profile
-        db.execute(
-            "UPDATE volunteers SET status = 'Active' WHERE user_id = %s", (user["id"],)
-        )
-        # Activate their pending org memberships that came from this invite
-        vol_row = db.execute(
-            "SELECT id FROM volunteers WHERE user_id = %s", (user["id"],)
-        ).fetchone()
-        if vol_row:
-            # Only activate memberships pre-approved via invite or manual import.
-            # Self-applied memberships (join requests) must still go through supervisor approval.
-            db.execute(
-                "UPDATE org_volunteers SET status = 'Active', is_active = 1 "
-                "WHERE volunteer_id = %s AND status = 'Pending' "
-                "AND source IN ('invite', 'manual_import')",
-                (vol_row["id"],),
-            )
-
-        token = generate_token({"id": user["id"], "email": user["email"], "role": user["role"]})
-        return {"token": token, "user": {"id": user["id"], "email": user["email"], "role": user["role"]}}

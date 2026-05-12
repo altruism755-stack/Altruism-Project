@@ -12,12 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
     email            TEXT UNIQUE NOT NULL,
     password         TEXT NOT NULL,
     role             TEXT NOT NULL CHECK(role IN ('volunteer','supervisor','org_admin')),
-    invite_token     TEXT,
-    invite_expires_at TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_users_invite_token ON users(invite_token);
 
 -- ── Organizations ─────────────────────────────────────────────────────────────
 

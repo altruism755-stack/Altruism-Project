@@ -475,13 +475,6 @@ def init_schema():
         ]:
             _add_column_if_missing(conn, "organizations", col, ddl)
 
-        # users
-        for col, ddl in [
-            ("invite_token",      "TEXT"),
-            ("invite_expires_at", "TIMESTAMPTZ"),
-        ]:
-            _add_column_if_missing(conn, "users", col, ddl)
-
         # org_volunteers
         for col, ddl in [
             ("source",                "TEXT DEFAULT 'manual_import'"),
@@ -499,7 +492,6 @@ def init_schema():
 
         # ── Indexes ───────────────────────────────────────────────────────────
         index_ddls = [
-            "CREATE INDEX IF NOT EXISTS idx_users_invite_token ON users(invite_token)",
             "CREATE INDEX IF NOT EXISTS idx_volunteers_status ON volunteers(status)",
             "CREATE INDEX IF NOT EXISTS idx_supervisors_org_id ON supervisors(org_id)",
             "CREATE INDEX IF NOT EXISTS idx_organizations_admin_user_id ON organizations(admin_user_id)",

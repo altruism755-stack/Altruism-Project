@@ -21,7 +21,6 @@ import { OrgPendingPage } from "./pages/OrgPendingPage";
 import { OrgProfilePage } from "./pages/OrgProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { PlatformAdminDashboard } from "./pages/PlatformAdminDashboard";
-import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function ErrorPage() {
@@ -65,8 +64,6 @@ export const router = createBrowserRouter([
       { path: "/cookies", element: <CookiesPage /> },
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
-      { path: "/accept-invite", element: <AcceptInvitePage /> },
-
       // Platform admin
       { path: "/platform-admin", element: <ProtectedRoute requirePlatformAdmin><PlatformAdminDashboard /></ProtectedRoute> },
 

@@ -262,9 +262,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  acceptInvite: (token: string, password: string) =>
-    request("/auth/accept-invite", { method: "POST", body: JSON.stringify({ token, password }) }),
-
   // Reports
   getReportSummary: () => request("/reports/summary"),
   getVolunteerHoursReport: (params?: Record<string, string>) => {

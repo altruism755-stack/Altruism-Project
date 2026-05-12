@@ -1,10 +1,8 @@
 import csv
 import io
 import json
-import os
 import re
-import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse, Response
@@ -14,9 +12,6 @@ from typing import Any, Optional
 from database import get_db, dict_row, dict_rows
 from auth import get_current_user, require_roles, require_approved_org_admin, get_org_for_admin
 from routes.notifications import create_notification
-
-# Base URL for invite links — set APP_BASE_URL in env for production.
-_APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
 
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -64,9 +59,6 @@ class AddVolunteerManuallyBody(BaseModel):
     skills: str = ""
     notes: str = ""
 
-
-def _make_invite_link(token: str) -> str:
-    return f"{_APP_BASE_URL}/accept-invite?token={token}"
 
 
 def _validate_csv_row(row: dict, row_num: int) -> tuple:
@@ -1023,7 +1015,6 @@ def import_volunteers_csv(
     linked_count   = 0
     skipped_count  = 0
     runtime_errors = []
-    invite_links   = []
 
     with get_db() as db:
         org = _assert_org_access(db, org_id, current_user["id"])
@@ -1033,7 +1024,7 @@ def import_volunteers_csv(
             email = r["email"]
             try:
                 existing_user = dict_row(db.execute(
-                    "SELECT id, role, invite_token FROM users WHERE email = %s", (email,)
+                    "SELECT id, role FROM users WHERE email = %s", (email,)
                 ).fetchone())
 
                 if existing_user:
@@ -1072,15 +1063,6 @@ def import_volunteers_csv(
                             )
                             skipped_count += 1
                             continue
-                        # invite_anyway: fall through to re-invite logic below only if pending invite
-                        if existing_user.get("invite_token"):
-                            token = secrets.token_urlsafe(32)
-                            expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
-                            db.execute(
-                                "UPDATE users SET invite_token = %s, invite_expires_at = %s WHERE id = %s",
-                                (token, expires, user_id),
-                            )
-                            invite_links.append({"email": email, "link": _make_invite_link(token)})
                         skipped_count += 1
                         continue
 
@@ -1098,18 +1080,15 @@ def import_volunteers_csv(
                     linked_count += 1
 
                 else:
-                    # Brand-new user — create without password, issue invite token
-                    token   = secrets.token_urlsafe(32)
-                    expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
+                    # Brand-new user — create account directly (no password; volunteer sets it later)
                     row = db.execute(
-                        "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
-                        "VALUES (%s, '', 'volunteer', %s, %s) RETURNING id",
-                        (email, token, expires),
+                        "INSERT INTO users (email, password, role) VALUES (%s, '', 'volunteer') RETURNING id",
+                        (email,),
                     ).fetchone()
                     user_id = row["id"]
                     row = db.execute(
                         "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                        "VALUES (%s, %s, %s, %s, %s, %s, 'Pending') RETURNING id",
+                        "VALUES (%s, %s, %s, %s, %s, %s, 'Active') RETURNING id",
                         (user_id, r["name"], email, r["phone"] or None, r["city"] or None,
                          json.dumps(r["skills"])),
                     ).fetchone()
@@ -1119,12 +1098,11 @@ def import_volunteers_csv(
                         "INSERT INTO org_volunteers "
                         "(org_id, volunteer_id, status, is_active, department, source, join_source, "
                         " channel_detail, governorate_snapshot, city_snapshot, joined_at) "
-                        "VALUES (%s, %s, 'Pending', %s, %s, 'invite', %s, %s, %s, %s, %s)",
-                        (org_id, vol_id, _is_active("Pending"), r["department"] or None,
+                        "VALUES (%s, %s, 'Active', %s, %s, 'manual_import', %s, %s, %s, %s, %s)",
+                        (org_id, vol_id, _is_active("Active"), r["department"] or None,
                          r["join_source"], r["channel_detail"],
                          r["governorate_snap"], r["city_snap"], _now),
                     )
-                    invite_links.append({"email": email, "link": _make_invite_link(token)})
                     invited_count += 1
 
             except Exception as e:
@@ -1136,13 +1114,11 @@ def import_volunteers_csv(
     return {
         "totalRows":       len(valid_rows) + len(parse_errors),
         "successCount":    success_count,
-        "invitedCount":    invited_count,
+        "importedCount":   invited_count,
         "linkedCount":     linked_count,
         "skippedCount":    skipped_count,
         "errorCount":      len(all_errors),
         "errors":          all_errors,
-        "inviteLinks":     invite_links,
-        # Data-quality report: rows where join_source was invalid and coerced to "other".
         "qualityWarnings": quality_warnings,
     }
 
@@ -1183,7 +1159,6 @@ def add_volunteer_manually(
         raise HTTPException(422, "City is required")
 
     _now = _utcnow()
-    new_invite_token: str | None = None
 
     with get_db() as db:
         org = dict_row(db.execute("SELECT id, student_only FROM organizations WHERE id = %s", (org_id,)).fetchone())
@@ -1219,12 +1194,9 @@ def add_volunteer_manually(
             if existing:
                 raise HTTPException(409, "This volunteer is already a member of your organization")
         else:
-            new_invite_token = secrets.token_urlsafe(32)
-            invite_expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
             row = db.execute(
-                "INSERT INTO users (email, password, role, invite_token, invite_expires_at) "
-                "VALUES (%s, '', 'volunteer', %s, %s) RETURNING id",
-                (email, new_invite_token, invite_expires_at),
+                "INSERT INTO users (email, password, role) VALUES (%s, '', 'volunteer') RETURNING id",
+                (email,),
             ).fetchone()
             user_id = row["id"]
             row = db.execute(
@@ -1242,7 +1214,4 @@ def add_volunteer_manually(
             (org_id, volunteer_id, city, _now, current_user["id"], body.notes),
         )
 
-        response: dict = {"message": "Volunteer added successfully (Manual)", "volunteer_id": volunteer_id}
-        if new_invite_token:
-            response["invite_token"] = new_invite_token
-        return response
+        return {"message": "Volunteer added successfully (Manual)", "volunteer_id": volunteer_id}

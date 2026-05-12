@@ -1152,8 +1152,6 @@ function AddVolunteerManuallyModal({ orgId, onClose, onSuccess }: {
   const [form, setForm] = useState({ name: "", email: "", phone: "", city: "", skills: "", notes: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const validate = () => {
     if (!form.name.trim()) return "Full name is required";
@@ -1168,61 +1166,14 @@ function AddVolunteerManuallyModal({ orgId, onClose, onSuccess }: {
     if (err) { setError(err); return; }
     setLoading(true); setError("");
     try {
-      const res = await api.addVolunteerManually(orgId, form);
-      if (res?.invite_token) {
-        const baseUrl = window.location.origin;
-        setInviteLink(`${baseUrl}/accept-invite?token=${res.invite_token}`);
-      } else {
-        onSuccess();
-      }
+      await api.addVolunteerManually(orgId, form);
+      onSuccess();
     } catch (e: any) {
       setError(e.message || "Failed to add volunteer. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  const handleCopy = () => {
-    if (!inviteLink) return;
-    navigator.clipboard.writeText(inviteLink).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  if (inviteLink) {
-    return (
-      <>
-        <div onClick={() => { onSuccess(); }} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 50 }} />
-        <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 520, backgroundColor: "#fff", borderRadius: 16, zIndex: 51, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", padding: 32 }}>
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", margin: "0 0 8px 0" }}>Volunteer Added</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>
-              This volunteer is new to the platform. Share the link below so they can set their password and access their account.
-            </p>
-          </div>
-          <div style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 14px", marginBottom: 12, wordBreak: "break-all", fontSize: 12, color: "#475569", fontFamily: "monospace" }}>
-            {inviteLink}
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              onClick={handleCopy}
-              style={{ flex: 1, height: 40, backgroundColor: copied ? "#DCFCE7" : "#F1F5F9", color: copied ? "#15803D" : "#1E293B", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-            >
-              {copied ? "Copied!" : "Copy Link"}
-            </button>
-            <button
-              onClick={() => { onSuccess(); }}
-              style={{ flex: 1, height: 40, backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
