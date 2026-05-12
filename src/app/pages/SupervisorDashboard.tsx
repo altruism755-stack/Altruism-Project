@@ -33,11 +33,6 @@ export function SupervisorDashboard() {
   const [certUploadBusy, setCertUploadBusy] = useState(false);
   const [certUploadError, setCertUploadError] = useState("");
 
-  // Log activity modal state
-  const [showLogActivity, setShowLogActivity] = useState(false);
-  const [logForm, setLogForm] = useState({ volunteer_id: "", event_id: "", date: "", hours: "", description: "", status: "Approved" });
-  const [logBusy, setLogBusy] = useState(false);
-  const [logError, setLogError] = useState("");
 
   // Create event panel state
   const emptyEventForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", acceptanceMode: "manual" as "manual" | "auto" };
@@ -49,8 +44,6 @@ export function SupervisorDashboard() {
   // Event detail modal
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
-  // Org-level volunteer list for "Log Activity" dropdown (all active org members)
-  const [orgVolunteers, setOrgVolunteers] = useState<any[]>([]);
 
   const tracksHours = org != null && org.tracks_hours !== false && org.tracks_hours !== 0;
 
@@ -87,17 +80,7 @@ export function SupervisorDashboard() {
     finally { setLoading(false); }
   }, []);
 
-  // Fetch org volunteers for the log-activity dropdown (org members).
-  const loadOrgVolunteers = useCallback(async () => {
-    try {
-      // Use the org-wide activities endpoint to collect unique volunteers — or call a dedicated endpoint if available.
-      // Since we have no /supervisors/me/org-volunteers, we derive from the org events participant list lazily.
-      // Alternatively, store volunteers seen in activities. For robustness, we skip auto-fill and let the supervisor
-      // type the volunteer ID. A future endpoint can provide this list.
-    } catch (e) { /* silent */ }
-  }, []);
-
-  useEffect(() => { loadAll(); loadOrgVolunteers(); }, [loadAll, loadOrgVolunteers]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   const handleApproveApplication = async (id: number) => {
     try {
@@ -190,35 +173,6 @@ export function SupervisorDashboard() {
     finally { setEventSaving(false); }
   };
 
-  const handleLogActivity = async () => {
-    if (!logForm.volunteer_id || !logForm.date) {
-      setLogError("Volunteer ID and date are required.");
-      return;
-    }
-    if (tracksHours && !logForm.hours) {
-      setLogError("Hours are required for this organization.");
-      return;
-    }
-    setLogBusy(true);
-    setLogError("");
-    try {
-      await api.logActivity({
-        volunteer_id: Number(logForm.volunteer_id),
-        event_id: logForm.event_id ? Number(logForm.event_id) : undefined,
-        date: logForm.date,
-        ...(tracksHours && logForm.hours ? { hours: Number(logForm.hours), status: logForm.status } : {}),
-        description: logForm.description,
-        org_id: org?.id,
-      });
-      setShowLogActivity(false);
-      setLogForm({ volunteer_id: "", event_id: "", date: "", hours: "", description: "", status: "Approved" });
-      loadAll();
-    } catch (e: any) {
-      setLogError(e?.message || "Failed to log activity.");
-    } finally {
-      setLogBusy(false);
-    }
-  };
 
 
   if (loading) return (
@@ -382,14 +336,9 @@ export function SupervisorDashboard() {
               <div>
                 <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 14, color: "#64748B" }}>
-                    Activity logs for your events in <strong>{org?.name}</strong>. You can also log hours on behalf of a volunteer.
+                    Activity records auto-generated from attendance on your events in <strong>{org?.name}</strong>.
+                    {tracksHours ? " Approve hours once you've reviewed them." : " Participation is recorded automatically — no approval needed."}
                   </div>
-                  <button
-                    onClick={() => { setShowLogActivity(true); setLogError(""); }}
-                    style={{ height: 36, padding: "0 16px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-                  >
-                    + Log Activity
-                  </button>
                 </div>
                 {activities.length === 0 ? (
                   <EmptyState label="No pending activity approvals for your events." />
@@ -624,111 +573,6 @@ export function SupervisorDashboard() {
           </>
         );
       })()}
-
-      {/* Log Activity modal */}
-      {showLogActivity && (
-        <div onClick={() => setShowLogActivity(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: 28 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Log Activity for Volunteer</div>
-            <div style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
-              {tracksHours
-                ? `Record volunteer hours for an event you manage in ${org?.name}.`
-                : `Record volunteer participation for an event you manage in ${org?.name}.`}
-            </div>
-
-            {logError && (
-              <div style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{logError}</div>
-            )}
-
-            <div className="flex flex-col gap-4">
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Volunteer ID <span style={{ color: "#DC2626" }}>*</span></label>
-                <input
-                  type="number"
-                  value={logForm.volunteer_id}
-                  onChange={(e) => setLogForm((f) => ({ ...f, volunteer_id: e.target.value }))}
-                  placeholder="Enter volunteer ID"
-                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Related Event (optional)</label>
-                <select
-                  value={logForm.event_id}
-                  onChange={(e) => setLogForm((f) => ({ ...f, event_id: e.target.value }))}
-                  style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
-                >
-                  <option value="">No specific event</option>
-                  {myEvents.map((ev) => (
-                    <option key={ev.id} value={ev.id}>{ev.name}</option>
-                  ))}
-                </select>
-                <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 3, marginBottom: 0 }}>Only your own events are listed — you may only log activities for events you manage.</p>
-              </div>
-
-              <div className="flex gap-3">
-                <div style={{ flex: tracksHours ? 1 : "1 1 100%" }}>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Date <span style={{ color: "#DC2626" }}>*</span></label>
-                  <input
-                    type="date"
-                    value={logForm.date}
-                    onChange={(e) => setLogForm((f) => ({ ...f, date: e.target.value }))}
-                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
-                  />
-                </div>
-                {tracksHours && (
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Hours <span style={{ color: "#DC2626" }}>*</span></label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      value={logForm.hours}
-                      onChange={(e) => setLogForm((f) => ({ ...f, hours: e.target.value }))}
-                      placeholder="e.g. 3"
-                      style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {tracksHours && (
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Status</label>
-                  <select
-                    value={logForm.status}
-                    onChange={(e) => setLogForm((f) => ({ ...f, status: e.target.value }))}
-                    style={{ width: "100%", height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 13, outline: "none" }}
-                  >
-                    <option value="Approved">Approved</option>
-                    <option value="Pending">Pending (under review)</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4 }}>Description (optional)</label>
-                <textarea
-                  value={logForm.description}
-                  onChange={(e) => setLogForm((f) => ({ ...f, description: e.target.value }))}
-                  rows={3}
-                  placeholder="Brief notes about the activity…"
-                  style={{ width: "100%", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", resize: "vertical", boxSizing: "border-box" as const }}
-                />
-              </div>
-
-              <div className="flex gap-2" style={{ justifyContent: "flex-end", marginTop: 4 }}>
-                <button onClick={() => setShowLogActivity(false)} style={{ height: 36, padding: "0 16px", backgroundColor: "#fff", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                <button onClick={handleLogActivity} disabled={logBusy} style={{ height: 36, padding: "0 18px", backgroundColor: logBusy ? "#94A3B8" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: logBusy ? "not-allowed" : "pointer" }}>
-                  {logBusy ? "Saving…" : "Save Activity"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Event detail modal */}
       {selectedEventId !== null && (

@@ -227,6 +227,9 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
   const [attDraft, setAttDraft] = useState<DraftAtt>({});
   const [attBusy, setAttBusy] = useState(false);
   const [attDirty, setAttDirty] = useState(false);
+  // Optional supervisor overrides applied to the whole batch when saving attendance
+  const [attHours, setAttHours] = useState("");
+  const [attDesc, setAttDesc] = useState("");
 
   // Certificate sub-modal
   const [certVolunteer, setCertVolunteer] = useState<EventApplicant | null>(null);
@@ -318,7 +321,13 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
     if (records.length === 0) return;
     setAttBusy(true);
     try {
-      await api.markAttendance(event.id, records);
+      const opts: { hours?: number; description?: string } = {};
+      if (event.tracks_hours) {
+        const h = parseFloat(attHours);
+        if (!isNaN(h) && h > 0) opts.hours = h;
+      }
+      if (attDesc.trim()) opts.description = attDesc.trim();
+      await api.markAttendance(event.id, records, opts);
       // Optimistically apply draft to local state so UI updates immediately.
       const draftMap = Object.fromEntries(records.map((r) => [r.app_id, r.attendance_status]));
       setEvent((prev) => prev ? {
@@ -329,6 +338,8 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
       } : prev);
       setAttDraft({});
       setAttDirty(false);
+      setAttHours("");
+      setAttDesc("");
       // Background sync to confirm server state without showing spinner.
       load(true);
     } catch (e: any) { setErr(e?.message || "Failed to save attendance"); }
@@ -505,9 +516,39 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
 
         {/* Attendance save bar */}
         {isOwned && showAttendance && appTab === "Approved" && attDirty && (
-          <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-            <Btn label={attBusy ? "Saving…" : "Apply Attendance"} color={GREEN} onClick={doSaveAttendance} disabled={attBusy} />
-            <span style={{ fontSize: 12, color: "#64748B" }}>Unsaved changes</span>
+          <div style={{ marginBottom: 12, padding: "12px 14px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
+            {event.tracks_hours && (
+              <div className="flex gap-2" style={{ marginBottom: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: "0 0 auto" }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 3 }}>
+                    Hours override <span style={{ fontWeight: 400 }}>(optional — defaults to event duration)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0.25"
+                    step="0.25"
+                    value={attHours}
+                    onChange={(e) => setAttHours(e.target.value)}
+                    placeholder={event.duration ? String(event.duration) : "e.g. 2"}
+                    style={{ height: 32, width: 90, border: "1.5px solid #E2E8F0", borderRadius: 7, padding: "0 10px", fontSize: 13, outline: "none" }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 3 }}>Description <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                  <input
+                    type="text"
+                    value={attDesc}
+                    onChange={(e) => setAttDesc(e.target.value)}
+                    placeholder="Activity notes…"
+                    style={{ height: 32, width: "100%", border: "1.5px solid #E2E8F0", borderRadius: 7, padding: "0 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Btn label={attBusy ? "Saving…" : "Apply Attendance"} color={GREEN} onClick={doSaveAttendance} disabled={attBusy} />
+              <span style={{ fontSize: 12, color: "#64748B" }}>Unsaved changes</span>
+            </div>
           </div>
         )}
 

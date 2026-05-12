@@ -178,8 +178,15 @@ export const api = {
     request(`/events/${id}/activate`, { method: "POST" }),
   toggleRegistration: (id: number, open: boolean) =>
     request(`/events/${id}/registration`, { method: "PUT", body: JSON.stringify({ registration_open: open }) }),
-  markAttendance: (eventId: number, records: { app_id: number; attendance_status: string }[]) =>
-    request(`/event-applications/event/${eventId}/attendance`, { method: "POST", body: JSON.stringify({ records }) }),
+  markAttendance: (
+    eventId: number,
+    records: { app_id: number; attendance_status: string }[],
+    opts?: { hours?: number; description?: string },
+  ) =>
+    request(`/event-applications/event/${eventId}/attendance`, {
+      method: "POST",
+      body: JSON.stringify({ records, ...opts }),
+    }),
 
   // Activities
   getActivities: (params?: Record<string, string>) => {

@@ -419,12 +419,22 @@ def bulk_mark_attendance(
         tracks_hours = bool((org_row or {}).get("tracks_hours", 1))
 
         if tracks_hours:
-            try:
-                hours = float(hours_raw)
-                if hours <= 0:
-                    raise ValueError
-            except (TypeError, ValueError):
-                raise HTTPException(400, "hours must be a positive number")
+            hours: float | None = None
+            if hours_raw is not None:
+                try:
+                    hours = float(hours_raw)
+                    if hours <= 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    raise HTTPException(400, "hours must be a positive number")
+            # Fall back to event duration when no explicit hours are provided.
+            if hours is None:
+                try:
+                    hours = float(event.get("duration") or 0) or None
+                except (TypeError, ValueError):
+                    pass
+            if hours is None:
+                raise HTTPException(400, "hours is required (or set an event duration to use as default)")
             act_status = "Pending"
         else:
             hours = None
@@ -450,6 +460,34 @@ def bulk_mark_attendance(
 
         eligible_map = {r["volunteer_id"]: r["user_id"] for r in eligible_rows}
         skipped_count = len(volunteer_ids) - len(eligible_map)
+
+        # All approved applicants for this event (so we know who to clear if unchecked).
+        all_approved_rows = db.execute(
+            """
+            SELECT ea.volunteer_id
+            FROM event_applications ea
+            JOIN org_volunteers ov
+                ON ov.volunteer_id = ea.volunteer_id
+                AND ov.org_id = %s
+                AND ov.status = 'Active'
+            WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL
+            """,
+            (caller_org_id, event_id),
+        ).fetchall()
+        all_approved_ids = [r["volunteer_id"] for r in all_approved_rows]
+
+        # Volunteers who were NOT selected (absent) — remove their activity if it exists.
+        absent_ids = [v for v in all_approved_ids if v not in eligible_map]
+        if absent_ids:
+            db.execute(
+                "DELETE FROM activities WHERE event_id = %s AND volunteer_id = ANY(%s)",
+                (event_id, absent_ids),
+            )
+            # Also clear attendance_status on their application row.
+            db.execute(
+                "UPDATE event_applications SET attendance_status = 'Absent' WHERE event_id = %s AND volunteer_id = ANY(%s) AND cancelled_at IS NULL",
+                (event_id, absent_ids),
+            )
 
         upsert_results = []
         if eligible_map:
@@ -479,6 +517,11 @@ def bulk_mark_attendance(
                 ),
             ).fetchall()
             upsert_results = rows
+            # Mark selected volunteers as Attended on their application row.
+            db.execute(
+                "UPDATE event_applications SET attendance_status = 'Attended' WHERE event_id = %s AND volunteer_id = ANY(%s) AND cancelled_at IS NULL",
+                (event_id, list(eligible_map.keys())),
+            )
 
         created_count = sum(1 for r in upsert_results if not r["was_updated"])
         updated_count = sum(1 for r in upsert_results if r["was_updated"])

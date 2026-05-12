@@ -559,8 +559,19 @@ def mark_attendance(
     current_user: dict = Depends(require_roles("org_admin", "supervisor")),
 ):
     """
-    Bulk-set attendance_status on approved applicants AND upsert activity records.
-    Accepts: { records: [{app_id: int, attendance_status: "Attended"|"Absent"}, ...], hours?: float, description?: str }
+    Unified attendance action: sets attendance_status and automatically manages activity records.
+
+    - Attended  → upsert activity (hours if org tracks hours, else participation-only Completed)
+    - Absent    → clear attendance and DELETE any existing activity for this volunteer+event
+                  so no phantom participation or hours records linger
+
+    Accepts:
+      {
+        records:     [{app_id: int, attendance_status: "Attended"|"Absent"}, ...],
+        hours?:      float   # optional supervisor override; defaults to event.duration
+        description?: str
+      }
+
     Only valid when event is Active or Completed.
     Supervisors must own the event (created_by_supervisor_id).
     """
@@ -590,33 +601,34 @@ def mark_attendance(
         if not records:
             raise HTTPException(400, "records list is required")
 
-        # Determine if org tracks hours to decide activity status.
         org_row = dict_row(db.execute(
             "SELECT tracks_hours FROM organizations WHERE id = %s", (caller_org_id,)
         ).fetchone())
         tracks_hours = bool((org_row or {}).get("tracks_hours", True))
 
-        hours_raw = body.get("hours")
+        # Resolve hours for this batch (only matters when org tracks hours).
         hours: float | None = None
-        if tracks_hours and hours_raw is not None:
-            try:
-                hours = float(hours_raw)
-                if hours <= 0:
-                    raise ValueError
-            except (TypeError, ValueError):
-                raise HTTPException(400, "hours must be a positive number")
+        if tracks_hours:
+            hours_raw = body.get("hours")
+            if hours_raw is not None:
+                try:
+                    hours = float(hours_raw)
+                    if hours <= 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    raise HTTPException(400, "hours must be a positive number")
+            # Fall back to event duration when no override is supplied.
+            if hours is None:
+                try:
+                    hours = float(event.get("duration") or 0) or None
+                except (TypeError, ValueError):
+                    pass
 
         description = body.get("description", "")
         event_date = str(event.get("date") or "")
-        event_duration = event.get("duration")
 
-        # Default hours from event duration if org tracks hours and no override given.
-        if tracks_hours and hours is None and event_duration:
-            try:
-                hours = float(event_duration)
-            except (TypeError, ValueError):
-                pass
-
+        # Participation-only orgs: activities land as Completed immediately (no approval step).
+        # Hours-based orgs: activities land as Pending (supervisor/admin approves later).
         act_status = "Pending" if tracks_hours else "Completed"
 
         updated = 0
@@ -626,7 +638,16 @@ def mark_attendance(
             if att_status not in ("Attended", "Absent"):
                 continue
 
-            # Update attendance flag on the application.
+            # Resolve volunteer_id first (needed for both paths).
+            app_row = dict_row(db.execute(
+                "SELECT volunteer_id FROM event_applications WHERE id = %s AND event_id = %s",
+                (app_id, event_id),
+            ).fetchone())
+            if not app_row:
+                continue
+            vol_id = app_row["volunteer_id"]
+
+            # Write attendance_status on the application row.
             result = db.execute(
                 """
                 UPDATE event_applications
@@ -640,34 +661,29 @@ def mark_attendance(
                 continue
             updated += 1
 
-            # Only create activity for "Attended" volunteers.
-            if att_status != "Attended":
-                continue
-
-            # Resolve volunteer_id from the application.
-            app_row = dict_row(db.execute(
-                "SELECT volunteer_id FROM event_applications WHERE id = %s", (app_id,)
-            ).fetchone())
-            if not app_row:
-                continue
-            vol_id = app_row["volunteer_id"]
-
-            # Upsert activity record so hours are tracked automatically.
-            db.execute(
-                """
-                INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (volunteer_id, event_id) WHERE event_id IS NOT NULL
-                DO UPDATE SET
-                    date        = EXCLUDED.date,
-                    hours       = EXCLUDED.hours,
-                    description = EXCLUDED.description,
-                    status      = EXCLUDED.status,
-                    reviewed_by = NULL,
-                    reviewed_at = NULL
-                """,
-                (vol_id, event_id, caller_org_id, event_date, hours, description, act_status),
-            )
+            if att_status == "Attended":
+                # Upsert the derived participation/hours record.
+                db.execute(
+                    """
+                    INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (volunteer_id, event_id) WHERE event_id IS NOT NULL
+                    DO UPDATE SET
+                        date        = EXCLUDED.date,
+                        hours       = EXCLUDED.hours,
+                        description = EXCLUDED.description,
+                        status      = EXCLUDED.status,
+                        reviewed_by = NULL,
+                        reviewed_at = NULL
+                    """,
+                    (vol_id, event_id, caller_org_id, event_date, hours, description, act_status),
+                )
+            else:
+                # Absent: remove any previously created activity so no phantom record remains.
+                db.execute(
+                    "DELETE FROM activities WHERE volunteer_id = %s AND event_id = %s",
+                    (vol_id, event_id),
+                )
 
         log_action(db, current_user["id"], current_user["role"], "mark_attendance",
                    "event", event_id, {"records_submitted": len(records), "updated": updated,

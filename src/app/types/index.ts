@@ -111,6 +111,7 @@ export interface EventApplicant {
 
 export interface EventDetail extends Event {
   applicants: EventApplicant[];
+  tracks_hours?: boolean;
 }
 
 export interface EventApplication {

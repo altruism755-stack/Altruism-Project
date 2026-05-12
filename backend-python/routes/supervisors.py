@@ -178,7 +178,12 @@ def get_my_event_detail(event_id: int, current_user: dict = Depends(require_role
         sup = _get_supervisor_record(db, current_user["id"])
 
         event = dict_row(db.execute(
-            "SELECT * FROM events WHERE id = %s AND created_by_supervisor_id = %s",
+            """
+            SELECT e.*, o.tracks_hours
+            FROM events e
+            JOIN organizations o ON o.id = e.org_id
+            WHERE e.id = %s AND e.created_by_supervisor_id = %s
+            """,
             (event_id, sup["id"]),
         ).fetchone())
         if not event:
