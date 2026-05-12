@@ -465,9 +465,18 @@ export function SupervisorDashboard() {
                   <input
                     id="cert-file-input"
                     type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
+                    accept=".pdf,application/pdf"
                     style={{ display: "none" }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setCertFile(f); setCertUploadError(""); } }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) {
+                        setCertUploadError("Only PDF files are accepted.");
+                        return;
+                      }
+                      setCertFile(f);
+                      setCertUploadError("");
+                    }}
                   />
                   {certFile ? (
                     <>
@@ -476,8 +485,8 @@ export function SupervisorDashboard() {
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: 13, color: "#64748B" }}>Click to select a file</div>
-                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>PDF, PNG, or JPG</div>
+                      <div style={{ fontSize: 13, color: "#64748B" }}>Click to select a PDF file</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>PDF only · max 10 MB</div>
                     </>
                   )}
                 </div>

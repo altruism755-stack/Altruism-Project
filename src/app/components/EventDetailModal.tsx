@@ -184,14 +184,14 @@ function CertModal({ volunteer, eventId, orgId, onClose }: { volunteer: EventApp
       ) : (
         <>
           <div style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", marginBottom: 4 }}>Certificate Issued!</div>
-          <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>Upload the PDF or image so the volunteer can download it.</div>
+          <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>Upload the PDF so the volunteer can download it.</div>
           {err && <div style={{ backgroundColor: "#FEE2E2", color: RED, padding: "8px 12px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{err}</div>}
           <div
             style={{ border: "2px dashed #E2E8F0", borderRadius: 10, padding: "18px 14px", textAlign: "center", marginBottom: 14, cursor: "pointer", backgroundColor: file ? "#F0FDF4" : "#FAFAFA" }}
             onClick={() => document.getElementById("cert-file-ev")?.click()}
           >
-            <input id="cert-file-ev" type="file" accept=".pdf,.png,.jpg,.jpeg" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }} />
-            {file ? <div style={{ fontSize: 13, fontWeight: 600, color: "#15803D" }}>{file.name}</div> : <div style={{ fontSize: 13, color: "#64748B" }}>Click to select file (PDF/PNG/JPG)</div>}
+            <input id="cert-file-ev" type="file" accept=".pdf,application/pdf" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) { setErr("Only PDF files are accepted."); return; } setErr(""); setFile(f); }} />
+            {file ? <div style={{ fontSize: 13, fontWeight: 600, color: "#15803D" }}>{file.name}</div> : <div style={{ fontSize: 13, color: "#64748B" }}>Click to select a PDF file</div>}
           </div>
           <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
             <Btn label="Skip" color="#94A3B8" onClick={onClose} />

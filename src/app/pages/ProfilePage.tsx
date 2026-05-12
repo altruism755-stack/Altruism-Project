@@ -588,7 +588,7 @@ export function ProfilePage() {
                         View
                       </button>
                       <button
-                        onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}`).catch(() => {})}
+                        onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}.pdf`).catch(() => {})}
                         style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
                       >
                         Download

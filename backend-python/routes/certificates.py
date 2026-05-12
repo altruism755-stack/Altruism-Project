@@ -13,7 +13,7 @@ from routes.audit import log_action
 router = APIRouter(prefix="/api/certificates", tags=["certificates"])
 
 CERT_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "certificates")
-ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg"}
+_PDF_MAGIC = b"%PDF"
 
 
 @router.get("")
@@ -152,8 +152,8 @@ async def upload_certificate_file(
     current_user: dict = Depends(require_roles("supervisor", "org_admin")),
 ):
     ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, "Only PDF and image files (.pdf, .png, .jpg, .jpeg) are allowed")
+    if ext != ".pdf":
+        raise HTTPException(400, "Only PDF files (.pdf) are allowed for certificates")
 
     with get_db() as db:
         cert = dict_row(db.execute("SELECT * FROM certificates WHERE id = %s", (cert_id,)).fetchone())
@@ -179,12 +179,16 @@ async def upload_certificate_file(
                 os.remove(old_path)
 
         os.makedirs(CERT_UPLOAD_DIR, exist_ok=True)
-        filename = f"cert_{cert_id}_{uuid.uuid4().hex}{ext}"
-        file_path = os.path.join(CERT_UPLOAD_DIR, filename)
         MAX_CERT_SIZE = 10 * 1024 * 1024  # 10 MB
         content = await file.read(MAX_CERT_SIZE + 1)
         if len(content) > MAX_CERT_SIZE:
             raise HTTPException(413, "Certificate file must be 10 MB or smaller")
+        # Verify PDF magic bytes to guard against disguised uploads
+        if not content.startswith(_PDF_MAGIC):
+            raise HTTPException(400, "File does not appear to be a valid PDF")
+
+        filename = f"cert_{cert_id}_{uuid.uuid4().hex}.pdf"
+        file_path = os.path.join(CERT_UPLOAD_DIR, filename)
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -233,5 +237,5 @@ def download_certificate_file(cert_id: int, current_user: dict = Depends(get_cur
         return FileResponse(
             file_path,
             filename=os.path.basename(file_path),
-            media_type="application/octet-stream",
+            media_type="application/pdf",
         )

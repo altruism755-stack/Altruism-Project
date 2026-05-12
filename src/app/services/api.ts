@@ -230,7 +230,8 @@ export const api = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename || `certificate_${certId}`;
+    const base = filename || `certificate_${certId}`;
+    a.download = base.endsWith(".pdf") ? base : `${base}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   },
@@ -240,7 +241,7 @@ export const api = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!r.ok) throw new Error("File not available");
-    const blob = await r.blob();
+    const blob = new Blob([await r.blob()], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
   },
