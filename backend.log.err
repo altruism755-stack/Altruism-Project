@@ -3486,3 +3486,9 @@ INFO:     Started server process [32604]
 INFO:     Waiting for application startup.
 [db] Connection pool opened (min=2, max=10)
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routes\organizations.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [32604]
+WARNING:  WatchFiles detected changes in 'routes\organizations.py'. Reloading...
