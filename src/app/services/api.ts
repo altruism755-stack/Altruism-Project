@@ -155,6 +155,8 @@ export const api = {
     request(`/supervisors/me/applications/${appId}/approve`, { method: "PUT" }),
   rejectMyApplication: (appId: number) =>
     request(`/supervisors/me/applications/${appId}/reject`, { method: "PUT" }),
+  bulkUpdateApplications: (appIds: number[], action: "approve" | "reject") =>
+    request("/supervisors/me/applications/bulk", { method: "PUT", body: JSON.stringify({ app_ids: appIds, action }) }),
   createMyEvent: (data: any) =>
     request("/supervisors/me/events", { method: "POST", body: JSON.stringify(data) }),
   updateMyEvent: (id: number, data: any) =>

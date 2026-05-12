@@ -209,9 +209,10 @@ interface Props {
   eventId: number;
   onClose: () => void;
   onEventUpdated: () => void;
+  isOwned?: boolean; // false = read-only view; management actions hidden
 }
 
-export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
+export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = true }: Props) {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -293,18 +294,14 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
     finally { setBusy(false); }
   };
 
-  // Staged bulk approve/reject
+  // Staged bulk approve/reject — single atomic backend call
   const doApplyChanges = async () => {
     if (!event || !pendingAction || selected.size === 0) return;
     setBusy(true);
     setErr("");
     try {
       const ids = Array.from(selected);
-      await Promise.all(ids.map((id) =>
-        pendingAction === "approve"
-          ? api.approveMyApplication(id)
-          : api.rejectMyApplication(id)
-      ));
+      await api.bulkUpdateApplications(ids, pendingAction);
       setSelected(new Set());
       setPendingAction(null);
       await load();
@@ -411,7 +408,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
 
         {/* Action bar */}
         <div className="flex gap-2" style={{ marginTop: 14, flexWrap: "wrap" }}>
-          {isUpcoming && (
+          {isOwned && isUpcoming && (
             <>
               {event.registration_open
                 ? <Btn label="Stop Registration" color={AMBER} onClick={() => doToggleRegistration(false)} disabled={busy} />
@@ -425,7 +422,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
               <span style={{ fontSize: 13, fontWeight: 600, color: GREEN, alignSelf: "center" }}>
                 🟢 Event is Live
               </span>
-              <Btn label="Complete Event" color="#475569" onClick={doComplete} disabled={busy} />
+              {isOwned && <Btn label="Complete Event" color="#475569" onClick={doComplete} disabled={busy} />}
             </>
           )}
         </div>
@@ -472,7 +469,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
         </div>
 
         {/* Bulk controls for Pending tab */}
-        {appTab === "Pending" && currentList.length > 0 && !showAttendance && (
+        {isOwned && appTab === "Pending" && currentList.length > 0 && !showAttendance && (
           <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
             <input
               type="checkbox"
@@ -491,7 +488,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
         )}
 
         {/* Approved tab: select for attendance or certificates */}
-        {appTab === "Approved" && currentList.length > 0 && !showAttendance && (
+        {isOwned && appTab === "Approved" && currentList.length > 0 && !showAttendance && (
           <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
             <input
               type="checkbox"
@@ -507,7 +504,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
         )}
 
         {/* Attendance save bar */}
-        {showAttendance && appTab === "Approved" && attDirty && (
+        {isOwned && showAttendance && appTab === "Approved" && attDirty && (
           <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
             <Btn label={attBusy ? "Saving…" : "Apply Attendance"} color={GREEN} onClick={doSaveAttendance} disabled={attBusy} />
             <span style={{ fontSize: 12, color: "#64748B" }}>Unsaved changes</span>
@@ -558,7 +555,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
                     <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.volunteer_email}</div>
                   </div>
                   {/* Attendance buttons (Active/Completed + Approved tab) */}
-                  {showAttendance && appTab === "Approved" && (
+                  {isOwned && showAttendance && appTab === "Approved" && (
                     <div className="flex gap-1" style={{ flexShrink: 0 }}>
                       {(["Attended", "Absent"] as AttendanceStatus[]).map((v) => {
                         const isDraft = draftVal === v;
@@ -585,8 +582,8 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated }: Props) {
                       })}
                     </div>
                   )}
-                  {/* Certificate button: only for Completed + Attended */}
-                  {isCompleted && appTab === "Approved" && app.attendance_status === "Attended" && (
+                  {/* Certificate button: only for Completed + Attended + owned */}
+                  {isOwned && isCompleted && appTab === "Approved" && app.attendance_status === "Attended" && (
                     <Btn label="+ Cert" color={CYAN} small onClick={() => setCertVolunteer(app)} />
                   )}
                 </div>

@@ -86,14 +86,31 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
         if not certificate_title:
             raise HTTPException(400, "certificate_title is required")
 
-        # Supervisors may issue certificates for any volunteer in their org.
+        # Supervisors may issue certificates for volunteers who are either:
+        # (a) active org members, or (b) approved on an event the supervisor manages.
         if current_user["role"] == "supervisor" and sup_record:
             membership = db.execute(
                 "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'Active'",
                 (volunteer_id, sup_record["org_id"]),
             ).fetchone()
             if not membership:
-                raise HTTPException(403, "Volunteer is not an active member of your organization")
+                # Fall back: allow if volunteer was approved on one of this supervisor's events.
+                event_id = body.get("event_id")
+                if event_id:
+                    event_approval = db.execute(
+                        """
+                        SELECT ea.id FROM event_applications ea
+                        JOIN events e ON e.id = ea.event_id
+                        WHERE ea.volunteer_id = %s AND ea.event_id = %s
+                          AND ea.status = 'Approved' AND ea.cancelled_at IS NULL
+                          AND e.created_by_supervisor_id = %s
+                        """,
+                        (volunteer_id, event_id, sup_record["id"]),
+                    ).fetchone()
+                    if not event_approval:
+                        raise HTTPException(403, "Volunteer is not an active org member and was not approved on this event")
+                else:
+                    raise HTTPException(403, "Volunteer is not an active member of your organization")
 
         row = db.execute(
             "INSERT INTO certificates (volunteer_id, org_id, event_id, certificate_title) VALUES (%s, %s, %s, %s) RETURNING id",

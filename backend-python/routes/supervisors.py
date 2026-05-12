@@ -237,40 +237,57 @@ def create_my_event(body: dict, current_user: dict = Depends(require_roles("supe
         return event
 
 
+_VALID_TRANSITIONS = {
+    "Upcoming": {"Active"},
+    "Active": {"Completed"},
+    "Completed": set(),
+}
+
+
 @router.put("/me/events/{event_id}")
 def update_my_event(event_id: int, body: dict, current_user: dict = Depends(require_roles("supervisor"))):
-    """Supervisor edits one of their own events."""
+    """Supervisor edits one of their own events. Status transitions enforce the state machine."""
     with get_db() as db:
         sup = _get_supervisor_record(db, current_user["id"])
 
         event = dict_row(db.execute(
-            "SELECT id FROM events WHERE id = %s AND created_by_supervisor_id = %s",
+            "SELECT * FROM events WHERE id = %s AND created_by_supervisor_id = %s",
             (event_id, sup["id"]),
         ).fetchone())
         if not event:
             raise HTTPException(404, "Event not found or you do not own this event")
 
+        new_status = body.get("status")
+        if new_status is not None and new_status != event["status"]:
+            allowed = _VALID_TRANSITIONS.get(event["status"], set())
+            if new_status not in allowed:
+                raise HTTPException(
+                    409,
+                    f"Invalid status transition: '{event['status']}' → '{new_status}'. "
+                    f"Allowed: {sorted(allowed) or 'none (terminal state)'}",
+                )
+
         db.execute(
-            "UPDATE events SET name = %s, description = %s, location = %s, date = %s, "
-            "time = %s, duration = %s, max_volunteers = %s, required_skills = %s, "
-            "status = %s, acceptance_mode = %s "
+            "UPDATE events SET "
+            "name = COALESCE(%s, name), description = COALESCE(%s, description), "
+            "location = COALESCE(%s, location), date = COALESCE(%s, date), "
+            "time = COALESCE(%s, time), duration = COALESCE(%s, duration), "
+            "max_volunteers = COALESCE(%s, max_volunteers), "
+            "required_skills = COALESCE(%s, required_skills), "
+            "status = COALESCE(%s, status), "
+            "acceptance_mode = COALESCE(%s, acceptance_mode) "
             "WHERE id = %s",
             (
-                body.get("name"),
-                body.get("description", ""),
-                body.get("location", ""),
-                body.get("date"),
-                body.get("time", ""),
-                body.get("duration") or None,
-                body.get("max_volunteers") or None,
-                body.get("required_skills", ""),
-                body.get("status", "Upcoming"),
-                body.get("acceptance_mode", "manual"),
+                body.get("name"), body.get("description"), body.get("location"),
+                body.get("date"), body.get("time"), body.get("duration") or None,
+                body.get("max_volunteers") or None, body.get("required_skills"),
+                new_status, body.get("acceptance_mode"),
                 event_id,
             ),
         )
-        updated = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
-        return updated
+        log_action(db, current_user["id"], current_user["role"], "update_event",
+                   "event", event_id, {"status": new_status} if new_status else {})
+        return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
 
 
 @router.get("/me/applications")
@@ -399,6 +416,98 @@ def reject_my_application(app_id: int, current_user: dict = Depends(require_role
                 "/dashboard/profile",
             )
         return {"message": "Application rejected"}
+
+
+@router.put("/me/applications/bulk")
+def bulk_update_applications(body: dict, current_user: dict = Depends(require_roles("supervisor"))):
+    """
+    Atomically approve or reject a list of applications for events this supervisor owns.
+    Accepts: { app_ids: [int, ...], action: "approve" | "reject" }
+    All-or-nothing: if any approval fails (capacity, ownership, state), the whole batch rolls back.
+    """
+    from routes.event_applications import _get_approved_count
+    action = body.get("action")
+    if action not in ("approve", "reject"):
+        raise HTTPException(400, "action must be 'approve' or 'reject'")
+    app_ids: list[int] = body.get("app_ids") or []
+    if not app_ids:
+        raise HTTPException(400, "app_ids must not be empty")
+
+    with exclusive_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        apps = dict_rows(db.execute(
+            """
+            SELECT ea.id, ea.volunteer_id, ea.event_id, ea.status,
+                   e.name as event_name, e.max_volunteers, e.status as event_status,
+                   e.created_by_supervisor_id, v.user_id
+            FROM event_applications ea
+            JOIN events e ON e.id = ea.event_id
+            JOIN volunteers v ON v.id = ea.volunteer_id
+            WHERE ea.id = ANY(%s) AND ea.cancelled_at IS NULL
+            """,
+            (app_ids,),
+        ).fetchall())
+
+        if len(apps) != len(app_ids):
+            raise HTTPException(404, "One or more applications not found")
+
+        # Validate ownership and state for every application first.
+        # Group by event to check capacity once per event.
+        event_approve_counts: dict[int, int] = {}
+        for app in apps:
+            if app["created_by_supervisor_id"] != sup["id"]:
+                raise HTTPException(403, f"Application {app['id']}: you can only manage applications for events you own")
+            if action == "approve":
+                if app["status"] == "Approved":
+                    raise HTTPException(400, f"Application {app['id']} is already approved")
+                if app.get("event_status") != "Upcoming":
+                    raise HTTPException(409, f"Application {app['id']}: can only approve for Upcoming events")
+                event_approve_counts[app["event_id"]] = event_approve_counts.get(app["event_id"], 0) + 1
+            else:
+                if app["status"] == "Rejected":
+                    raise HTTPException(400, f"Application {app['id']} is already rejected")
+
+        # Capacity check per event.
+        if action == "approve":
+            for event_id, batch_count in event_approve_counts.items():
+                event_row = dict_row(db.execute(
+                    "SELECT max_volunteers FROM events WHERE id = %s", (event_id,)
+                ).fetchone())
+                capacity = (event_row or {}).get("max_volunteers") or 0
+                if capacity > 0:
+                    current_approved = _get_approved_count(db, event_id)
+                    if current_approved + batch_count > capacity:
+                        raise HTTPException(409, f"Event {event_id}: approving {batch_count} would exceed capacity ({current_approved}/{capacity})")
+
+        # All checks passed — apply atomically.
+        new_status = "Approved" if action == "approve" else "Rejected"
+        db.execute(
+            "UPDATE event_applications SET status = %s WHERE id = ANY(%s)",
+            (new_status, app_ids),
+        )
+
+        # Notify each volunteer.
+        for app in apps:
+            if app.get("user_id"):
+                if action == "approve":
+                    create_notification(
+                        db, app["user_id"], "application_approved",
+                        "Event Application Approved",
+                        f"You have been accepted for '{app.get('event_name', 'the event')}'. See you there!",
+                        "/dashboard/profile",
+                    )
+                else:
+                    create_notification(
+                        db, app["user_id"], "application_rejected",
+                        "Event Application Declined",
+                        f"Your application for '{app.get('event_name', 'the event')}' was not accepted.",
+                        "/dashboard/profile",
+                    )
+
+        log_action(db, current_user["id"], current_user["role"], f"bulk_{action}",
+                   "event", None, {"app_ids": app_ids, "count": len(app_ids)})
+        return {"updated": len(app_ids), "status": new_status}
 
 
 @router.get("/me/activities")

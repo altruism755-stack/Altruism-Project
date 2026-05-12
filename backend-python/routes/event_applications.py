@@ -559,10 +559,10 @@ def mark_attendance(
     current_user: dict = Depends(require_roles("org_admin", "supervisor")),
 ):
     """
-    Bulk-set attendance_status (Attended | Absent) for approved applicants.
-    Accepts: { records: [{app_id: int, attendance_status: "Attended"|"Absent"}, ...] }
+    Bulk-set attendance_status on approved applicants AND upsert activity records.
+    Accepts: { records: [{app_id: int, attendance_status: "Attended"|"Absent"}, ...], hours?: float, description?: str }
     Only valid when event is Active or Completed.
-    Supervisors must own the event.
+    Supervisors must own the event (created_by_supervisor_id).
     """
     with get_db() as db:
         event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
@@ -579,14 +579,45 @@ def mark_attendance(
                 raise HTTPException(403, "You do not have permission to access this resource")
             if event.get("created_by_supervisor_id") != sup["id"]:
                 raise HTTPException(403, "You can only mark attendance for events you manage")
+            caller_org_id = sup["org_id"]
         else:
             org = get_org_for_admin(db, current_user["id"])
             if org["id"] != event["org_id"]:
                 raise HTTPException(403, "You do not have permission to access this resource")
+            caller_org_id = org["id"]
 
         records = body.get("records") or []
         if not records:
             raise HTTPException(400, "records list is required")
+
+        # Determine if org tracks hours to decide activity status.
+        org_row = dict_row(db.execute(
+            "SELECT tracks_hours FROM organizations WHERE id = %s", (caller_org_id,)
+        ).fetchone())
+        tracks_hours = bool((org_row or {}).get("tracks_hours", True))
+
+        hours_raw = body.get("hours")
+        hours: float | None = None
+        if tracks_hours and hours_raw is not None:
+            try:
+                hours = float(hours_raw)
+                if hours <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                raise HTTPException(400, "hours must be a positive number")
+
+        description = body.get("description", "")
+        event_date = str(event.get("date") or "")
+        event_duration = event.get("duration")
+
+        # Default hours from event duration if org tracks hours and no override given.
+        if tracks_hours and hours is None and event_duration:
+            try:
+                hours = float(event_duration)
+            except (TypeError, ValueError):
+                pass
+
+        act_status = "Pending" if tracks_hours else "Completed"
 
         updated = 0
         for rec in records:
@@ -594,6 +625,8 @@ def mark_attendance(
             att_status = rec.get("attendance_status")
             if att_status not in ("Attended", "Absent"):
                 continue
+
+            # Update attendance flag on the application.
             result = db.execute(
                 """
                 UPDATE event_applications
@@ -603,8 +636,40 @@ def mark_attendance(
                 """,
                 (att_status, app_id, event_id),
             )
-            updated += result.rowcount
+            if result.rowcount == 0:
+                continue
+            updated += 1
+
+            # Only create activity for "Attended" volunteers.
+            if att_status != "Attended":
+                continue
+
+            # Resolve volunteer_id from the application.
+            app_row = dict_row(db.execute(
+                "SELECT volunteer_id FROM event_applications WHERE id = %s", (app_id,)
+            ).fetchone())
+            if not app_row:
+                continue
+            vol_id = app_row["volunteer_id"]
+
+            # Upsert activity record so hours are tracked automatically.
+            db.execute(
+                """
+                INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (volunteer_id, event_id) WHERE event_id IS NOT NULL
+                DO UPDATE SET
+                    date        = EXCLUDED.date,
+                    hours       = EXCLUDED.hours,
+                    description = EXCLUDED.description,
+                    status      = EXCLUDED.status,
+                    reviewed_by = NULL,
+                    reviewed_at = NULL
+                """,
+                (vol_id, event_id, caller_org_id, event_date, hours, description, act_status),
+            )
 
         log_action(db, current_user["id"], current_user["role"], "mark_attendance",
-                   "event", event_id, {"records_submitted": len(records), "updated": updated})
-        return {"updated": updated}
+                   "event", event_id, {"records_submitted": len(records), "updated": updated,
+                                       "hours": hours, "tracks_hours": tracks_hours})
+        return {"updated": updated, "hours_logged": hours, "activity_status": act_status}
