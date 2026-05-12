@@ -3434,3 +3434,8 @@ Traceback (most recent call last):
     await getter
 asyncio.exceptions.CancelledError
 
+[db] Connecting to PostgreSQL at localhost:5432/alturism
+INFO:     Started server process [23304]
+INFO:     Waiting for application startup.
+[db] Connection pool opened (min=2, max=10)
+INFO:     Application startup complete.
