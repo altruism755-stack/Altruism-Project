@@ -45,8 +45,19 @@ def list_activities(
             org = get_org_for_admin(db, current_user["id"])
             where_clauses.append("a.org_id = %s")
             where_params.append(org["id"])
+        elif role == "volunteer":
+            # Volunteers may only view their own activities — never other people's.
+            vol = dict_row(db.execute(
+                "SELECT id FROM volunteers WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not vol:
+                raise HTTPException(403, "Volunteer profile not found")
+            where_clauses.append("a.volunteer_id = %s")
+            where_params.append(vol["id"])
 
-        if volunteer_id:
+        # volunteer_id query-param filter is only honoured for supervisors and org_admins;
+        # volunteers are already pinned to their own record above.
+        if volunteer_id and role != "volunteer":
             where_clauses.append("a.volunteer_id = %s")
             where_params.append(volunteer_id)
         if status and status != "All":

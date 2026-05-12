@@ -193,8 +193,6 @@ export const api = {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
     return request(`/activities${qs}`);
   },
-  logActivity: (data: any) =>
-    request("/activities", { method: "POST", body: JSON.stringify(data) }),
   approveActivity: (id: number) =>
     request(`/activities/${id}/approve`, { method: "PUT" }),
   rejectActivity: (id: number) =>
