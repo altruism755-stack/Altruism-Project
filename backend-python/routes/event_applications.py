@@ -8,6 +8,7 @@ from routes.audit import log_action
 
 router = APIRouter(prefix="/api/event-applications", tags=["event_applications"])
 logger = logging.getLogger(__name__)
+FORBIDDEN = "You do not have permission to access this resource"
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -408,13 +409,13 @@ def list_waitlist(event_id: int, current_user: dict = Depends(require_roles("org
 
 
 @router.put("/{app_id}/approve")
-def approve_application(app_id: int, current_user: dict = Depends(require_roles("org_admin"))):
+def approve_application(app_id: int, current_user: dict = Depends(require_roles("org_admin", "supervisor"))):
     # exclusive_db() prevents two simultaneous approvals from both passing the capacity check.
     with exclusive_db() as db:
         app = dict_row(db.execute(
             "SELECT ea.volunteer_id, ea.event_id, ea.status, "
             "e.name as event_name, e.max_volunteers, e.status as event_status, "
-            "v.user_id "
+            "e.org_id as event_org_id, v.user_id "
             "FROM event_applications ea "
             "JOIN events e ON e.id = ea.event_id "
             "JOIN volunteers v ON v.id = ea.volunteer_id "
@@ -425,6 +426,18 @@ def approve_application(app_id: int, current_user: dict = Depends(require_roles(
             raise HTTPException(404, "Application not found")
         if app["status"] == "Approved":
             raise HTTPException(400, "Application is already approved")
+
+        # Scope check.
+        if current_user["role"] == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup or sup["org_id"] != app["event_org_id"]:
+                raise HTTPException(403, FORBIDDEN)
+        else:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != app["event_org_id"]:
+                raise HTTPException(403, FORBIDDEN)
 
         # Only approve for Upcoming events.
         if app.get("event_status") != "Upcoming":
@@ -520,7 +533,7 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
 
 
 @router.put("/{app_id}/reject")
-def reject_application(app_id: int, current_user: dict = Depends(require_roles("org_admin"))):
+def reject_application(app_id: int, current_user: dict = Depends(require_roles("org_admin", "supervisor"))):
     with exclusive_db() as db:
         app = dict_row(db.execute(
             "SELECT ea.volunteer_id, ea.event_id, ea.status, e.name as event_name, "
@@ -535,6 +548,18 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
             raise HTTPException(404, "Application not found")
         if app["status"] == "Rejected":
             raise HTTPException(400, "Application is already rejected")
+
+        # Scope check.
+        if current_user["role"] == "supervisor":
+            sup = dict_row(db.execute(
+                "SELECT org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
+            ).fetchone())
+            if not sup or sup["org_id"] != app["event_org_id"]:
+                raise HTTPException(403, FORBIDDEN)
+        else:
+            org = get_org_for_admin(db, current_user["id"])
+            if org["id"] != app["event_org_id"]:
+                raise HTTPException(403, FORBIDDEN)
 
         was_approved = app["status"] == "Approved"
         db.execute("UPDATE event_applications SET status = 'Rejected' WHERE id = %s", (app_id,))
