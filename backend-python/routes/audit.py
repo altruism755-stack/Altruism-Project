@@ -78,7 +78,7 @@ def list_audit_logs(
                 OR (entity_type = 'event'        AND entity_id IN (SELECT id FROM events WHERE org_id = %s))
                 OR (entity_type = 'activity'     AND entity_id IN (SELECT id FROM activities WHERE org_id = %s))
                 OR (entity_type = 'certificate'  AND entity_id IN (SELECT id FROM certificates WHERE org_id = %s))
-                OR (entity_type = 'event_application' AND entity_id IN (SELECT id FROM event_applications WHERE org_id = %s))
+                OR (entity_type = 'event_application' AND entity_id IN (SELECT ea.id FROM event_applications ea JOIN events ev ON ev.id = ea.event_id WHERE ev.org_id = %s))
             )"""
         ]
         params: list = [org_id, org_id, org_id, org_id, org_id, org_id, org_id]

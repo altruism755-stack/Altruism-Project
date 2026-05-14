@@ -34,7 +34,7 @@ def _assert_supervisor_volunteer(db, supervisor_id: int, volunteer_id: int) -> N
     if not sup:
         raise HTTPException(403, FORBIDDEN)
     row = db.execute(
-        "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'Active'",
+        "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'active'",
         (volunteer_id, sup["org_id"]),
     ).fetchone()
     if not row:
@@ -61,6 +61,7 @@ def list_volunteers(
     with get_db() as db:
         _joins = (
             "FROM volunteers v "
+            "JOIN users u ON u.id = v.user_id "
             "LEFT JOIN org_volunteers ov ON v.id = ov.volunteer_id"
         )
         filters: list[str] = []
@@ -74,7 +75,7 @@ def list_volunteers(
             filters.append("v.status = %s")
             params.append(status)
         if search:
-            filters.append("(v.name ILIKE %s OR v.email ILIKE %s)")
+            filters.append("(v.name ILIKE %s OR u.email ILIKE %s)")
             params.extend([f"%{search}%", f"%{search}%"])
 
         where = " WHERE " + " AND ".join(filters) if filters else ""
@@ -115,10 +116,10 @@ def _build_volunteer_response(db, vol: dict) -> dict:
     ).fetchall())
 
     orgs = dict_rows(db.execute(
-        "SELECT o.*, ov.status as membership_status, ov.department, ov.joined_date "
+        "SELECT o.*, ov.status as membership_status, ov.department "
         "FROM organizations o "
         "JOIN org_volunteers ov ON o.id = ov.org_id WHERE ov.volunteer_id = %s "
-        "ORDER BY ov.status DESC, ov.joined_date DESC",
+        "ORDER BY ov.status DESC",
         (vol["id"],),
     ).fetchall())
 
@@ -131,7 +132,7 @@ def _build_volunteer_response(db, vol: dict) -> dict:
         (vol["id"],),
     ).fetchall())
 
-    total_hours = sum(a["hours"] or 0 for a in activities if a["status"] == "Approved")
+    total_hours = sum(a["hours"] or 0 for a in activities if a["status"] == "approved")
     return {**vol, "activities": activities, "organizations": orgs, "certificates": certificates, "totalHours": total_hours}
 
 
@@ -250,7 +251,7 @@ def update_volunteer(volunteer_id: int, body: dict, current_user: dict = Depends
                 if conflict:
                     raise HTTPException(409, "Email already in use by another account")
                 db.execute("UPDATE users SET email = %s WHERE id = %s", (new_email, vol["user_id"]))
-                db.execute("UPDATE volunteers SET email = %s WHERE id = %s", (new_email, volunteer_id))
+                # email lives in users table only — no volunteers.email column
 
         # Handle password change
         new_password = body.get("new_password")
@@ -381,7 +382,7 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             _assert_org_volunteer(db, admin_org["id"], volunteer_id)
 
         activities = dict_rows(db.execute(
-            "SELECT a.*, e.name as event_name, e.date as event_date "
+            "SELECT a.*, e.name as event_name, e.starts_at as event_date "
             "FROM activities a "
             "LEFT JOIN events e ON a.event_id = e.id "
             "WHERE a.volunteer_id = %s AND a.org_id = %s ORDER BY a.date DESC",
@@ -397,15 +398,15 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
         ).fetchall())
 
         membership = dict_row(db.execute(
-            "SELECT status, joined_date, approved_at FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
+            "SELECT status, joined_at, approved_at FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s",
             (org_id, volunteer_id),
         ).fetchone())
-        member_status = (membership or {}).get("status", "Pending")
+        member_status = (membership or {}).get("status", "pending")
 
         # Single source of truth: member_status gates all activity/certificate data.
-        if member_status == "Active":
-            pending_activities  = [a for a in activities if a["status"] == "Pending"]
-            approved_activities = [a for a in activities if a["status"] == "Approved"]
+        if member_status == "active":
+            pending_activities  = [a for a in activities if a["status"] == "pending"]
+            approved_activities = [a for a in activities if a["status"] == "approved"]
             total_hours         = sum(a["hours"] for a in approved_activities)
             visible_activities  = activities
             visible_certs       = certificates
@@ -417,10 +418,10 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             visible_certs       = []
 
         pending_applications = dict_rows(db.execute(
-            "SELECT ea.*, e.name as event_name, e.date as event_date "
+            "SELECT ea.*, e.name as event_name, e.starts_at as event_date "
             "FROM event_applications ea "
             "JOIN events e ON ea.event_id = e.id "
-            "WHERE ea.volunteer_id = %s AND ea.org_id = %s AND ea.status IN ('Pending', 'Waitlisted')",
+            "WHERE ea.volunteer_id = %s AND e.org_id = %s AND ea.status IN ('pending', 'waitlisted')",
             (volunteer_id, org_id),
         ).fetchall())
 
@@ -435,7 +436,7 @@ def get_volunteer_org_dashboard(volunteer_id: int, org_id: int, current_user: di
             "pending_activities":    pending_activities,
             "pending_applications":  pending_applications,
             "member_status":         member_status,
-            "applied_at":            (membership or {}).get("joined_date"),
+            "applied_at":            (membership or {}).get("joined_at"),
             "approved_at":           (membership or {}).get("approved_at"),
             "lifecycle":             lifecycle,
         }
@@ -448,7 +449,7 @@ def update_volunteer_status(
     current_user: dict = Depends(require_roles("org_admin")),
 ):
     status_val = body.get("status")
-    if status_val not in ("Active", "Pending", "Suspended"):
+    if status_val not in ("active", "pending", "suspended"):
         raise HTTPException(400, "Invalid status")
 
     with get_db() as db:

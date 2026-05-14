@@ -51,10 +51,10 @@ def compute_volunteer_lifecycle(
     Hours are logged by supervisors — volunteers have no submission step.
     The journey is: Apply → Get Accepted → Supervisor Logs Hours → Certificate.
     """
-    has_approved = any(a["status"] == "Approved" for a in activities)
+    has_approved = any(a["status"] == "approved" for a in activities)
     has_any = len(activities) > 0
     has_cert = len(certificates) > 0
-    is_member = member_status == "Active"
+    is_member = member_status == "active"
 
     # Canonical state
     if not is_member:
@@ -134,19 +134,19 @@ def compute_volunteer_lifecycle(
 def compute_org_lifecycle(db, org_id: int) -> dict:
     """Aggregate pipeline lifecycle for an org admin."""
     pending_members = db.execute(
-        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'Pending'",
+        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'pending'",
         (org_id,),
     ).fetchone()["c"]
     active_members = db.execute(
-        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'Active'",
+        "SELECT COUNT(*) c FROM org_volunteers WHERE org_id = %s AND status = 'active'",
         (org_id,),
     ).fetchone()["c"]
     pending_acts = db.execute(
-        "SELECT COUNT(*) c FROM activities WHERE org_id = %s AND status = 'Pending'",
+        "SELECT COUNT(*) c FROM activities WHERE org_id = %s AND status = 'pending'",
         (org_id,),
     ).fetchone()["c"]
     total_hours = db.execute(
-        "SELECT COALESCE(SUM(hours), 0) h FROM activities WHERE org_id = %s AND status = 'Approved'",
+        "SELECT COALESCE(SUM(hours), 0) h FROM activities WHERE org_id = %s AND status = 'approved'",
         (org_id,),
     ).fetchone()["h"]
 
@@ -309,7 +309,7 @@ def get_supervisor_lifecycle(current_user: dict = Depends(require_roles("supervi
         pending_acts = db.execute(
             "SELECT COUNT(*) c FROM activities a "
             "JOIN events e ON e.id = a.event_id AND e.created_by_supervisor_id = %s "
-            "WHERE a.org_id = %s AND a.status = 'Pending'",
+            "WHERE a.org_id = %s AND a.status = 'pending'",
             (sup["id"], sup["org_id"]),
         ).fetchone()["c"]
         return {"lifecycle": compute_supervisor_lifecycle(events_count, pending_acts)}

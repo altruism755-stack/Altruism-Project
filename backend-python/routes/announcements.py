@@ -38,8 +38,9 @@ def list_announcements(
                 return {"announcements": []}
             placeholders = ",".join(["%s"] * len(ids))
             announcements = dict_rows(db.execute(
-                f"SELECT a.*, o.name as org_name, o.initials as org_initials, o.color as org_color "
+                f"SELECT a.*, o.name as org_name, t.initials as org_initials, t.color as org_color "
                 f"FROM announcements a JOIN organizations o ON a.org_id = o.id "
+                f"LEFT JOIN org_theme t ON t.org_id = o.id "
                 f"WHERE a.org_id IN ({placeholders}) ORDER BY a.created_at DESC LIMIT 50",
                 ids,
             ).fetchall())
@@ -51,7 +52,7 @@ def list_announcements(
                     r["org_id"] for r in db.execute(
                         "SELECT ov.org_id FROM org_volunteers ov "
                         "JOIN volunteers v ON v.id = ov.volunteer_id "
-                        "WHERE v.user_id = %s AND ov.status = 'Active'",
+                        "WHERE v.user_id = %s AND ov.status = 'active'",
                         (current_user["id"],),
                     ).fetchall()
                 ]
@@ -73,8 +74,9 @@ def list_announcements(
                 return {"announcements": []}
             placeholders = ",".join(["%s"] * len(scoped_ids))
             announcements = dict_rows(db.execute(
-                f"SELECT a.*, o.name as org_name, o.initials as org_initials, o.color as org_color "
+                f"SELECT a.*, o.name as org_name, t.initials as org_initials, t.color as org_color "
                 f"FROM announcements a JOIN organizations o ON a.org_id = o.id "
+                f"LEFT JOIN org_theme t ON t.org_id = o.id "
                 f"WHERE a.org_id IN ({placeholders}) ORDER BY a.created_at DESC LIMIT 50",
                 scoped_ids,
             ).fetchall())
@@ -112,7 +114,7 @@ def create_announcement(body: dict, current_user: dict = Depends(require_roles("
                 SELECT v.user_id
                 FROM org_volunteers ov
                 JOIN volunteers v ON v.id = ov.volunteer_id
-                WHERE ov.org_id = %s AND ov.status = 'Active'
+                WHERE ov.org_id = %s AND ov.status = 'active'
                 """,
                 (org["id"],),
             ).fetchall()

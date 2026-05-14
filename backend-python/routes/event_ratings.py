@@ -37,15 +37,15 @@ def rate_event(body: dict, current_user: dict = Depends(require_roles("volunteer
             raise HTTPException(404, "Event not found")
 
         # Only completed events can be rated.
-        if event["status"] != "Completed":
+        if event["status"] != "completed":
             raise HTTPException(409, "You can only rate events that have been completed")
 
         # Volunteer must have an approved application and a logged activity record.
         attended = db.execute(
             "SELECT ea.id FROM event_applications ea "
             "JOIN activities a ON a.volunteer_id = ea.volunteer_id AND a.event_id = ea.event_id "
-            "  AND a.status IN ('Approved', 'Completed') "
-            "WHERE ea.event_id = %s AND ea.volunteer_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
+            "  AND a.status IN ('approved', 'completed') "
+            "WHERE ea.event_id = %s AND ea.volunteer_id = %s AND ea.status = 'approved' AND ea.cancelled_at IS NULL",
             (event_id, vol["id"]),
         ).fetchone()
         if not attended:

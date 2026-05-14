@@ -63,18 +63,12 @@ def require_roles(*roles: str):
 
 
 def require_platform_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """Platform admins are stored in the platform_admins table — a user may also
-    have a regular role (org_admin, volunteer) and be elevated to platform level."""
-    from database import get_db
-    with get_db() as db:
-        row = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = %s", (current_user["id"],)
-        ).fetchone()
-        if not row:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Platform admin access required",
-            )
+    """Platform admin role is stored as users.role = 'platform_admin'."""
+    if current_user.get("role") != "platform_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Platform admin access required",
+        )
     return current_user
 
 

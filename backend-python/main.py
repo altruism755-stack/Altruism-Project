@@ -149,20 +149,17 @@ def _seed_platform_admin():
         ).fetchone()
         if not existing:
             hashed = hash_password(admin_password)
-            row = conn.execute(
-                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'org_admin') RETURNING id",
-                (admin_email, hashed),
-            ).fetchone()
-            user_id = row["id"]
             conn.execute(
-                "INSERT INTO platform_admins (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user_id,)
+                "INSERT INTO users (email, password, role) VALUES (%s, %s, 'platform_admin')",
+                (admin_email, hashed),
             )
             conn.commit()
             print(f"[seed] Created platform admin: {admin_email}")
         else:
-            # Ensure the user is in platform_admins even if seeded before
+            # Promote to platform_admin role if not already
             conn.execute(
-                "INSERT INTO platform_admins (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (existing["id"],)
+                "UPDATE users SET role = 'platform_admin' WHERE id = %s AND role != 'platform_admin'",
+                (existing["id"],),
             )
             conn.commit()
     finally:

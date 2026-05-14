@@ -55,7 +55,7 @@ class AddVolunteerManuallyBody(BaseModel):
 # These are applied immediately without any review step.
 EDITABLE_FIELDS = {
     "description", "logo_url", "phone", "website",
-    "category", "categories",
+    "categories",
     "branches",
     "submitter_name", "submitter_role", "additional_notes",
     "tracks_hours",
@@ -96,7 +96,7 @@ class OrgProfileUpdate(BaseModel):
 
 
 def _decode_org_json(org: dict) -> dict:
-    """Parse JSON-encoded list columns into native Python lists."""
+    """Normalize JSONB list columns — already parsed by psycopg, but guard against legacy TEXT rows."""
     if not org:
         return org
     for f in JSON_ARRAY_FIELDS:
@@ -112,6 +112,7 @@ def _decode_org_json(org: dict) -> dict:
 
 
 def _encode_for_db(field: str, value: Any) -> Any:
+    # JSONB columns: psycopg accepts native lists; TEXT fallback uses json.dumps.
     if field in JSON_ARRAY_FIELDS:
         return json.dumps(value or [])
     return value
@@ -349,7 +350,7 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
             SELECT
                 v.id                                                        AS volunteer_id,
                 ov.org_id,
-                LOWER(TRIM(v.email))                                        AS email,
+                LOWER(TRIM(u.email))                                        AS email,
                 v.name,
                 COALESCE(ov.join_source, 'other')                          AS join_source,
                 CASE
@@ -358,24 +359,21 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
                     ELSE ''
                 END                                                         AS channel_detail,
                 CASE ov.status
-                    WHEN 'Pending'  THEN 'applied'
-                    WHEN 'Active'   THEN 'accepted'
-                    WHEN 'Inactive' THEN 'inactive'
+                    WHEN 'pending'  THEN 'applied'
+                    WHEN 'active'   THEN 'accepted'
+                    WHEN 'inactive' THEN 'inactive'
                     ELSE            'unknown'
                 END                                                         AS status,
-                COALESCE(ov.is_active, 0)                                  AS is_active,
-                COALESCE(
-                    ov.joined_at::text,
-                    ov.joined_date::text || 'T00:00:00Z',
-                    ''
-                )                                                           AS joined_at,
+                CASE WHEN ov.status = 'active' THEN 1 ELSE 0 END           AS is_active,
+                COALESCE(ov.joined_at::text, '')                           AS joined_at,
                 ''                                                          AS activity_id,
                 COALESCE(ov.governorate_snapshot, '')                       AS governorate,
                 COALESCE(ov.city_snapshot,        '')                       AS city
             FROM volunteers v
+            JOIN users u ON u.id = v.user_id
             JOIN org_volunteers ov ON v.id = ov.volunteer_id
             WHERE ov.org_id = %s
-            ORDER BY COALESCE(ov.joined_at, ov.joined_date::timestamptz) ASC
+            ORDER BY ov.joined_at ASC
             """,
             (org_id,),
         ).fetchall())
@@ -459,9 +457,9 @@ def _shape_row(row: dict) -> dict:
         elif col == "prior_experience":
             out[col] = "Yes" if val else "No"
         elif col == "is_active":
-            out[col] = 1 if val else 0
+            out[col] = 1 if (row.get("membership_status") or "").lower() == "active" else 0
         elif col == "joined_at":
-            out[col] = val or row.get("joined_date") or ""
+            out[col] = val or ""
         elif val is None:
             out[col] = ""
         else:
@@ -474,7 +472,7 @@ def _fetch_export_rows(db, org_id: int) -> list[dict]:
         """
         SELECT
             v.id AS volunteer_id,
-            v.name, v.email, v.phone, v.national_id, v.nationality,
+            v.name, u.email, v.phone, v.national_id, v.nationality,
             v.gender, v.date_of_birth, v.governorate, v.city,
             v.education_level, v.university_name, v.faculty, v.field_of_study, v.study_year,
             v.languages, v.skills, v.cause_areas, v.availability,
@@ -483,10 +481,10 @@ def _fetch_export_rows(db, org_id: int) -> list[dict]:
             ov.status AS membership_status,
             COALESCE(ov.join_source, 'other') AS join_source,
             COALESCE(ov.channel_detail, '') AS channel_detail,
-            COALESCE(ov.joined_at, ov.joined_date::text) AS joined_at,
-            ov.joined_date,
-            COALESCE(ov.is_active, 0) AS is_active
+            COALESCE(ov.joined_at::text, '') AS joined_at,
+            CASE WHEN ov.status = 'active' THEN 1 ELSE 0 END AS is_active
         FROM volunteers v
+        JOIN users u ON u.id = v.user_id
         JOIN org_volunteers ov ON v.id = ov.volunteer_id
         WHERE ov.org_id = %s
         ORDER BY v.name ASC
@@ -615,17 +613,18 @@ def list_organizations():
     with get_db() as db:
         orgs = dict_rows(db.execute(
             """
-            SELECT o.id, o.name, o.description, o.category, o.color, o.secondary_color,
-                   o.initials, o.founded, o.founded_year, o.location, o.org_type,
+            SELECT o.id, o.name, o.description, o.categories, o.founded_year, o.hq_city, o.org_type,
                    o.logo_url, o.website, o.student_only,
-                   COUNT(CASE WHEN ov.status = 'Active'  THEN 1 END) AS total_volunteers,
-                   COUNT(CASE WHEN ov.status = 'Pending' THEN 1 END) AS pending_requests,
-                   COUNT(CASE WHEN e.status IN ('Active','Upcoming') THEN 1 END) AS active_activities
+                   t.color, t.secondary_color, t.initials,
+                   COUNT(CASE WHEN ov.status = 'active'  THEN 1 END) AS total_volunteers,
+                   COUNT(CASE WHEN ov.status = 'pending' THEN 1 END) AS pending_requests,
+                   COUNT(CASE WHEN e.status IN ('active','upcoming') THEN 1 END) AS active_activities
             FROM organizations o
+            LEFT JOIN org_theme t ON t.org_id = o.id
             LEFT JOIN org_volunteers ov ON ov.org_id = o.id
             LEFT JOIN events e ON e.org_id = o.id
             WHERE o.status = 'approved'
-            GROUP BY o.id
+            GROUP BY o.id, t.color, t.secondary_color, t.initials
             """
         ).fetchall())
         return {"organizations": orgs}
@@ -643,15 +642,16 @@ def get_organization(org_id: int, current_user: dict = Depends(get_current_user)
         # Public-safe volunteer projection for non-admins; full data for admins.
         if role in ("org_admin", "supervisor"):
             vol_query = (
-                "SELECT v.id, v.name, v.email, v.phone, v.status, ov.department, ov.joined_date "
-                "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
+                "SELECT v.id, v.name, u.email, v.phone, v.status, ov.department "
+                "FROM volunteers v JOIN users u ON u.id = v.user_id "
+                "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
                 "WHERE ov.org_id = %s LIMIT 200"
             )
         else:
             vol_query = (
-                "SELECT v.id, v.name, v.status, ov.department, ov.joined_date "
+                "SELECT v.id, v.name, v.status, ov.department "
                 "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
-                "WHERE ov.org_id = %s AND ov.status = 'Active' LIMIT 200"
+                "WHERE ov.org_id = %s AND ov.status = 'active' LIMIT 200"
             )
 
         volunteers = dict_rows(db.execute(vol_query, (org["id"],)).fetchall())
@@ -661,7 +661,7 @@ def get_organization(org_id: int, current_user: dict = Depends(get_current_user)
         ).fetchall())
 
         events = dict_rows(db.execute(
-            "SELECT * FROM events WHERE org_id = %s ORDER BY date DESC LIMIT 100", (org["id"],)
+            "SELECT * FROM events WHERE org_id = %s ORDER BY starts_at DESC LIMIT 100", (org["id"],)
         ).fetchall())
 
         return {**org, "volunteers": volunteers, "supervisors": supervisors, "events": events}
@@ -683,11 +683,12 @@ def get_org_members(org_id: int, current_user: dict = Depends(require_roles("org
             _assert_org_access(db, org_id, current_user["id"])
 
         volunteers = dict_rows(db.execute(
-            "SELECT v.id, v.name, v.email, v.phone, v.city, v.skills, v.status, "
+            "SELECT v.id, v.name, u.email, v.phone, v.city, v.skills, v.status, "
             "v.gender, v.education_level, v.cause_areas, "
-            "ov.department, ov.status as org_status, ov.joined_date, "
+            "ov.department, ov.status as org_status, "
             "ov.join_source "
-            "FROM volunteers v JOIN org_volunteers ov ON v.id = ov.volunteer_id "
+            "FROM volunteers v JOIN users u ON u.id = v.user_id "
+            "JOIN org_volunteers ov ON v.id = ov.volunteer_id "
             "WHERE ov.org_id = %s",
             (org_id,),
         ).fetchall())
@@ -731,11 +732,11 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
         _now = _utcnow()
         db.execute(
             "INSERT INTO org_volunteers "
-            "(org_id, volunteer_id, status, is_active, join_source, "
+            "(org_id, volunteer_id, status, join_source, "
             " governorate_snapshot, city_snapshot, joined_at) "
-            "VALUES (%s, %s, 'Pending', %s, 'website', %s, %s, %s)",
-            (org_id, vol["id"], _is_active("Pending"),
-             vol.get("governorate") or "", vol.get("city") or "", _now),
+            "VALUES (%s, %s, 'pending', 'website', %s, %s, %s)",
+            (org_id, vol["id"],
+             vol.get("governorate") or None, vol.get("city") or None, _now),
         )
         vol_name = dict_row(db.execute(
             "SELECT name FROM volunteers WHERE id = %s", (vol["id"],)
@@ -765,15 +766,15 @@ def approve_org_member(
             "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
             "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = %s", (vol_id,)
         ).fetchone())
-        gov_snap = (vol or {}).get("governorate") or ""
-        city_snap = (vol or {}).get("city") or ""
+        gov_snap = (vol or {}).get("governorate") or None
+        city_snap = (vol or {}).get("city") or None
         db.execute(
-            "UPDATE org_volunteers SET status = 'Active', is_active = %s, department = %s, "
+            "UPDATE org_volunteers SET status = 'active', department = %s, "
             "joined_at = NOW(), "
             "approved_at = NOW(), "
             "governorate_snapshot = %s, city_snapshot = %s "
             "WHERE org_id = %s AND volunteer_id = %s",
-            (_is_active("Active"), body.get("department"),
+            (body.get("department"),
              gov_snap, city_snap, org_id, vol_id),
         )
         # Notify volunteer
@@ -803,8 +804,8 @@ def reject_org_member(
             "SELECT v.user_id FROM volunteers v WHERE v.id = %s", (vol_id,)
         ).fetchone())
         db.execute(
-            "UPDATE org_volunteers SET status = 'Rejected' "
-            "WHERE org_id = %s AND volunteer_id = %s AND status = 'Pending'",
+            "UPDATE org_volunteers SET status = 'rejected' "
+            "WHERE org_id = %s AND volunteer_id = %s AND status = 'pending'",
             (org_id, vol_id),
         )
         # Notify volunteer
@@ -886,9 +887,9 @@ def add_volunteer_manually(
                 )
             if not volunteer:
                 row = db.execute(
-                    "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, 'Active') RETURNING id",
-                    (user["id"], name, email, phone, city, body.skills),
+                    "INSERT INTO volunteers (user_id, name, phone, city, skills, status) "
+                    "VALUES (%s, %s, %s, %s, %s, 'active') RETURNING id",
+                    (user["id"], name, phone, city, body.skills),
                 ).fetchone()
                 volunteer_id = row["id"]
             else:
@@ -907,17 +908,17 @@ def add_volunteer_manually(
             ).fetchone()
             user_id = row["id"]
             row = db.execute(
-                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, status) "
-                "VALUES (%s, %s, %s, %s, %s, %s, 'Active') RETURNING id",
-                (user_id, name, email, phone, city, body.skills),
+                "INSERT INTO volunteers (user_id, name, phone, city, skills, status) "
+                "VALUES (%s, %s, %s, %s, %s, 'active') RETURNING id",
+                (user_id, name, phone, city, body.skills),
             ).fetchone()
             volunteer_id = row["id"]
 
         db.execute(
             "INSERT INTO org_volunteers "
-            "(org_id, volunteer_id, status, is_active, join_source, source, "
+            "(org_id, volunteer_id, status, join_source, "
             " city_snapshot, joined_at, added_by_admin_id, notes) "
-            "VALUES (%s, %s, 'Active', 1, 'manual', 'manual', %s, %s, %s, %s)",
+            "VALUES (%s, %s, 'active', 'manual', %s, %s, %s, %s)",
             (org_id, volunteer_id, city, _now, current_user["id"], body.notes),
         )
 

@@ -96,13 +96,13 @@ def register(request: Request, body: RegisterBody):
             ).fetchone()
             user_id = row["id"]
             db.execute(
-                "INSERT INTO volunteers (user_id, name, email, phone, city, skills, "
+                "INSERT INTO volunteers (user_id, name, phone, city, skills, "
                 "date_of_birth, governorate, national_id, gender, health_notes, availability, "
                 "hours_per_week, languages, education_level, prior_experience, prior_org, "
                 "experiences, cause_areas, nationality, university_name, faculty, study_year, "
                 "field_of_study, department, status) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active')",
-                (user_id, body.name or "", body.email, body.phone or None, body.city or None,
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')",
+                (user_id, body.name or "", body.phone or None, body.city or None,
                  json.dumps(body.skills or []),
                  body.dateOfBirth or None, body.governorate or None, body.nationalId or None,
                  body.gender or None, body.healthNotes or None,
@@ -147,29 +147,26 @@ def register(request: Request, body: RegisterBody):
                 (body.email, hashed),
             ).fetchone()
             user_id = row["id"]
-            initials = "".join(w[0] for w in (body.orgName or "").split() if w)[:2].upper()
-            # Resolve category vs categories: prefer the canonical multi-select
-            # list when provided; otherwise fall back to the legacy comma-string.
+            # Resolve categories: prefer the canonical multi-select list; fall back to legacy comma-string.
             cats_list = body.categories or (
                 [c.strip() for c in (body.category or "").split(",") if c.strip()]
                 if body.category else []
             )
-            cats_string = ", ".join(cats_list) if cats_list else (body.category or "")
+            initials = "".join(w[0] for w in (body.orgName or "").split() if w)[:2].upper()
             db.execute(
                 """INSERT INTO organizations (
-                    name, description, category, categories, initials, website, phone, admin_user_id,
-                    status, org_type, org_size, official_email, founded_year, location, hq_city,
+                    name, description, categories, website, phone, admin_user_id,
+                    status, org_type, org_size, official_email, founded_year, hq_city,
                     branches, social_links, logo_url, documents_url,
                     submitter_name, submitter_role, additional_notes
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                ) VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (
                     body.orgName, body.description or "",
-                    cats_string, json.dumps(cats_list),
-                    initials,
+                    json.dumps(cats_list),
                     body.website or "", body.phone or "", user_id,
                     body.orgType or "", body.orgSize or "",
                     body.officialEmail or body.email, body.foundedYear or "",
-                    body.location or "", body.hqCity or "",
+                    body.hqCity or body.location or "",
                     json.dumps(body.branches or []),
                     body.socialLinks or "",
                     body.logoUrl or "", body.documentsUrl or "",
@@ -177,7 +174,21 @@ def register(request: Request, body: RegisterBody):
                     body.additionalNotes or "",
                 ),
             )
-            org = dict_row(db.execute("SELECT * FROM organizations WHERE admin_user_id = %s", (user_id,)).fetchone())
+            # Store UI theme separately
+            new_org = dict_row(db.execute(
+                "SELECT id FROM organizations WHERE admin_user_id = %s ORDER BY created_at DESC LIMIT 1",
+                (user_id,),
+            ).fetchone())
+            if new_org:
+                db.execute(
+                    "INSERT INTO org_theme (org_id, initials) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    (new_org["id"], initials),
+                )
+            org = dict_row(db.execute(
+                "SELECT o.*, t.color, t.secondary_color, t.initials FROM organizations o "
+                "LEFT JOIN org_theme t ON t.org_id = o.id WHERE o.admin_user_id = %s",
+                (user_id,),
+            ).fetchone())
             # Invariant: creator is always an org admin from day one.
             # ON CONFLICT DO NOTHING is safe against the UNIQUE(user_id, org_id) constraint.
             if org:
@@ -226,11 +237,7 @@ def login(request: Request, body: LoginBody):
             if profile:
                 org_status = profile.get("status") or "approved"
 
-        # Check if this user is also a platform admin
-        pa_row = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
-        ).fetchone()
-        is_platform_admin = pa_row is not None
+        is_platform_admin = user["role"] == "platform_admin"
 
         return {
             "token": token,
@@ -264,10 +271,7 @@ def me(current_user: dict = Depends(get_current_user)):
             except HTTPException:
                 profile = None
 
-        pa_row = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
-        ).fetchone()
-        user["is_platform_admin"] = pa_row is not None
+        user["is_platform_admin"] = user["role"] == "platform_admin"
 
         return {"user": user, "profile": profile}
 

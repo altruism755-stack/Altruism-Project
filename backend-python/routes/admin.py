@@ -116,11 +116,11 @@ def platform_stats(current_user: dict = Depends(require_platform_admin)):
                 (SELECT COUNT(*) FROM organizations WHERE status = 'pending')               AS pending_organizations,
                 (SELECT COUNT(*) FROM organizations WHERE status = 'approved')              AS approved_organizations,
                 (SELECT COUNT(*) FROM organizations WHERE status = 'rejected')              AS rejected_organizations,
-                (SELECT COUNT(*) FROM volunteers)                                           AS total_volunteers,
-                (SELECT COUNT(*) FROM supervisors)                                          AS total_supervisors,
-                (SELECT COUNT(*) FROM users)                                                AS total_users,
-                (SELECT COUNT(*) FROM platform_admins)                                     AS total_platform_admins,
-                (SELECT COUNT(*) FROM org_profile_change_requests WHERE status = 'pending') AS pending_profile_changes
+                (SELECT COUNT(*) FROM volunteers)                                                AS total_volunteers,
+                (SELECT COUNT(*) FROM supervisors)                                             AS total_supervisors,
+                (SELECT COUNT(*) FROM users)                                                   AS total_users,
+                (SELECT COUNT(*) FROM users WHERE role = 'platform_admin')                     AS total_platform_admins,
+                (SELECT COUNT(*) FROM org_profile_change_requests WHERE status = 'pending')    AS pending_profile_changes
             """
         ).fetchone()
         return dict(row)
@@ -133,7 +133,7 @@ def platform_stats(current_user: dict = Depends(require_platform_admin)):
 # in the dynamic UPDATE below. Must mirror SENSITIVE_FIELDS in organizations.py.
 _SENSITIVE_COLUMNS = frozenset({
     "name", "official_email", "org_type", "founded_year",
-    "org_size", "location", "hq_city",
+    "org_size", "hq_city",
 })
 
 _FIELD_LABELS: dict = {
@@ -142,7 +142,6 @@ _FIELD_LABELS: dict = {
     "org_type": "Organization Type",
     "founded_year": "Founded Year",
     "org_size": "Organization Size",
-    "location": "Headquarters Governorate",
     "hq_city": "Headquarters City",
 }
 
@@ -161,7 +160,7 @@ def list_profile_changes(
             "u.email as requested_by_email, "
             "o.name as cur_name, o.official_email as cur_official_email, "
             "o.org_type as cur_org_type, o.founded_year as cur_founded_year, "
-            "o.org_size as cur_org_size, o.location as cur_location, o.hq_city as cur_hq_city "
+            "o.org_size as cur_org_size, o.hq_city as cur_hq_city "
             "FROM org_profile_change_requests r "
             "JOIN organizations o ON r.org_id = o.id "
             "JOIN users u ON r.requested_by = u.id"
@@ -277,7 +276,7 @@ def list_all_volunteers(
             conditions.append("v.status = %s")
             params.append(status)
         if search:
-            conditions.append("(v.name ILIKE %s OR v.email ILIKE %s)")
+            conditions.append("(v.name ILIKE %s OR u.email ILIKE %s)")
             params.extend([f"%{search}%", f"%{search}%"])
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
@@ -285,7 +284,7 @@ def list_all_volunteers(
         volunteers = dict_rows(db.execute(
             f"""
             SELECT v.*, u.email as user_email, u.created_at as user_created_at,
-                   COUNT(DISTINCT CASE WHEN ov.status = 'Active' THEN ov.id END) AS active_orgs,
+                   COUNT(DISTINCT CASE WHEN ov.status = 'active' THEN ov.id END) AS active_orgs,
                    COUNT(DISTINCT a.id) AS activity_count
             FROM volunteers v
             LEFT JOIN users u ON v.user_id = u.id
@@ -308,8 +307,8 @@ def update_volunteer_status(
     current_user: dict = Depends(require_platform_admin),
 ):
     new_status = (body or {}).get("status", "")
-    if new_status not in ("Active", "Pending", "Suspended"):
-        raise HTTPException(400, "Status must be Active, Pending, or Suspended")
+    if new_status not in ("active", "pending", "suspended"):
+        raise HTTPException(400, "Status must be active, pending, or suspended")
     with get_db() as db:
         vol = dict_row(db.execute("SELECT id FROM volunteers WHERE id = %s", (volunteer_id,)).fetchone())
         if not vol:
@@ -324,9 +323,7 @@ def update_volunteer_status(
 def list_platform_admins(current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
         rows = dict_rows(db.execute(
-            "SELECT pa.user_id, u.email, u.created_at, pa.created_at as promoted_at "
-            "FROM platform_admins pa JOIN users u ON pa.user_id = u.id "
-            "ORDER BY pa.created_at ASC"
+            "SELECT id as user_id, email, created_at FROM users WHERE role = 'platform_admin' ORDER BY created_at ASC"
         ).fetchall())
         return {"admins": rows}
 
@@ -334,15 +331,12 @@ def list_platform_admins(current_user: dict = Depends(require_platform_admin)):
 @router.post("/platform-admins", status_code=201)
 def add_platform_admin(body: AddAdminBody, current_user: dict = Depends(require_platform_admin)):
     with get_db() as db:
-        user = dict_row(db.execute("SELECT id, email FROM users WHERE email = %s", (body.email,)).fetchone())
+        user = dict_row(db.execute("SELECT id, email, role FROM users WHERE email = %s", (body.email,)).fetchone())
         if not user:
             raise HTTPException(404, f"No user found with email '{body.email}'")
-        existing = db.execute(
-            "SELECT user_id FROM platform_admins WHERE user_id = %s", (user["id"],)
-        ).fetchone()
-        if existing:
+        if user["role"] == "platform_admin":
             raise HTTPException(409, "User is already a platform admin")
-        db.execute("INSERT INTO platform_admins (user_id) VALUES (%s)", (user["id"],))
+        db.execute("UPDATE users SET role = 'platform_admin' WHERE id = %s", (user["id"],))
         return {"message": f"{body.email} is now a platform admin"}
 
 
@@ -351,10 +345,10 @@ def remove_platform_admin(user_id: int, current_user: dict = Depends(require_pla
     if current_user["id"] == user_id:
         raise HTTPException(400, "You cannot remove yourself as platform admin")
     with get_db() as db:
-        row = db.execute("SELECT user_id FROM platform_admins WHERE user_id = %s", (user_id,)).fetchone()
-        if not row:
+        row = db.execute("SELECT id, role FROM users WHERE id = %s", (user_id,)).fetchone()
+        if not row or row["role"] != "platform_admin":
             raise HTTPException(404, "Platform admin not found")
-        db.execute("DELETE FROM platform_admins WHERE user_id = %s", (user_id,))
+        db.execute("UPDATE users SET role = 'volunteer' WHERE id = %s", (user_id,))
         return {"message": "Platform admin removed"}
 
 

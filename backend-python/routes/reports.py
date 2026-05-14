@@ -67,13 +67,13 @@ def report_summary(current_user: dict = Depends(require_roles("org_admin"))):
             """
             SELECT
                 COUNT(ov.id)                                                          AS total_volunteers,
-                COUNT(ov.id) FILTER (WHERE ov.status = 'Active')                     AS active_volunteers,
-                COUNT(ov.id) FILTER (WHERE ov.status = 'Pending')                    AS pending_members,
-                COALESCE(SUM(a.hours) FILTER (WHERE a.status = 'Approved'), 0)       AS total_hours,
-                COUNT(a.id)  FILTER (WHERE a.status = 'Pending')                     AS pending_activities,
+                COUNT(ov.id) FILTER (WHERE ov.status = 'active')                     AS active_volunteers,
+                COUNT(ov.id) FILTER (WHERE ov.status = 'pending')                    AS pending_members,
+                COALESCE(SUM(a.hours) FILTER (WHERE a.status = 'approved'), 0)       AS total_hours,
+                COUNT(a.id)  FILTER (WHERE a.status = 'pending')                     AS pending_activities,
                 COUNT(e.id)                                                           AS total_events,
-                COUNT(e.id)  FILTER (WHERE e.status = 'Completed')                   AS completed_events,
-                COUNT(e.id)  FILTER (WHERE e.status IN ('Active','Upcoming'))        AS active_events
+                COUNT(e.id)  FILTER (WHERE e.status = 'completed')                   AS completed_events,
+                COUNT(e.id)  FILTER (WHERE e.status IN ('active','upcoming'))        AS active_events
             FROM organizations o
             LEFT JOIN org_volunteers ov ON ov.org_id = o.id
             LEFT JOIN activities a ON a.org_id = o.id
@@ -106,11 +106,12 @@ def volunteer_hours(
 
         oid = org["id"]
         query = (
-            "SELECT v.id, v.name, v.email, v.status, "
-            "COALESCE(SUM(CASE WHEN a.status = 'Approved' THEN a.hours ELSE 0 END), 0) as total_hours, "
-            "COUNT(CASE WHEN a.status = 'Approved' THEN 1 END) as events_attended, "
-            "MAX(CASE WHEN a.status = 'Approved' THEN a.date END) as last_activity "
+            "SELECT v.id, v.name, u.email, v.status, "
+            "COALESCE(SUM(CASE WHEN a.status = 'approved' THEN a.hours ELSE 0 END), 0) as total_hours, "
+            "COUNT(CASE WHEN a.status = 'approved' THEN 1 END) as events_attended, "
+            "MAX(CASE WHEN a.status = 'approved' THEN a.date END) as last_activity "
             "FROM volunteers v "
+            "JOIN users u ON u.id = v.user_id "
             "JOIN org_volunteers ov ON v.id = ov.volunteer_id AND ov.org_id = %s "
             "LEFT JOIN activities a ON v.id = a.volunteer_id AND a.org_id = %s"
         )
@@ -139,12 +140,13 @@ def export_csv(current_user: dict = Depends(require_roles("org_admin"))):
 
         oid = org["id"]
         rows = dict_rows(db.execute(
-            "SELECT v.name, v.email, v.status, "
-            "COALESCE(SUM(CASE WHEN a.status='Approved' THEN a.hours ELSE 0 END),0) as total_hours, "
-            "COUNT(CASE WHEN a.status='Approved' THEN 1 END) as events "
-            "FROM volunteers v JOIN org_volunteers ov ON v.id=ov.volunteer_id AND ov.org_id=%s "
+            "SELECT v.name, u.email, v.status, "
+            "COALESCE(SUM(CASE WHEN a.status='approved' THEN a.hours ELSE 0 END),0) as total_hours, "
+            "COUNT(CASE WHEN a.status='approved' THEN 1 END) as events "
+            "FROM volunteers v JOIN users u ON u.id = v.user_id "
+            "JOIN org_volunteers ov ON v.id=ov.volunteer_id AND ov.org_id=%s "
             "LEFT JOIN activities a ON v.id=a.volunteer_id AND a.org_id=%s "
-            "GROUP BY v.id ORDER BY total_hours DESC",
+            "GROUP BY v.id, u.email ORDER BY total_hours DESC",
             (oid, oid),
         ).fetchall())
 
@@ -192,10 +194,10 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     (a.created_at::date)::text                                       AS submitted_date,
                     COALESCE((a.reviewed_at::date)::text, '')                        AS reviewed_date,
                     a.hours                                                          AS hours_logged,
-                    CASE WHEN a.status='Approved' THEN a.hours ELSE 0 END            AS hours_approved,
-                    CASE WHEN a.status='Approved' THEN 1 ELSE 0 END                  AS is_approved,
-                    CASE WHEN a.status='Rejected' THEN 1 ELSE 0 END                  AS is_rejected,
-                    CASE WHEN a.status='Pending'  THEN 1 ELSE 0 END                  AS is_pending,
+                    CASE WHEN a.status='approved' THEN a.hours ELSE 0 END            AS hours_approved,
+                    CASE WHEN a.status='approved' THEN 1 ELSE 0 END                  AS is_approved,
+                    CASE WHEN a.status='rejected' THEN 1 ELSE 0 END                  AS is_rejected,
+                    CASE WHEN a.status='pending'  THEN 1 ELSE 0 END                  AS is_pending,
                     CASE WHEN a.event_id IS NOT NULL THEN 1 ELSE 0 END               AS is_event_linked,
                     COALESCE(
                         ROUND(EXTRACT(EPOCH FROM (a.reviewed_at - a.created_at)) / 86400.0, 2)::text,
@@ -211,7 +213,7 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                 SELECT
                     v.id                                                             AS volunteer_id,
                     v.name,
-                    v.email,
+                    u.email,
                     COALESCE(v.gender, '')                                           AS gender,
                     COALESCE(v.date_of_birth::text, '')                              AS date_of_birth,
                     CASE
@@ -241,6 +243,7 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     v.status                                                         AS volunteer_status,
                     v.created_at                                                     AS registered_at
                 FROM volunteers v
+                JOIN users u ON u.id = v.user_id
                 JOIN org_volunteers ov ON v.id = ov.volunteer_id
                 WHERE ov.org_id = %s
             """, (oid,)).fetchall()
@@ -252,10 +255,9 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     o.id                                                             AS organization_id,
                     o.name,
                     COALESCE(o.org_type, '')                                         AS org_type,
-                    COALESCE(o.categories, '')                                       AS categories,
+                    COALESCE(o.categories::text, '')                                 AS categories,
                     COALESCE(o.hq_city, '')                                          AS hq_city,
-                    COALESCE(o.location, '')                                         AS hq_governorate,
-                    COALESCE(o.branches, '')                                         AS branches,
+                    COALESCE(o.branches::text, '')                                   AS branches,
                     COALESCE(o.org_size, '')                                         AS org_size,
                     COALESCE(o.founded_year, '')                                     AS founded_year,
                     o.student_only,
@@ -274,17 +276,17 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     e.org_id                                                         AS organization_id,
                     e.name,
                     COALESCE(e.location, '')                                         AS location,
-                    e.date                                                           AS event_date,
-                    EXTRACT(YEAR FROM e.date)::int                             AS event_year,
+                    e.starts_at                                                      AS event_starts_at,
+                    (e.starts_at::date)                                              AS event_date,
+                    EXTRACT(YEAR FROM e.starts_at)::int                              AS event_year,
                     CASE
-                        WHEN EXTRACT(MONTH FROM e.date) <= 3  THEN 1
-                        WHEN EXTRACT(MONTH FROM e.date) <= 6  THEN 2
-                        WHEN EXTRACT(MONTH FROM e.date) <= 9  THEN 3
+                        WHEN EXTRACT(MONTH FROM e.starts_at) <= 3  THEN 1
+                        WHEN EXTRACT(MONTH FROM e.starts_at) <= 6  THEN 2
+                        WHEN EXTRACT(MONTH FROM e.starts_at) <= 9  THEN 3
                         ELSE 4
                     END                                                              AS event_quarter,
-                    EXTRACT(MONTH FROM e.date)::int                            AS event_month,
-                    TO_CHAR(e.date, 'Day')                                     AS day_of_week,
-                    COALESCE(e.time, '')                                             AS start_time,
+                    EXTRACT(MONTH FROM e.starts_at)::int                             AS event_month,
+                    TO_CHAR(e.starts_at, 'Day')                                      AS day_of_week,
                     COALESCE(e.duration, 0)                                          AS planned_duration_hours,
                     COALESCE(e.max_volunteers, 0)                                    AS max_volunteers,
                     COALESCE(e.required_skills, '')                                  AS required_skills,
@@ -301,11 +303,12 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     s.id                                                             AS supervisor_id,
                     s.org_id                                                         AS organization_id,
                     s.name,
-                    s.email,
+                    u.email,
                     COALESCE(s.team, '')                                             AS team,
                     s.status                                                         AS supervisor_status,
                     s.created_at
                 FROM supervisors s
+                JOIN users u ON u.id = s.user_id
                 WHERE s.org_id = %s
             """, (oid,)).fetchall()
             zf.writestr("dim_supervisor.csv", _to_csv(rows))
@@ -327,11 +330,10 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     ov.status                                                        AS membership_status,
                     ov.join_source,
                     COALESCE(ov.channel_detail, '')                                  AS channel_detail,
-                    ov.joined_date,
                     COALESCE(ov.joined_at::text, '')                                 AS joined_at,
                     COALESCE(ov.governorate_snapshot, '')                            AS governorate_at_join,
                     COALESCE(ov.city_snapshot, '')                                   AS city_at_join,
-                    ov.is_active
+                    CASE WHEN ov.status = 'active' THEN 1 ELSE 0 END                AS is_active
                 FROM org_volunteers ov
                 WHERE ov.org_id = %s
             """, (oid,)).fetchall()

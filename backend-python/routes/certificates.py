@@ -90,7 +90,7 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
         # (a) active org members, or (b) approved on an event the supervisor manages.
         if current_user["role"] == "supervisor" and sup_record:
             membership = db.execute(
-                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'Active'",
+                "SELECT id FROM org_volunteers WHERE volunteer_id = %s AND org_id = %s AND status = 'active'",
                 (volunteer_id, sup_record["org_id"]),
             ).fetchone()
             if not membership:
@@ -102,7 +102,7 @@ def issue_certificate(body: dict, current_user: dict = Depends(require_roles("or
                         SELECT ea.id FROM event_applications ea
                         JOIN events e ON e.id = ea.event_id
                         WHERE ea.volunteer_id = %s AND ea.event_id = %s
-                          AND ea.status = 'Approved' AND ea.cancelled_at IS NULL
+                          AND ea.status = 'approved' AND ea.cancelled_at IS NULL
                           AND e.created_by_supervisor_id = %s
                         """,
                         (volunteer_id, event_id, sup_record["id"]),

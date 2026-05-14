@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Strict one-way state machine: Upcoming → Active → Completed only.
 _VALID_TRANSITIONS = {
-    "Upcoming": {"Active"},
-    "Active": {"Completed"},
-    "Completed": set(),
+    "upcoming": {"active"},
+    "active": {"completed"},
+    "completed": set(),
 }
 
 
@@ -49,24 +49,22 @@ def list_events(
                 raise HTTPException(403, FORBIDDEN)
             org_id = caller_org
 
-        # current_volunteers is computed live from event_applications so it is
-        # always accurate even if the trigger-maintained column is stale. is_full
-        # is derived here so the frontend doesn't have to recompute it.
         query = (
-            "SELECT e.id, e.org_id, e.name, e.description, e.location, e.date, e.time, "
+            "SELECT e.id, e.org_id, e.name, e.description, e.location, e.starts_at, "
             "e.duration, e.max_volunteers, e.required_skills, e.status, "
             "e.acceptance_mode, e.registration_open, e.created_at, "
             "o.name as org_name, o.student_only as org_student_only, "
-            "o.initials as org_initials, o.color as org_color, "
+            "t.initials as org_initials, t.color as org_color, "
             "(SELECT COUNT(*) FROM event_applications ea "
-            " WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            " WHERE ea.event_id = e.id AND ea.status = 'approved' AND ea.cancelled_at IS NULL"
             ") AS current_volunteers, "
             "CASE WHEN e.max_volunteers > 0 AND "
             "  (SELECT COUNT(*) FROM event_applications ea "
-            "   WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            "   WHERE ea.event_id = e.id AND ea.status = 'approved' AND ea.cancelled_at IS NULL"
             "  ) >= e.max_volunteers THEN TRUE ELSE FALSE END AS is_full "
             "FROM events e "
-            "LEFT JOIN organizations o ON e.org_id = o.id WHERE 1=1"
+            "LEFT JOIN organizations o ON e.org_id = o.id "
+            "LEFT JOIN org_theme t ON t.org_id = o.id WHERE 1=1"
         )
         params: list = []
 
@@ -77,7 +75,7 @@ def list_events(
             query += " AND e.org_id = %s"
             params.append(org_id)
 
-        query += " ORDER BY e.date DESC LIMIT %s OFFSET %s"
+        query += " ORDER BY e.starts_at DESC LIMIT %s OFFSET %s"
         params += [limit, offset]
         return {"events": dict_rows(db.execute(query, params).fetchall()), "limit": limit, "offset": offset}
 
@@ -86,16 +84,16 @@ def list_events(
 def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
     with get_db() as db:
         event = dict_row(db.execute(
-            "SELECT e.id, e.org_id, e.name, e.description, e.location, e.date, e.time, "
+            "SELECT e.id, e.org_id, e.name, e.description, e.location, e.starts_at, "
             "e.duration, e.max_volunteers, e.required_skills, e.status, "
             "e.acceptance_mode, e.registration_open, e.created_at, "
             "o.name as org_name, "
             "(SELECT COUNT(*) FROM event_applications ea "
-            " WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            " WHERE ea.event_id = e.id AND ea.status = 'approved' AND ea.cancelled_at IS NULL"
             ") AS current_volunteers, "
             "CASE WHEN e.max_volunteers > 0 AND "
             "  (SELECT COUNT(*) FROM event_applications ea "
-            "   WHERE ea.event_id = e.id AND ea.status = 'Approved' AND ea.cancelled_at IS NULL"
+            "   WHERE ea.event_id = e.id AND ea.status = 'approved' AND ea.cancelled_at IS NULL"
             "  ) >= e.max_volunteers THEN TRUE ELSE FALSE END AS is_full "
             "FROM events e "
             "LEFT JOIN organizations o ON e.org_id = o.id WHERE e.id = %s",
@@ -113,26 +111,27 @@ def get_event(event_id: int, current_user: dict = Depends(get_current_user)):
                 raise HTTPException(403, FORBIDDEN)
             # Supervisors see all approved participants for this event (org-wide, no ownership filter).
             participants = dict_rows(db.execute(
-                "SELECT v.id, v.name, v.email, "
+                "SELECT v.id, v.name, u.email, "
                 "a.id as activity_id, a.status as activity_status, a.hours "
                 "FROM event_applications ea "
                 "JOIN volunteers v ON ea.volunteer_id = v.id "
+                "JOIN users u ON u.id = v.user_id "
                 "LEFT JOIN activities a ON a.volunteer_id = v.id AND a.event_id = ea.event_id "
-                "WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
+                "WHERE ea.event_id = %s AND ea.status = 'approved' AND ea.cancelled_at IS NULL",
                 (event_id,),
             ).fetchall())
         elif role == "org_admin":
             org = get_org_for_admin(db, current_user["id"])
             if org["id"] != event["org_id"]:
                 raise HTTPException(403, FORBIDDEN)
-            # Org admin sees all approved participants with attendance status.
             participants = dict_rows(db.execute(
-                "SELECT v.id, v.name, v.email, "
+                "SELECT v.id, v.name, u.email, "
                 "a.id as activity_id, a.status as activity_status, a.hours "
                 "FROM event_applications ea "
                 "JOIN volunteers v ON ea.volunteer_id = v.id "
+                "JOIN users u ON u.id = v.user_id "
                 "LEFT JOIN activities a ON a.volunteer_id = v.id AND a.event_id = ea.event_id "
-                "WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL",
+                "WHERE ea.event_id = %s AND ea.status = 'approved' AND ea.cancelled_at IS NULL",
                 (event_id,),
             ).fetchall())
         else:
@@ -148,9 +147,9 @@ def create_event(body: dict, current_user: dict = Depends(require_roles("org_adm
         org = get_org_for_admin(db, current_user["id"])
 
         name = body.get("name")
-        date = body.get("date")
-        if not name or not date:
-            raise HTTPException(400, "Name and date are required")
+        starts_at = body.get("starts_at") or body.get("date")
+        if not name or not starts_at:
+            raise HTTPException(400, "Name and starts_at are required")
 
         acceptance_mode = body.get("acceptance_mode", "manual")
         if acceptance_mode not in ("manual", "auto"):
@@ -158,12 +157,12 @@ def create_event(body: dict, current_user: dict = Depends(require_roles("org_adm
 
         row = db.execute(
             "INSERT INTO events "
-            "(org_id, name, description, location, date, time, duration, max_volunteers, "
+            "(org_id, name, description, location, starts_at, duration, max_volunteers, "
             "required_skills, status, acceptance_mode, registration_open) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Upcoming', %s, TRUE) RETURNING id",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'upcoming', %s, TRUE) RETURNING id",
             (
                 org["id"], name, body.get("description", ""), body.get("location", ""),
-                date, body.get("time", ""), body.get("duration", 0),
+                starts_at, body.get("duration", 0),
                 body.get("max_volunteers", 0), body.get("required_skills", ""),
                 acceptance_mode,
             ),
@@ -202,8 +201,8 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
         db.execute(
             "UPDATE events SET "
             "name = COALESCE(%s, name), description = COALESCE(%s, description), "
-            "location = COALESCE(%s, location), date = COALESCE(%s, date), "
-            "time = COALESCE(%s, time), duration = COALESCE(%s, duration), "
+            "location = COALESCE(%s, location), starts_at = COALESCE(%s, starts_at), "
+            "duration = COALESCE(%s, duration), "
             "max_volunteers = COALESCE(%s, max_volunteers), "
             "required_skills = COALESCE(%s, required_skills), "
             "status = COALESCE(%s, status), "
@@ -212,7 +211,7 @@ def update_event(event_id: int, body: dict, current_user: dict = Depends(require
             "WHERE id = %s",
             (
                 body.get("name"), body.get("description"), body.get("location"),
-                body.get("date"), body.get("time"), body.get("duration"),
+                body.get("starts_at") or body.get("date"), body.get("duration"),
                 body.get("max_volunteers"), body.get("required_skills"),
                 new_status, acceptance_mode,
                 registration_open, registration_open, event_id,
@@ -230,8 +229,8 @@ def delete_event(event_id: int, current_user: dict = Depends(require_roles("org_
         event = db.execute("SELECT org_id, status FROM events WHERE id = %s", (event_id,)).fetchone()
         if not event or event["org_id"] != org["id"]:
             raise HTTPException(403, FORBIDDEN)
-        if event["status"] in ("Active", "Completed"):
-            raise HTTPException(409, "Cannot delete an event that is Active or Completed")
+        if event["status"] in ("active", "completed"):
+            raise HTTPException(409, "Cannot delete an event that is active or completed")
 
         db.execute("DELETE FROM event_applications WHERE event_id = %s", (event_id,))
         db.execute("DELETE FROM activities WHERE event_id = %s", (event_id,))
@@ -252,7 +251,7 @@ def activate_event(event_id: int, current_user: dict = Depends(require_roles("or
         event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
-        if event["status"] != "Upcoming":
+        if event["status"] != "upcoming":
             # Idempotent — already active or completed, just return current state.
             return dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
 
@@ -270,7 +269,7 @@ def activate_event(event_id: int, current_user: dict = Depends(require_roles("or
                 raise HTTPException(403, FORBIDDEN)
 
         db.execute(
-            "UPDATE events SET status = 'Active', registration_open = FALSE WHERE id = %s",
+            "UPDATE events SET status = 'active', registration_open = FALSE WHERE id = %s",
             (event_id,),
         )
         log_action(db, current_user["id"], current_user["role"], "activate_event",
@@ -289,8 +288,8 @@ def toggle_registration(
         event = dict_row(db.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone())
         if not event:
             raise HTTPException(404, "Event not found")
-        if event["status"] != "Upcoming":
-            raise HTTPException(409, "Registration can only be toggled for Upcoming events")
+        if event["status"] != "upcoming":
+            raise HTTPException(409, "Registration can only be toggled for upcoming events")
 
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
@@ -348,13 +347,14 @@ def get_event_detail(event_id: int, current_user: dict = Depends(require_roles("
 
         applicants = dict_rows(db.execute(
             """
-            SELECT ea.id as app_id, ea.volunteer_id, ea.status, ea.applied_date,
+            SELECT ea.id as app_id, ea.volunteer_id, ea.status, ea.created_at,
                    ea.attendance_status,
-                   v.name as volunteer_name, v.email as volunteer_email
+                   v.name as volunteer_name, u.email as volunteer_email
             FROM event_applications ea
             JOIN volunteers v ON v.id = ea.volunteer_id
+            JOIN users u ON u.id = v.user_id
             WHERE ea.event_id = %s AND ea.cancelled_at IS NULL
-            ORDER BY ea.applied_date ASC
+            ORDER BY ea.created_at ASC
             """,
             (event_id,),
         ).fetchall())
@@ -382,10 +382,10 @@ def bulk_mark_attendance(
             raise HTTPException(404, "Event not found")
 
         # Attendance only makes sense for Active or Completed events.
-        if event["status"] not in ("Active", "Completed"):
+        if event["status"] not in ("active", "completed"):
             raise HTTPException(
                 409,
-                f"Attendance can only be recorded for Active or Completed events (current: {event['status']})",
+                f"Attendance can only be recorded for active or completed events (current: {event['status']})",
             )
 
         # Resolve caller org; supervisors must own this event.
@@ -408,7 +408,7 @@ def bulk_mark_attendance(
         if not volunteer_ids:
             raise HTTPException(400, "volunteer_ids is required and must not be empty")
 
-        date = body.get("date") or event["date"]
+        date = body.get("date") or str(event["starts_at"])[:10]
         hours_raw = body.get("hours")
         description = body.get("description", "")
 
@@ -440,7 +440,6 @@ def bulk_mark_attendance(
             hours = None
             act_status = "Completed"
 
-        # Resolve eligible volunteer IDs: Approved applicants who are Active org members.
         eligible_rows = db.execute(
             """
             SELECT ea.volunteer_id, v.user_id
@@ -448,10 +447,10 @@ def bulk_mark_attendance(
             JOIN org_volunteers ov
                 ON ov.volunteer_id = ea.volunteer_id
                 AND ov.org_id = %s
-                AND ov.status = 'Active'
+                AND ov.status = 'active'
             JOIN volunteers v ON v.id = ea.volunteer_id
             WHERE ea.event_id = %s
-              AND ea.status = 'Approved'
+              AND ea.status = 'approved'
               AND ea.cancelled_at IS NULL
               AND ea.volunteer_id = ANY(%s)
             """,
@@ -461,7 +460,6 @@ def bulk_mark_attendance(
         eligible_map = {r["volunteer_id"]: r["user_id"] for r in eligible_rows}
         skipped_count = len(volunteer_ids) - len(eligible_map)
 
-        # All approved applicants for this event (so we know who to clear if unchecked).
         all_approved_rows = db.execute(
             """
             SELECT ea.volunteer_id
@@ -469,8 +467,8 @@ def bulk_mark_attendance(
             JOIN org_volunteers ov
                 ON ov.volunteer_id = ea.volunteer_id
                 AND ov.org_id = %s
-                AND ov.status = 'Active'
-            WHERE ea.event_id = %s AND ea.status = 'Approved' AND ea.cancelled_at IS NULL
+                AND ov.status = 'active'
+            WHERE ea.event_id = %s AND ea.status = 'approved' AND ea.cancelled_at IS NULL
             """,
             (caller_org_id, event_id),
         ).fetchall()
@@ -485,7 +483,7 @@ def bulk_mark_attendance(
             )
             # Also clear attendance_status on their application row.
             db.execute(
-                "UPDATE event_applications SET attendance_status = 'Absent' WHERE event_id = %s AND volunteer_id = ANY(%s) AND cancelled_at IS NULL",
+                "UPDATE event_applications SET attendance_status = 'absent' WHERE event_id = %s AND volunteer_id = ANY(%s) AND cancelled_at IS NULL",
                 (event_id, absent_ids),
             )
 
@@ -517,9 +515,8 @@ def bulk_mark_attendance(
                 ),
             ).fetchall()
             upsert_results = rows
-            # Mark selected volunteers as Attended on their application row.
             db.execute(
-                "UPDATE event_applications SET attendance_status = 'Attended' WHERE event_id = %s AND volunteer_id = ANY(%s) AND cancelled_at IS NULL",
+                "UPDATE event_applications SET attendance_status = 'attended' WHERE event_id = %s AND volunteer_id = ANY(%s) AND cancelled_at IS NULL",
                 (event_id, list(eligible_map.keys())),
             )
 

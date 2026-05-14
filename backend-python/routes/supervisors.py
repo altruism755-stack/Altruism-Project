@@ -71,9 +71,9 @@ def create_supervisor(body: dict, current_user: dict = Depends(require_roles("or
         user_id = row["id"]
 
         db.execute(
-            "INSERT INTO supervisors (user_id, name, email, phone, team, org_id, status) "
-            "VALUES (%s, %s, %s, %s, %s, %s, 'Active')",
-            (user_id, name, email, phone, team, org["id"]),
+            "INSERT INTO supervisors (user_id, name, phone, team, org_id, status) "
+            "VALUES (%s, %s, %s, %s, %s, 'active')",
+            (user_id, name, phone, team, org["id"]),
         )
 
         sup = dict_row(db.execute("SELECT * FROM supervisors WHERE user_id = %s", (user_id,)).fetchone())
@@ -109,14 +109,16 @@ def get_my_profile(current_user: dict = Depends(require_roles("supervisor"))):
     """Supervisor's own profile including their org details."""
     with get_db() as db:
         sup = dict_row(db.execute(
-            "SELECT id, user_id, name, email, phone, team, org_id, status, created_at "
+            "SELECT id, user_id, name, phone, team, org_id, status, created_at "
             "FROM supervisors WHERE user_id = %s",
             (current_user["id"],),
         ).fetchone())
         if not sup:
             raise HTTPException(404, "Supervisor profile not found")
         org = dict_row(db.execute(
-            "SELECT id, name, description, category, color, initials, tracks_hours FROM organizations WHERE id = %s",
+            "SELECT o.id, o.name, o.description, o.categories, o.tracks_hours, "
+            "t.color, t.initials FROM organizations o "
+            "LEFT JOIN org_theme t ON t.org_id = o.id WHERE o.id = %s",
             (sup["org_id"],),
         ).fetchone())
         return {"supervisor": sup, "organization": org}
@@ -133,7 +135,7 @@ def get_my_events(
         sup = _get_supervisor_record(db, current_user["id"])
         events = dict_rows(db.execute(
             "SELECT * FROM events WHERE org_id = %s AND created_by_supervisor_id = %s "
-            "ORDER BY date DESC LIMIT %s OFFSET %s",
+            "ORDER BY starts_at DESC LIMIT %s OFFSET %s",
             (sup["org_id"], sup["id"], limit, offset),
         ).fetchall())
         return {"events": events, "limit": limit, "offset": offset}
@@ -152,7 +154,7 @@ def get_org_events(
             "SELECT e.*, s.name as supervisor_name "
             "FROM events e "
             "LEFT JOIN supervisors s ON e.created_by_supervisor_id = s.id "
-            "WHERE e.org_id = %s ORDER BY e.date DESC LIMIT %s OFFSET %s",
+            "WHERE e.org_id = %s ORDER BY e.starts_at DESC LIMIT %s OFFSET %s",
             (sup["org_id"], limit, offset),
         ).fetchall())
         return {"events": events, "limit": limit, "offset": offset}
@@ -178,13 +180,14 @@ def get_my_event_detail(event_id: int, current_user: dict = Depends(require_role
 
         applicants = dict_rows(db.execute(
             """
-            SELECT ea.id as app_id, ea.volunteer_id, ea.status, ea.applied_date,
+            SELECT ea.id as app_id, ea.volunteer_id, ea.status, ea.created_at,
                    ea.attendance_status,
-                   v.name as volunteer_name, v.email as volunteer_email
+                   v.name as volunteer_name, u.email as volunteer_email
             FROM event_applications ea
             JOIN volunteers v ON v.id = ea.volunteer_id
+            JOIN users u ON u.id = v.user_id
             WHERE ea.event_id = %s AND ea.cancelled_at IS NULL
-            ORDER BY ea.applied_date ASC
+            ORDER BY ea.created_at ASC
             """,
             (event_id,),
         ).fetchall())
@@ -205,21 +208,21 @@ def create_my_event(body: dict, current_user: dict = Depends(require_roles("supe
         if not date:
             raise HTTPException(400, "Event date is required")
 
+        starts_at = body.get("starts_at") or date
         row = db.execute(
-            "INSERT INTO events (org_id, name, description, location, date, time, duration, "
+            "INSERT INTO events (org_id, name, description, location, starts_at, duration, "
             "max_volunteers, required_skills, status, acceptance_mode, registration_open, created_by_supervisor_id) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id",
             (
                 sup["org_id"],
                 name,
                 body.get("description", ""),
                 body.get("location", ""),
-                date,
-                body.get("time", ""),
+                starts_at,
                 body.get("duration") or None,
                 body.get("max_volunteers") or None,
                 body.get("required_skills", ""),
-                body.get("status", "Upcoming"),
+                body.get("status", "upcoming"),
                 body.get("acceptance_mode", "manual"),
                 sup["id"],
             ),
@@ -230,9 +233,9 @@ def create_my_event(body: dict, current_user: dict = Depends(require_roles("supe
 
 
 _VALID_TRANSITIONS = {
-    "Upcoming": {"Active"},
-    "Active": {"Completed"},
-    "Completed": set(),
+    "upcoming": {"active"},
+    "active": {"completed"},
+    "completed": set(),
 }
 
 
@@ -262,8 +265,8 @@ def update_my_event(event_id: int, body: dict, current_user: dict = Depends(requ
         db.execute(
             "UPDATE events SET "
             "name = COALESCE(%s, name), description = COALESCE(%s, description), "
-            "location = COALESCE(%s, location), date = COALESCE(%s, date), "
-            "time = COALESCE(%s, time), duration = COALESCE(%s, duration), "
+            "location = COALESCE(%s, location), starts_at = COALESCE(%s, starts_at), "
+            "duration = COALESCE(%s, duration), "
             "max_volunteers = COALESCE(%s, max_volunteers), "
             "required_skills = COALESCE(%s, required_skills), "
             "status = COALESCE(%s, status), "
@@ -271,7 +274,7 @@ def update_my_event(event_id: int, body: dict, current_user: dict = Depends(requ
             "WHERE id = %s",
             (
                 body.get("name"), body.get("description"), body.get("location"),
-                body.get("date"), body.get("time"), body.get("duration") or None,
+                body.get("starts_at") or body.get("date"), body.get("duration") or None,
                 body.get("max_volunteers") or None, body.get("required_skills"),
                 new_status, body.get("acceptance_mode"),
                 event_id,
@@ -298,21 +301,22 @@ def get_my_applications(
 
         applications = dict_rows(db.execute(
             f"""
-            SELECT ea.id, ea.volunteer_id, ea.event_id, ea.org_id, ea.status,
-                   ea.applied_date, ea.attendance_status,
-                   v.name as volunteer_name, v.email as volunteer_email,
-                   e.name as event_name, e.date as event_date, e.time as event_time,
+            SELECT ea.id, ea.volunteer_id, ea.event_id, e.org_id, ea.status,
+                   ea.created_at, ea.attendance_status,
+                   v.name as volunteer_name, u.email as volunteer_email,
+                   e.name as event_name, e.starts_at as event_starts_at,
                    e.max_volunteers, e.acceptance_mode, e.registration_open,
                    (SELECT COUNT(*) FROM event_applications a2
-                    WHERE a2.event_id = ea.event_id AND a2.status = 'Approved' AND a2.cancelled_at IS NULL
+                    WHERE a2.event_id = ea.event_id AND a2.status = 'approved' AND a2.cancelled_at IS NULL
                    ) AS approved_count
             FROM event_applications ea
             JOIN volunteers v ON v.id = ea.volunteer_id
+            JOIN users u ON u.id = v.user_id
             JOIN events e ON e.id = ea.event_id
             WHERE e.created_by_supervisor_id = %s
               AND ea.cancelled_at IS NULL
               {where_status}
-            ORDER BY ea.applied_date ASC
+            ORDER BY ea.created_at ASC
             """,
             params,
         ).fetchall())
@@ -355,7 +359,7 @@ def approve_my_application(app_id: int, current_user: dict = Depends(require_rol
             if approved_count >= capacity:
                 raise HTTPException(409, "Event is at full capacity — cannot approve more volunteers")
 
-        db.execute("UPDATE event_applications SET status = 'Approved' WHERE id = %s", (app_id,))
+        db.execute("UPDATE event_applications SET status = 'approved' WHERE id = %s", (app_id,))
         log_action(db, current_user["id"], current_user["role"], "approve_application",
                    "event_application", app_id,
                    {"volunteer_id": app["volunteer_id"], "event_id": app["event_id"]})
@@ -395,7 +399,7 @@ def reject_my_application(app_id: int, current_user: dict = Depends(require_role
         if app["status"] == "Rejected":
             raise HTTPException(400, "Application is already rejected")
 
-        db.execute("UPDATE event_applications SET status = 'Rejected' WHERE id = %s", (app_id,))
+        db.execute("UPDATE event_applications SET status = 'rejected' WHERE id = %s", (app_id,))
         log_action(db, current_user["id"], current_user["role"], "reject_application",
                    "event_application", app_id,
                    {"volunteer_id": app["volunteer_id"], "event_id": app["event_id"]})

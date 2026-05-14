@@ -137,7 +137,7 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
 
         # Verify the volunteer is an active member of this org.
         membership = dict_row(db.execute(
-            "SELECT id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s AND status = 'Active'",
+            "SELECT id FROM org_volunteers WHERE org_id = %s AND volunteer_id = %s AND status = 'active'",
             (org_id, vol["id"]),
         ).fetchone())
         if not membership:
@@ -157,16 +157,18 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
         # Active events are live so logging is always allowed.
         if event_id:
             event_row = dict_row(db.execute(
-                "SELECT date, status FROM events WHERE id = %s", (event_id,)
+                "SELECT starts_at, status FROM events WHERE id = %s", (event_id,)
             ).fetchone())
             if not event_row:
                 raise HTTPException(404, "Event not found")
-            if event_row.get("status") not in ("Active", "Completed"):
-                if event_row.get("date"):
+            if event_row.get("status") not in ("active", "completed"):
+                if event_row.get("starts_at"):
                     today_utc = datetime.datetime.utcnow().date()
-                    event_date = event_row["date"]
-                    if not isinstance(event_date, datetime.date):
-                        event_date = datetime.date.fromisoformat(str(event_date))
+                    event_date = event_row["starts_at"]
+                    if hasattr(event_date, "date"):
+                        event_date = event_date.date()
+                    elif not isinstance(event_date, datetime.date):
+                        event_date = datetime.date.fromisoformat(str(event_date)[:10])
                     if event_date > today_utc:
                         raise HTTPException(400, "Attendance can only be recorded once the event is active or has passed")
 
@@ -183,9 +185,9 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
                 raise HTTPException(400, "hours must be a valid number")
             if hours <= 0:
                 raise HTTPException(400, "hours must be greater than 0")
-            status = body.get("status", "Pending")
-            if status not in ("Pending", "Approved", "Rejected"):
-                status = "Pending"
+            status = body.get("status", "pending")
+            if status not in ("pending", "approved", "rejected"):
+                status = "pending"
         else:
             hours = None
             status = "Completed"
@@ -262,7 +264,7 @@ def approve_activity(
         if not act:
             raise HTTPException(404, "Activity not found")
 
-        if act.get("status") == "Completed":
+        if act.get("status") == "completed":
             raise HTTPException(400, "Participation records cannot be approved — they are already completed")
 
         caller_org_id = _resolve_caller_org_id(db, current_user)
@@ -283,7 +285,7 @@ def approve_activity(
                     raise HTTPException(403, "You can only approve activities for events you manage")
 
         db.execute(
-            "UPDATE activities SET status = 'Approved', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
+            "UPDATE activities SET status = 'approved', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
             (reviewer_id, activity_id),
         )
         log_action(db, current_user["id"], current_user["role"], "approve_activity",
@@ -326,7 +328,7 @@ def reject_activity(
         if not act:
             raise HTTPException(404, "Activity not found")
 
-        if act.get("status") == "Completed":
+        if act.get("status") == "completed":
             raise HTTPException(400, "Participation records cannot be rejected — they are already completed")
 
         caller_org_id = _resolve_caller_org_id(db, current_user)
@@ -346,7 +348,7 @@ def reject_activity(
                     raise HTTPException(403, "You can only reject activities for events you manage")
 
         db.execute(
-            "UPDATE activities SET status = 'Rejected', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
+            "UPDATE activities SET status = 'rejected', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
             (reviewer_id, activity_id),
         )
         log_action(db, current_user["id"], current_user["role"], "reject_activity",
