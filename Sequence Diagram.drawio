@@ -1,0 +1,466 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!--
+      Lifeline centers (absolute x):
+        Volunteer      V = 270
+        System         S = 650
+        Org Admin      O = 1030
+        Supervisor     U = 1410
+      Header box: y=20, height=54
+      Lifeline dashed line: y=74 → y=3260
+    -->
+
+    <!-- ===== LIFELINE HEADER BOXES ===== -->
+    <mxCell id="hdr_V" value="&lt;b&gt;Volunteer&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px;opacity:0.7;&quot;&gt;actor&lt;/font&gt;" style="rounded=1;arcSize=10;fillColor=#1a1a1a;strokeColor=#1a1a1a;fontColor=#ffffff;fontSize=12;align=center;html=1;" vertex="1" parent="1">
+      <mxGeometry x="160" y="20" width="220" height="54" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_S" value="&lt;b&gt;System&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px;opacity:0.7;&quot;&gt;FastAPI · PostgreSQL&lt;/font&gt;" style="rounded=1;arcSize=10;fillColor=#1a1a1a;strokeColor=#1a1a1a;fontColor=#ffffff;fontSize=12;align=center;html=1;" vertex="1" parent="1">
+      <mxGeometry x="540" y="20" width="220" height="54" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_O" value="&lt;b&gt;Organization Admin&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px;opacity:0.7;&quot;&gt;actor&lt;/font&gt;" style="rounded=1;arcSize=10;fillColor=#1a1a1a;strokeColor=#1a1a1a;fontColor=#ffffff;fontSize=12;align=center;html=1;" vertex="1" parent="1">
+      <mxGeometry x="920" y="20" width="220" height="54" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_U" value="&lt;b&gt;Supervisor&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px;opacity:0.7;&quot;&gt;actor&lt;/font&gt;" style="rounded=1;arcSize=10;fillColor=#1a1a1a;strokeColor=#1a1a1a;fontColor=#ffffff;fontSize=12;align=center;html=1;" vertex="1" parent="1">
+      <mxGeometry x="1300" y="20" width="220" height="54" as="geometry" />
+    </mxCell>
+
+    <!-- ===== LIFELINE DASHED LINES ===== -->
+    <mxCell id="ll_V" value="" style="endArrow=none;dashed=1;dashPattern=4 5;strokeColor=#6b6760;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="74"/><mxPoint x="270" y="3260"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="ll_S" value="" style="endArrow=none;dashed=1;dashPattern=4 5;strokeColor=#6b6760;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="74"/><mxPoint x="650" y="3260"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="ll_O" value="" style="endArrow=none;dashed=1;dashPattern=4 5;strokeColor=#6b6760;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1030" y="74"/><mxPoint x="1030" y="3260"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="ll_U" value="" style="endArrow=none;dashed=1;dashPattern=4 5;strokeColor=#6b6760;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="74"/><mxPoint x="1410" y="3260"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- Start node -->
+    <mxCell id="start" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="261" y="95" width="18" height="18" as="geometry" />
+    </mxCell>
+
+    <!-- ===== PHASE LABELS & DIVIDERS ===== -->
+    <mxCell id="ph00_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="125"/><mxPoint x="1600" y="125"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph00_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;00&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;ORGANIZATION&lt;br/&gt;MEMBERSHIP&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="125" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph01_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="840"/><mxPoint x="1600" y="840"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph01_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;01&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;EVENT&lt;br/&gt;CREATION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="840" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph02_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="1020"/><mxPoint x="1600" y="1020"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph02_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;02&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;VOLUNTEER&lt;br/&gt;APPLIES&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="1020" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph03b_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="1720"/><mxPoint x="1600" y="1720"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph03b_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;03B&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;MANUAL WAITLIST&lt;br/&gt;PROMOTION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="1720" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph03a_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="1900"/><mxPoint x="1600" y="1900"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph03a_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;03A&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;APPLICATION&lt;br/&gt;REVIEW&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="1900" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph04_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="2200"/><mxPoint x="1600" y="2200"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph04_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;04&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;EVENT&lt;br/&gt;ACTIVATION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="2200" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph05_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="2360"/><mxPoint x="1600" y="2360"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph05_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;05&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;ATTENDANCE&lt;br/&gt;RECORDING&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="2360" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph07_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="2660"/><mxPoint x="1600" y="2660"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph07_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;07&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;EVENT&lt;br/&gt;COMPLETION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="2660" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph08_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="2820"/><mxPoint x="1600" y="2820"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph08_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;08&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;CERTIFICATE&lt;br/&gt;ISSUANCE&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="2820" width="78" height="55" as="geometry" /></mxCell>
+
+    <mxCell id="ph09_d" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="3060"/><mxPoint x="1600" y="3060"/></Array></mxGeometry></mxCell>
+    <mxCell id="ph09_t" value="&lt;font color='#b85c00' style='font-size:16px;'&gt;&lt;b&gt;09&lt;/b&gt;&lt;/font&gt;&lt;br/&gt;&lt;b style='font-size:9px;'&gt;CERTIFICATE&lt;br/&gt;DOWNLOAD&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="0" y="3060" width="78" height="55" as="geometry" /></mxCell>
+
+    <!-- ============================= PHASE 00 ============================= -->
+
+    <!-- V→S: POST join -->
+    <mxCell id="m00_1" value="POST /api/organizations/{org_id}/join" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="170"/><mxPoint x="650" y="170"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- S self: SELECT is_student_only -->
+    <mxCell id="m00_2" value="SELECT is_student_only FROM organizations" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="200"/><mxPoint x="720" y="200"/><mxPoint x="720" y="218"/><mxPoint x="650" y="218"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- OPT frame: student-only rejection -->
+    <mxCell id="fopt1_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="232" width="1360" height="110" as="geometry" />
+    </mxCell>
+    <mxCell id="fopt1_tab" value="opt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="232" width="36" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="fopt1_guard" value="[is_student_only = true AND education_level ≠ 'University Student']" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="252" y="232" width="520" height="18" as="geometry" />
+    </mxCell>
+    <!-- S self: SELECT education_level -->
+    <mxCell id="m00_3" value="SELECT education_level FROM volunteers" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="264"/><mxPoint x="720" y="264"/><mxPoint x="720" y="282"/><mxPoint x="650" y="282"/></Array></mxGeometry>
+    </mxCell>
+    <!-- S→V: HTTP 400 reject -->
+    <mxCell id="m00_4" value="HTTP 400 – Rejected: Not a University Student" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="312"/><mxPoint x="270" y="312"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- S self: INSERT pending -->
+    <mxCell id="m00_5" value="INSERT INTO org_volunteers (status='pending')" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="370"/><mxPoint x="720" y="370"/><mxPoint x="720" y="388"/><mxPoint x="650" y="388"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- S→O: Notify new application -->
+    <mxCell id="m00_6" value="Notify: New Volunteer Application" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="416"/><mxPoint x="1030" y="416"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ALT frame: Approve | Reject (membership) -->
+    <mxCell id="falt1_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="436" width="1360" height="370" as="geometry" />
+    </mxCell>
+    <mxCell id="falt1_tab" value="alt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="436" width="30" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="falt1_g1" value="[Approve]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="246" y="436" width="100" height="18" as="geometry" />
+    </mxCell>
+    <!-- alt divider -->
+    <mxCell id="falt1_div" value="" style="endArrow=none;strokeColor=#b85c00;dashed=1;dashPattern=3 4;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="210" y="620"/><mxPoint x="1570" y="620"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="falt1_g2" value="[Reject]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="222" y="622" width="80" height="16" as="geometry" />
+    </mxCell>
+    <!-- Approve branch -->
+    <mxCell id="m00_7" value="PUT /api/organizations/{org_id}/members/{vol_id}/approve" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1030" y="472"/><mxPoint x="650" y="472"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m00_8" value="UPDATE org_volunteers SET status='active', approved_at=NOW()" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="502"/><mxPoint x="720" y="502"/><mxPoint x="720" y="520"/><mxPoint x="650" y="520"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m00_9" value="Notify: Membership Approved" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="550"/><mxPoint x="270" y="550"/></Array></mxGeometry>
+    </mxCell>
+    <!-- Reject branch -->
+    <mxCell id="m00_10" value="PUT /api/organizations/{org_id}/members/{vol_id}/reject" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1030" y="656"/><mxPoint x="650" y="656"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m00_11" value="UPDATE org_volunteers SET status='rejected'" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="686"/><mxPoint x="720" y="686"/><mxPoint x="720" y="704"/><mxPoint x="650" y="704"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m00_12" value="Notify: Membership Rejected" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="734"/><mxPoint x="270" y="734"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- merge bullet -->
+    <mxCell id="mrg00" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="644" y="818" width="12" height="12" as="geometry" />
+    </mxCell>
+    <mxCell id="mrg00_l" value="paths re-join" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;fontColor=#6b6760;align=left;" vertex="1" parent="1">
+      <mxGeometry x="662" y="816" width="120" height="14" as="geometry" />
+    </mxCell>
+
+    <!-- ============================= PHASE 01 ============================= -->
+
+    <!-- U→S: POST create event -->
+    <mxCell id="m01_1" value="POST /api/supervisors/me/events  { name · date · location · capacity · acceptance_mode · duration }" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="890"/><mxPoint x="650" y="890"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m01_2" value="INSERT INTO events (status='upcoming', registration_open=TRUE)" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="920"/><mxPoint x="720" y="920"/><mxPoint x="720" y="938"/><mxPoint x="650" y="938"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m01_3" value="HTTP 201 – Event Created" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="966"/><mxPoint x="1410" y="966"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ============================= PHASE 02 ============================= -->
+
+    <!-- V→S: POST apply -->
+    <mxCell id="m02_1" value="POST /api/event-applications  { event_id }" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="1072"/><mxPoint x="650" y="1072"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_2" value="SELECT status, registration_open FROM events" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1102"/><mxPoint x="720" y="1102"/><mxPoint x="720" y="1120"/><mxPoint x="650" y="1120"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- OPT: registration closed -->
+    <mxCell id="fopt2_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="1134" width="1360" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="fopt2_tab" value="opt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="1134" width="36" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="fopt2_g" value="[status ≠ 'upcoming'  OR  registration_open = FALSE]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="252" y="1134" width="420" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="m02_3" value="HTTP 400 – Registration Closed" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1182"/><mxPoint x="270" y="1182"/></Array></mxGeometry>
+    </mxCell>
+
+    <mxCell id="m02_4" value="SELECT acceptance_mode, max_volunteers FROM events" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1240"/><mxPoint x="720" y="1240"/><mxPoint x="720" y="1258"/><mxPoint x="650" y="1258"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ALT outer: auto | manual -->
+    <mxCell id="falt2_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="1272" width="1360" height="418" as="geometry" />
+    </mxCell>
+    <mxCell id="falt2_tab" value="alt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="1272" width="30" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="falt2_g1" value="[acceptance_mode = 'auto']" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="246" y="1272" width="200" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="falt2_div" value="" style="endArrow=none;strokeColor=#b85c00;dashed=1;dashPattern=3 4;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="210" y="1490"/><mxPoint x="1570" y="1490"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="falt2_g2" value="[acceptance_mode = 'manual']" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="222" y="1492" width="200" height="16" as="geometry" />
+    </mxCell>
+
+    <!-- Auto sub-section -->
+    <mxCell id="m02_5" value="SELECT COUNT(*) approved applications" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1306"/><mxPoint x="720" y="1306"/><mxPoint x="720" y="1324"/><mxPoint x="650" y="1324"/></Array></mxGeometry>
+    </mxCell>
+    <!-- nested alt: auto capacity -->
+    <mxCell id="faltA_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="230" y="1338" width="1320" height="138" as="geometry" />
+    </mxCell>
+    <mxCell id="faltA_tab" value="alt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="230" y="1338" width="30" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="faltA_g1" value="[count &lt; max_volunteers]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="266" y="1338" width="180" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="faltA_div" value="" style="endArrow=none;strokeColor=#b85c00;dashed=1;dashPattern=3 4;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="230" y="1406"/><mxPoint x="1550" y="1406"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="faltA_g2" value="[count ≥ max_volunteers]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="242" y="1408" width="180" height="16" as="geometry" />
+    </mxCell>
+    <mxCell id="m02_6" value="INSERT INTO event_applications (status='approved')" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1362"/><mxPoint x="720" y="1362"/><mxPoint x="720" y="1380"/><mxPoint x="650" y="1380"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_7" value="Notify: You're In" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1392"/><mxPoint x="270" y="1392"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_7b" value="Notify: Auto-Accepted" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1420"/><mxPoint x="1410" y="1420"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_8" value="INSERT INTO event_applications (status='waitlisted')" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1436"/><mxPoint x="720" y="1436"/><mxPoint x="720" y="1454"/><mxPoint x="650" y="1454"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_9" value="Notify: You're on Waitlist" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1468"/><mxPoint x="270" y="1468"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- Manual sub-section -->
+    <mxCell id="m02_10" value="SELECT COUNT(*) approved applications" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1514"/><mxPoint x="720" y="1514"/><mxPoint x="720" y="1532"/><mxPoint x="650" y="1532"/></Array></mxGeometry>
+    </mxCell>
+    <!-- nested alt: manual capacity -->
+    <mxCell id="faltM_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="230" y="1546" width="1320" height="128" as="geometry" />
+    </mxCell>
+    <mxCell id="faltM_tab" value="alt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="230" y="1546" width="30" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="faltM_g1" value="[count &lt; max_volunteers]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="266" y="1546" width="180" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="faltM_div" value="" style="endArrow=none;strokeColor=#b85c00;dashed=1;dashPattern=3 4;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="230" y="1610"/><mxPoint x="1550" y="1610"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="faltM_g2" value="[count ≥ max_volunteers]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="242" y="1612" width="180" height="16" as="geometry" />
+    </mxCell>
+    <mxCell id="m02_11" value="INSERT INTO event_applications (status='pending')" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1572"/><mxPoint x="720" y="1572"/><mxPoint x="720" y="1590"/><mxPoint x="650" y="1590"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_12" value="Notify: New Application for Review" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1602"/><mxPoint x="1410" y="1602"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_13" value="INSERT INTO event_applications (status='waitlisted')" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1626"/><mxPoint x="720" y="1626"/><mxPoint x="720" y="1644"/><mxPoint x="650" y="1644"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m02_14" value="Notify: Waitlist Entry Added" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1658"/><mxPoint x="1410" y="1658"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- merge bullet -->
+    <mxCell id="mrg02" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="644" y="1700" width="12" height="12" as="geometry" />
+    </mxCell>
+    <mxCell id="mrg02_l" value="auto-approved + manual-approved paths re-join" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;fontColor=#6b6760;align=left;" vertex="1" parent="1">
+      <mxGeometry x="662" y="1698" width="300" height="14" as="geometry" />
+    </mxCell>
+
+    <!-- ============================= PHASE 03B ============================= -->
+
+    <mxCell id="m03b_1" value="PUT /api/event-applications/{app_id}/promote" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="1780"/><mxPoint x="650" y="1780"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03b_2" value="UPDATE event_applications SET status='pending' WHERE status='waitlisted'" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1812"/><mxPoint x="720" y="1812"/><mxPoint x="720" y="1830"/><mxPoint x="650" y="1830"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03b_3" value="Notify: Application Under Review" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1858"/><mxPoint x="270" y="1858"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ============================= PHASE 03A ============================= -->
+
+    <mxCell id="m03a_1" value="GET /api/event-applications  (reads pending list)" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="1952"/><mxPoint x="650" y="1952"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03a_2" value="review retrieved" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1984"/><mxPoint x="720" y="1984"/><mxPoint x="720" y="2002"/><mxPoint x="650" y="2002"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ALT: Approve | Reject (application) -->
+    <mxCell id="falt3_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="2016" width="1360" height="154" as="geometry" />
+    </mxCell>
+    <mxCell id="falt3_tab" value="alt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="2016" width="30" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="falt3_g1" value="[Approve]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="246" y="2016" width="100" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="falt3_div" value="" style="endArrow=none;strokeColor=#b85c00;dashed=1;dashPattern=3 4;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="210" y="2094"/><mxPoint x="1570" y="2094"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="falt3_g2" value="[Reject]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="222" y="2096" width="80" height="16" as="geometry" />
+    </mxCell>
+    <mxCell id="m03a_3" value="PUT /api/event-applications/{app_id}/approve" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2040"/><mxPoint x="650" y="2040"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03a_4" value="UPDATE event_applications SET status='approved'  (capacity lock)" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2060"/><mxPoint x="720" y="2060"/><mxPoint x="720" y="2078"/><mxPoint x="650" y="2078"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03a_5" value="Notify: Application Approved" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2082"/><mxPoint x="270" y="2082"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03a_6" value="PUT /api/event-applications/{app_id}/reject" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2112"/><mxPoint x="650" y="2112"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03a_7" value="UPDATE event_applications SET status='rejected'" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2134"/><mxPoint x="720" y="2134"/><mxPoint x="720" y="2152"/><mxPoint x="650" y="2152"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m03a_8" value="Notify: Application Rejected" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2160"/><mxPoint x="270" y="2160"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- merge bullet -->
+    <mxCell id="mrg03a" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="644" y="2182" width="12" height="12" as="geometry" />
+    </mxCell>
+    <mxCell id="mrg03a_l" value="all approval paths re-join" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;fontColor=#6b6760;align=left;" vertex="1" parent="1">
+      <mxGeometry x="662" y="2180" width="180" height="14" as="geometry" />
+    </mxCell>
+
+    <!-- ============================= PHASE 04 ============================= -->
+
+    <mxCell id="m04_1" value="POST /api/events/{event_id}/activate" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2260"/><mxPoint x="650" y="2260"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m04_2" value="UPDATE events SET status='active', registration_open=FALSE" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2292"/><mxPoint x="720" y="2292"/><mxPoint x="720" y="2310"/><mxPoint x="650" y="2310"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ============================= PHASE 05 ============================= -->
+
+    <mxCell id="m05_1" value="POST /api/event-applications/event/{event_id}/attendance  [{ app_id, attendance_status }]" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2410"/><mxPoint x="650" y="2410"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- LOOP + nested ALT -->
+    <mxCell id="floop_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="2430" width="1360" height="194" as="geometry" />
+    </mxCell>
+    <mxCell id="floop_tab" value="loop" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="210" y="2430" width="40" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="floop_g" value="[for each volunteer record in payload]" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="256" y="2430" width="300" height="18" as="geometry" />
+    </mxCell>
+    <!-- nested alt: attended | absent -->
+    <mxCell id="faltAtt_box" value="" style="rounded=0;fillColor=none;strokeColor=#b85c00;strokeWidth=1;dashed=1;dashPattern=5 4;" vertex="1" parent="1">
+      <mxGeometry x="230" y="2452" width="1320" height="160" as="geometry" />
+    </mxCell>
+    <mxCell id="faltAtt_tab" value="alt" style="rounded=0;fillColor=#b85c00;strokeColor=#b85c00;fontColor=#ffffff;fontSize=10;fontStyle=1;align=left;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="230" y="2452" width="30" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="faltAtt_g1" value="[attendance_status = 'attended']" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="266" y="2452" width="240" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="faltAtt_div" value="" style="endArrow=none;strokeColor=#b85c00;dashed=1;dashPattern=3 4;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="230" y="2536"/><mxPoint x="1550" y="2536"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="faltAtt_g2" value="[attendance_status = 'absent']" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=3;fontColor=#b85c00;align=left;" vertex="1" parent="1">
+      <mxGeometry x="242" y="2538" width="220" height="16" as="geometry" />
+    </mxCell>
+    <mxCell id="m05_2" value="UPSERT INTO activities (status='Approved'/'Completed', hours, date)" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2482"/><mxPoint x="720" y="2482"/><mxPoint x="720" y="2500"/><mxPoint x="650" y="2500"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m05_3" value="DELETE FROM activities WHERE volunteer_id=? AND event_id=?" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2558"/><mxPoint x="720" y="2558"/><mxPoint x="720" y="2576"/><mxPoint x="650" y="2576"/></Array></mxGeometry>
+    </mxCell>
+
+    <mxCell id="m05_4" value="Notify: Attendance Recorded" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2640"/><mxPoint x="270" y="2640"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ============================= PHASE 07 ============================= -->
+
+    <mxCell id="m07_1" value="PUT /api/events/{event_id}  { status: 'completed' }" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2718"/><mxPoint x="650" y="2718"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m07_2" value="UPDATE events SET status='completed'  (only valid from 'active')" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2750"/><mxPoint x="720" y="2750"/><mxPoint x="720" y="2768"/><mxPoint x="650" y="2768"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ============================= PHASE 08 ============================= -->
+
+    <mxCell id="m08_1" value="POST /api/certificates  { volunteer_id, event_id, certificate_title }" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2876"/><mxPoint x="650" y="2876"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m08_2" value="INSERT INTO certificates – validate eligibility · valid PDF ≤ 10MB" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2908"/><mxPoint x="720" y="2908"/><mxPoint x="720" y="2926"/><mxPoint x="650" y="2926"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m08_3" value="POST /api/certificates/{cert_id}/upload  (PDF file)" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2952"/><mxPoint x="650" y="2952"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m08_4" value="validate PDF magic bytes · store in /uploads/certificates/ · UPDATE file_url" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="2984"/><mxPoint x="720" y="2984"/><mxPoint x="720" y="3002"/><mxPoint x="650" y="3002"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m08_5" value="Notify: Certificate Issued" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="3030"/><mxPoint x="270" y="3030"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ============================= PHASE 09 ============================= -->
+
+    <mxCell id="m09_1" value="GET /api/certificates/{cert_id}/file" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=1;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="3112"/><mxPoint x="650" y="3112"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m09_2" value="SELECT * FROM certificates WHERE id=? – verify volunteer owns it" style="endArrow=block;endFill=1;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=left;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="3144"/><mxPoint x="720" y="3144"/><mxPoint x="720" y="3162"/><mxPoint x="650" y="3162"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="m09_3" value="FileResponse (PDF)" style="endArrow=open;endFill=0;dashed=1;dashPattern=6 4;strokeColor=#1a1a1a;fontSize=10;fontStyle=2;align=center;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="3190"/><mxPoint x="270" y="3190"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- End node -->
+    <mxCell id="end_out" value="" style="ellipse;fillColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="259" y="3228" width="22" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="end_in" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="266" y="3235" width="8" height="8" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
