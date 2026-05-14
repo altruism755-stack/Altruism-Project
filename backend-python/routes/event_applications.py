@@ -175,6 +175,17 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
         capacity = event.get("max_volunteers") or 0
         mode = event.get("acceptance_mode", "manual")
 
+        vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = %s", (vol["id"],)).fetchone())
+        vol_name = (vol_info or {}).get("name", "A volunteer")
+
+        supervisor_user_id = None
+        if event.get("created_by_supervisor_id"):
+            sup = dict_row(db.execute(
+                "SELECT user_id FROM supervisors WHERE id = %s", (event["created_by_supervisor_id"],)
+            ).fetchone())
+            if sup:
+                supervisor_user_id = sup["user_id"]
+
         if mode == "auto":
             # Re-read approved count inside the exclusive lock to prevent race conditions.
             approved_count = _get_approved_count(db, event_id)
@@ -197,6 +208,13 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                     f"'{event['name']}' is currently full. You'll be notified automatically if a spot opens up.",
                     "/dashboard/profile",
                 )
+                if supervisor_user_id:
+                    create_notification(
+                        db, supervisor_user_id, "event_application",
+                        "New Waitlist Entry",
+                        f"{vol_name} joined the waitlist for '{event['name']}' (event is full).",
+                        f"/supervisor/events/{event_id}",
+                    )
                 return {"message": "Event is full — added to waitlist", "status": "Waitlisted", "auto_accepted": False}
 
             else:
@@ -217,18 +235,12 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                     f"You've been automatically accepted for '{event['name']}'. See you there!",
                     "/dashboard/profile",
                 )
-
-                org_admin = dict_row(db.execute(
-                    "SELECT admin_user_id FROM organizations WHERE id = %s", (event["org_id"],)
-                ).fetchone())
-                vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = %s", (vol["id"],)).fetchone())
-                vol_name = (vol_info or {}).get("name", "A volunteer")
-                if org_admin and org_admin.get("admin_user_id"):
+                if supervisor_user_id:
                     create_notification(
-                        db, org_admin["admin_user_id"], "event_application",
+                        db, supervisor_user_id, "event_application",
                         "Volunteer Auto-Accepted",
                         f"{vol_name} was automatically accepted for '{event['name']}'.",
-                        "/org",
+                        f"/supervisor/events/{event_id}",
                     )
 
                 return {"message": "Application approved", "status": "Approved", "auto_accepted": True}
@@ -250,26 +262,21 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                        "event_application", app_id,
                        {"event_id": event_id, "volunteer_id": vol["id"], "mode": "manual", "status": initial_status})
 
-            vol_info = dict_row(db.execute("SELECT name FROM volunteers WHERE id = %s", (vol["id"],)).fetchone())
-            vol_name = (vol_info or {}).get("name", "A volunteer")
-            org_admin = dict_row(db.execute(
-                "SELECT admin_user_id FROM organizations WHERE id = %s", (event["org_id"],)
-            ).fetchone())
-            if org_admin and org_admin.get("admin_user_id"):
+            if supervisor_user_id:
                 if is_full:
                     create_notification(
-                        db, org_admin["admin_user_id"], "event_application",
+                        db, supervisor_user_id, "event_application",
                         "New Waitlist Entry",
                         f"{vol_name} joined the waitlist for '{event['name']}' (event is full). "
                         "You can promote them manually if a spot opens.",
-                        "/org",
+                        f"/supervisor/events/{event_id}",
                     )
                 else:
                     create_notification(
-                        db, org_admin["admin_user_id"], "event_application",
+                        db, supervisor_user_id, "event_application",
                         "New Event Application",
                         f"{vol_name} applied to join '{event['name']}'. Review pending applications.",
-                        "/org",
+                        f"/supervisor/events/{event_id}",
                     )
 
             if is_full:
