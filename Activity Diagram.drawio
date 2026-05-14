@@ -1,0 +1,586 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ==================== SWIMLANE HEADERS ==================== -->
+    <!-- Lane boundaries (absolute x from left edge of diagram):
+         Volunteer:        80  – 460   (cx=270)
+         System:           460 – 840   (cx=650)
+         Org Admin:        840 – 1220  (cx=1030)
+         Supervisor:       1220– 1600  (cx=1410)
+    -->
+
+    <!-- Header bar -->
+    <mxCell id="hdr_bg" value="" style="rounded=0;whiteSpace=wrap;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="80" y="0" width="1520" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_vol"  value="Volunteer"          style="text;html=1;strokeColor=none;fillColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="80"   y="0" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_sys"  value="System"             style="text;html=1;strokeColor=none;fillColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="460"  y="0" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_org"  value="Organization Admin" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="840"  y="0" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="hdr_sup"  value="Supervisor"         style="text;html=1;strokeColor=none;fillColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1220" y="0" width="380" height="50" as="geometry" />
+    </mxCell>
+    <!-- vertical lane dividers -->
+    <mxCell id="div1" value="" style="line;strokeColor=#1a1a1a;strokeWidth=1;fillColor=none;" vertex="1" parent="1">
+      <mxGeometry x="460"  y="0" width="1"  height="5540" as="geometry" />
+    </mxCell>
+    <mxCell id="div2" value="" style="line;strokeColor=#1a1a1a;strokeWidth=1;fillColor=none;" vertex="1" parent="1">
+      <mxGeometry x="840"  y="0" width="1"  height="5540" as="geometry" />
+    </mxCell>
+    <mxCell id="div3" value="" style="line;strokeColor=#1a1a1a;strokeWidth=1;fillColor=none;" vertex="1" parent="1">
+      <mxGeometry x="1220" y="0" width="1"  height="5540" as="geometry" />
+    </mxCell>
+    <!-- outer frame -->
+    <mxCell id="frame" value="" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#1a1a1a;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="80" y="0" width="1520" height="5540" as="geometry" />
+    </mxCell>
+    <!-- alternate lane shading (System + Supervisor) -->
+    <mxCell id="shade_sys" value="" style="rounded=0;fillColor=#efeadf;strokeColor=none;opacity=45;" vertex="1" parent="1">
+      <mxGeometry x="460" y="50" width="380" height="5490" as="geometry" />
+    </mxCell>
+    <mxCell id="shade_sup" value="" style="rounded=0;fillColor=#efeadf;strokeColor=none;opacity=45;" vertex="1" parent="1">
+      <mxGeometry x="1220" y="50" width="380" height="5490" as="geometry" />
+    </mxCell>
+
+    <!-- ==================== PHASE LABELS (left strip) ==================== -->
+    <mxCell id="ph00_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;00&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;ORGANIZATION&lt;br&gt;MEMBERSHIP&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="60" width="78" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="ph01_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;01&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;EVENT&lt;br&gt;CREATION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="1450" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph02_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;02&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;VOLUNTEER&lt;br&gt;APPLIES&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="1680" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph03b_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;03B&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;MANUAL WAITLIST&lt;br&gt;PROMOTION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="3100" width="78" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="ph03a_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;03A&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;APPLICATION&lt;br&gt;REVIEW&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="3420" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph04_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;04&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;EVENT&lt;br&gt;ACTIVATION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="4040" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph05_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;05&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;ATTENDANCE&lt;br&gt;RECORDING&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="4360" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph07_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;07&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;EVENT&lt;br&gt;COMPLETION&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="4890" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph08_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;08&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;CERTIFICATE&lt;br&gt;ISSUANCE&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="5080" width="78" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ph09_lbl" value="&lt;font color=&quot;#b85c00&quot; style=&quot;font-size:18px;&quot;&gt;&lt;b&gt;09&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;b style=&quot;font-size:9px;&quot;&gt;CERTIFICATE&lt;br&gt;DOWNLOAD&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="0" y="5300" width="78" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ==================== PHASE DIVIDER LINES ==================== -->
+    <mxCell id="pdiv01" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="1450"/><mxPoint x="1600" y="1450"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv02" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="1680"/><mxPoint x="1600" y="1680"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv03b" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="3100"/><mxPoint x="1600" y="3100"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv03a" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="3420"/><mxPoint x="1600" y="3420"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv04" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="4040"/><mxPoint x="1600" y="4040"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv05" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="4360"/><mxPoint x="1600" y="4360"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv07" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="4890"/><mxPoint x="1600" y="4890"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv08" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="5080"/><mxPoint x="1600" y="5080"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="pdiv09" value="" style="endArrow=none;dashed=1;dashPattern=2 6;strokeColor=#cbc6ba;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="5300"/><mxPoint x="1600" y="5300"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== PHASE 00 — ORGANIZATION MEMBERSHIP ==================== -->
+
+    <!-- Start (Volunteer cx=270) -->
+    <mxCell id="n0_start" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="258" y="120" width="24" height="24" as="geometry" />
+    </mxCell>
+
+    <!-- Submit Join Request (Volunteer) -->
+    <mxCell id="n0_submit" value="Submit Join Request&#xa;to Organization" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="160" y="195" width="220" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Is org student-only? (System cx=650) -->
+    <mxCell id="n0_studentOnly" value="Is org&#xa;student-only?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="540" y="310" width="220" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- Is volunteer a University Student? (System) -->
+    <mxCell id="n0_isUniv" value="Is volunteer a&#xa;University Student?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="535" y="490" width="230" height="120" as="geometry" />
+    </mxCell>
+
+    <!-- End: Not a University Student (System, left side) -->
+    <mxCell id="n0_endNotUniv" value="" style="ellipse;fillColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="346" y="672" width="24" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="n0_endNotUniv_in" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="353" y="679" width="10" height="10" as="geometry" />
+    </mxCell>
+    <mxCell id="n0_endNotUniv_lbl" value="Reject: Not a&#xa;University Student" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;align=center;fontColor=#6b6760;" vertex="1" parent="1">
+      <mxGeometry x="294" y="698" width="132" height="28" as="geometry" />
+    </mxCell>
+
+    <!-- Create Membership Pending (System) -->
+    <mxCell id="n0_createMembership" value="Create Membership&#xa;(Status: Pending)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="530" y="690" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Notify Org Admin (System) -->
+    <mxCell id="n0_notifyOrg" value="Notify Org Admin:&#xa;New Volunteer Application" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="520" y="800" width="260" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Merge diamond (Org Admin cx=1030) -->
+    <mxCell id="n0_merge" value="" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="1000" y="808" width="60" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Review Membership Request (Org Admin) -->
+    <mxCell id="n0_review" value="Review Membership Request" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="910" y="910" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Approve or Reject? (Org Admin) -->
+    <mxCell id="n0_decide" value="Approve&#xa;or Reject?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="930" y="1010" width="200" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- Approve Membership (Org Admin) -->
+    <mxCell id="n0_approve" value="Approve Membership&#xa;(Status: Active)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="910" y="1175" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Notify Volunteer: Membership Approved (Org Admin) -->
+    <mxCell id="n0_notifyApproved" value="Notify Volunteer:&#xa;Membership Approved" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="910" y="1285" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Reject Membership (Supervisor cx=1410) -->
+    <mxCell id="n0_reject" value="Reject Membership&#xa;(Status: Rejected)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1290" y="1175" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Notify Volunteer: Membership Rejected (Supervisor) -->
+    <mxCell id="n0_notifyRejected" value="Notify Volunteer:&#xa;Membership Rejected" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1290" y="1285" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- End: Rejected (Supervisor) -->
+    <mxCell id="n0_endRejected" value="" style="ellipse;fillColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="1398" y="1395" width="24" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="n0_endRejected_in" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="1405" y="1402" width="10" height="10" as="geometry" />
+    </mxCell>
+
+    <!-- Phase 00 edges -->
+    <mxCell id="e00_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_start" target="n0_submit" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_submit" target="n0_studentOnly" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="270"/><mxPoint x="650" y="270"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e00_3" value="No" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n0_studentOnly" target="n0_merge" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="760" y="365"/><mxPoint x="1030" y="365"/><mxPoint x="1030" y="808"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e00_4" value="Yes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;" edge="1" source="n0_studentOnly" target="n0_isUniv" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_5" value="No" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n0_isUniv" target="n0_endNotUniv" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="535" y="550"/><mxPoint x="358" y="550"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e00_6" value="Yes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;" edge="1" source="n0_isUniv" target="n0_createMembership" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_7" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_createMembership" target="n0_notifyOrg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_8" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_notifyOrg" target="n0_merge" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="780" y="828"/><mxPoint x="1000" y="828"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e00_9" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_merge" target="n0_review" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_10" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_review" target="n0_decide" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_11" value="Approve" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" source="n0_decide" target="n0_approve" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_12" value="Reject" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n0_decide" target="n0_reject" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1220" y="1065"/><mxPoint x="1410" y="1065"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e00_13" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_approve" target="n0_notifyApproved" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_14" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_reject" target="n0_notifyRejected" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e00_15" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_notifyRejected" target="n0_endRejected" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ==================== PHASE 01 — EVENT CREATION ==================== -->
+
+    <!-- Create Event (Supervisor cx=1410) -->
+    <mxCell id="n1_createEvent" value="Create Event&#xa;name · date · location&#xa;capacity · acceptance_mode · duration" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1270" y="1500" width="280" height="88" as="geometry" />
+    </mxCell>
+
+    <!-- Event Created (System cx=650) -->
+    <mxCell id="n1_eventCreated" value="Event Created&#xa;Status: Upcoming&#xa;registration_open: TRUE" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="510" y="1500" width="280" height="88" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e01_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n0_notifyApproved" target="n1_createEvent" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1030" y="1410"/><mxPoint x="1410" y="1410"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e01_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n1_createEvent" target="n1_eventCreated" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="1560"/><mxPoint x="650" y="1560"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== PHASE 02 — VOLUNTEER APPLIES ==================== -->
+
+    <!-- Apply to Event (Volunteer cx=270) -->
+    <mxCell id="n2_apply" value="Apply to Event" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="160" y="1750" width="220" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Event Upcoming & registration_open = TRUE? (System cx=650) -->
+    <mxCell id="n2_regOpen" value="Event Upcoming &amp;&#xa;registration_open&#xa;= TRUE?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="530" y="1730" width="240" height="120" as="geometry" />
+    </mxCell>
+
+    <!-- End: Cannot Apply (Volunteer lane) -->
+    <mxCell id="n2_endClosed" value="" style="ellipse;fillColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="258" y="1908" width="24" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="n2_endClosed_in" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="265" y="1915" width="10" height="10" as="geometry" />
+    </mxCell>
+    <mxCell id="n2_endClosed_lbl" value="Cannot Apply&#xa;(Registration Closed)" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;align=center;fontColor=#6b6760;" vertex="1" parent="1">
+      <mxGeometry x="192" y="1934" width="160" height="28" as="geometry" />
+    </mxCell>
+
+    <!-- Acceptance Mode? (System cx=650) -->
+    <mxCell id="n2_mode" value="Acceptance&#xa;Mode?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="550" y="1960" width="200" height="110" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e02_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n1_eventCreated" target="n2_apply" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="1640"/><mxPoint x="270" y="1640"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2_apply" target="n2_regOpen" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="1778"/><mxPoint x="650" y="1778"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_3" value="No" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_regOpen" target="n2_endClosed" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="1790"/><mxPoint x="270" y="1790"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_4" value="Yes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;" edge="1" source="n2_regOpen" target="n2_mode" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Event at Max Capacity? AUTO (System) -->
+    <mxCell id="n2_autoCap" value="Event at Max&#xa;Capacity? (auto)" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="540" y="2140" width="220" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- AUTO No — Approved branch (left sub-col cx=565) -->
+    <mxCell id="n2a_appApproved" value="Create Application&#xa;(Status: Approved)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="468" y="2320" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="n2a_notifyVolIn" value="Notify Volunteer:&#xa;You're In" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="468" y="2410" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="n2a_notifySupAuto" value="Notify Supervisor:&#xa;Auto-Accepted" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="468" y="2500" width="175" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- AUTO Yes — Waitlisted branch (right sub-col cx=745) -->
+    <mxCell id="n2a_appWaitlisted" value="Create Application&#xa;(Status: Waitlisted)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="657" y="2320" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="n2a_notifyVolWait" value="Notify Volunteer:&#xa;You're on Waitlist" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="657" y="2410" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="n2a_notifySupWait_auto" value="Notify Supervisor:&#xa;Waitlist Entry Added" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="657" y="2500" width="175" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Auto-merge junction (cx=650) -->
+    <mxCell id="n2a_autoMerge" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="636" y="2596" width="18" height="18" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e02_auto1" value="Auto" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_mode" target="n2_autoCap" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="2015"/><mxPoint x="530" y="2090"/><mxPoint x="650" y="2090"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_auto2" value="No" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_autoCap" target="n2a_appApproved" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="540" y="2195"/><mxPoint x="555" y="2195"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_auto3" value="Yes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_autoCap" target="n2a_appWaitlisted" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="760" y="2195"/><mxPoint x="744" y="2195"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_auto4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_appApproved" target="n2a_notifyVolIn" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e02_auto5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_notifyVolIn" target="n2a_notifySupAuto" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e02_auto6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_appWaitlisted" target="n2a_notifyVolWait" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e02_auto7" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_notifyVolWait" target="n2a_notifySupWait_auto" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e02_auto8" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_notifySupAuto" target="n2a_autoMerge" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="555" y="2605"/><mxPoint x="636" y="2605"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_auto9" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_notifySupWait_auto" target="n2a_autoMerge" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="744" y="2605"/><mxPoint x="654" y="2605"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- Event at Max Capacity? MANUAL (System) -->
+    <mxCell id="n2_manualCap" value="Event at Max&#xa;Capacity? (manual)" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="540" y="2710" width="220" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- MANUAL No — Pending branch -->
+    <mxCell id="n2m_appPending" value="Create Application&#xa;(Status: Pending)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="468" y="2890" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="n2m_notifySupReview" value="Notify Supervisor:&#xa;New Application for Review" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="468" y="2980" width="175" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- MANUAL Yes — Waitlisted branch -->
+    <mxCell id="n2m_appWaitlisted" value="Create Application&#xa;(Status: Waitlisted)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="657" y="2890" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="n2m_notifySupWait" value="Notify Supervisor:&#xa;Waitlist Entry Added" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="657" y="2980" width="175" height="56" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e02_man1" value="Manual" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_mode" target="n2_manualCap" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="840" y="2015"/><mxPoint x="840" y="2660"/><mxPoint x="650" y="2660"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_man2" value="No" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_manualCap" target="n2m_appPending" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="540" y="2765"/><mxPoint x="555" y="2765"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_man3" value="Yes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n2_manualCap" target="n2m_appWaitlisted" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="760" y="2765"/><mxPoint x="744" y="2765"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e02_man4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2m_appPending" target="n2m_notifySupReview" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e02_man5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2m_appWaitlisted" target="n2m_notifySupWait" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ==================== PHASE 03B — MANUAL WAITLIST PROMOTION ==================== -->
+
+    <!-- Manual Waitlist Promotion (Supervisor cx=1410) -->
+    <mxCell id="n3b_promote" value="Manual Waitlist Promotion&#xa;(Promote Waitlisted → Pending)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1270" y="3160" width="280" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- Notify Volunteer: Under Review (Supervisor) -->
+    <mxCell id="n3b_underReview" value="Notify Volunteer:&#xa;Under Review" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="3290" width="260" height="56" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e03b_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2m_notifySupWait" target="n3b_promote" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="744" y="3010"/><mxPoint x="1410" y="3010"/><mxPoint x="1410" y="3160"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e03b_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n3b_promote" target="n3b_underReview" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ==================== PHASE 03A — APPLICATION REVIEW ==================== -->
+
+    <!-- Review Application (Supervisor cx=1410) -->
+    <mxCell id="n3a_review" value="Review Application" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1290" y="3480" width="240" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Approve or Reject? (Supervisor) -->
+    <mxCell id="n3a_decide" value="Approve&#xa;or Reject?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1310" y="3590" width="200" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- Application Approved (Supervisor, left) -->
+    <mxCell id="n3a_approved" value="Application Approved&#xa;+ Notify Volunteer" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1230" y="3770" width="175" height="68" as="geometry" />
+    </mxCell>
+
+    <!-- Application Rejected (Supervisor, right) -->
+    <mxCell id="n3a_rejected" value="Application Rejected&#xa;+ Notify Volunteer" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1415" y="3770" width="175" height="68" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e03a_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2m_notifySupReview" target="n3a_review" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="555" y="3010"/><mxPoint x="555" y="3450"/><mxPoint x="1410" y="3450"/><mxPoint x="1410" y="3480"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e03a_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n3b_underReview" target="n3a_review" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e03a_3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n3a_review" target="n3a_decide" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e03a_4" value="Approve" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n3a_decide" target="n3a_approved" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1310" y="3645"/><mxPoint x="1317" y="3645"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e03a_5" value="Reject" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="n3a_decide" target="n3a_rejected" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1510" y="3645"/><mxPoint x="1502" y="3645"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== JOIN JUNCTION 1 (System cx=650) ==================== -->
+    <mxCell id="j1" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="636" y="3983" width="18" height="18" as="geometry" />
+    </mxCell>
+
+    <!-- auto merge → j1 -->
+    <mxCell id="ej1_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n2a_autoMerge" target="j1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="645" y="2640"/><mxPoint x="460" y="2640"/><mxPoint x="460" y="3992"/><mxPoint x="636" y="3992"/></Array></mxGeometry>
+    </mxCell>
+    <!-- approved → j1 -->
+    <mxCell id="ej1_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n3a_approved" target="j1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1317" y="3950"/><mxPoint x="645" y="3950"/></Array></mxGeometry>
+    </mxCell>
+    <!-- rejected → j1 -->
+    <mxCell id="ej1_3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n3a_rejected" target="j1" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1502" y="3970"/><mxPoint x="1560" y="3970"/><mxPoint x="1560" y="3992"/><mxPoint x="654" y="3992"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== PHASE 04 — EVENT ACTIVATION ==================== -->
+
+    <!-- Activate Event (Supervisor cx=1410) -->
+    <mxCell id="n4_activate" value="Activate Event&#xa;Status: Upcoming → Active&#xa;registration_open: FALSE" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1260" y="4100" width="300" height="88" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e04_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="j1" target="n4_activate" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="645" y="4060"/><mxPoint x="1410" y="4060"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== JOIN JUNCTION 2 (System cx=650) ==================== -->
+    <mxCell id="j2" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="636" y="4295" width="18" height="18" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e04_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n4_activate" target="j2" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="4270"/><mxPoint x="645" y="4270"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== PHASE 05 — ATTENDANCE RECORDING ==================== -->
+
+    <!-- Mark Attendance (Supervisor cx=1410) -->
+    <mxCell id="n5_markAttendance" value="Mark Attendance&#xa;(submit volunteers who attended)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1270" y="4410" width="280" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- For Attended Volunteers (System) -->
+    <mxCell id="n5_attended" value="For Attended Volunteers:&#xa;Create / Update Activity Record&#xa;(tracks_hours → Approved + hours; else Completed)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="490" y="4550" width="320" height="88" as="geometry" />
+    </mxCell>
+
+    <!-- For Absent Volunteers (System) -->
+    <mxCell id="n5_absent" value="For Absent Volunteers:&#xa;attendance_status = Absent;&#xa;delete Activity Record (if any)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="490" y="4680" width="320" height="76" as="geometry" />
+    </mxCell>
+
+    <!-- Notify Volunteers: Attendance Recorded (System) -->
+    <mxCell id="n5_notifyAttendance" value="Notify Volunteers:&#xa;Attendance Recorded" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="510" y="4800" width="280" height="56" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e05_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="j2" target="n5_markAttendance" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="645" y="4380"/><mxPoint x="1410" y="4380"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e05_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n5_markAttendance" target="n5_attended" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="4530"/><mxPoint x="650" y="4530"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e05_3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n5_attended" target="n5_absent" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e05_4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n5_absent" target="n5_notifyAttendance" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ==================== PHASE 07 — EVENT COMPLETION ==================== -->
+
+    <!-- Complete Event (Supervisor cx=1410) -->
+    <mxCell id="n7_complete" value="Complete Event&#xa;(Status: Completed)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="4960" width="260" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e07_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n5_notifyAttendance" target="n7_complete" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="4940"/><mxPoint x="1410" y="4940"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== PHASE 08 — CERTIFICATE ISSUANCE ==================== -->
+
+    <!-- Issue & Upload Certificate (Supervisor cx=1410) -->
+    <mxCell id="n8_issueCert" value="Issue &amp; Upload Certificate (PDF)&#xa;validates: volunteer eligibility&#xa;valid PDF · ≤ 10MB" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1260" y="5140" width="300" height="88" as="geometry" />
+    </mxCell>
+
+    <!-- Create Certificate Record (System cx=650) -->
+    <mxCell id="n8_createRecord" value="Create Certificate Record&#xa;+ Notify Volunteer:&#xa;Certificate Issued" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="490" y="5140" width="320" height="88" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e08_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n7_complete" target="n8_issueCert" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e08_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n8_issueCert" target="n8_createRecord" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="5200"/><mxPoint x="650" y="5200"/></Array></mxGeometry>
+    </mxCell>
+
+    <!-- ==================== PHASE 09 — CERTIFICATE DOWNLOAD ==================== -->
+
+    <!-- Download Certificate (Volunteer cx=270) -->
+    <mxCell id="n9_download" value="Download Certificate" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;strokeColor=#1a1a1a;fillColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="160" y="5360" width="220" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- End node (Volunteer) -->
+    <mxCell id="n9_end" value="" style="ellipse;fillColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="258" y="5460" width="24" height="24" as="geometry" />
+    </mxCell>
+    <mxCell id="n9_end_in" value="" style="ellipse;fillColor=#1a1a1a;strokeColor=#1a1a1a;" vertex="1" parent="1">
+      <mxGeometry x="265" y="5467" width="10" height="10" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e09_1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n8_createRecord" target="n9_download" parent="1">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="5310"/><mxPoint x="270" y="5310"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="e09_2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1a1a1a;" edge="1" source="n9_download" target="n9_end" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
