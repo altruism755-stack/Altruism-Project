@@ -36,135 +36,105 @@
 
     <!-- EVENT APPLICATION -->
     <mxCell id="EA" value="&lt;b&gt;EventApplication&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+event_id : int&lt;br/&gt;+volunteer_id : int&lt;br/&gt;+status : String&lt;br/&gt;+attendance_status : String&lt;br/&gt;+created_at : DateTime&lt;br/&gt;+cancelled_at : DateTime" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
-      <mxGeometry x="380" y="820" width="220" height="170" as="geometry" />
+      <mxGeometry x="380" y="840" width="220" height="170" as="geometry" />
     </mxCell>
 
     <!-- CERTIFICATE -->
     <mxCell id="Cert" value="&lt;b&gt;Certificate&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+volunteer_id : int&lt;br/&gt;+event_id : int&lt;br/&gt;+type : String&lt;br/&gt;+certificate_title : String&lt;br/&gt;+hours : float&lt;br/&gt;+issued_date : Date&lt;br/&gt;+file_url : String&lt;br/&gt;+created_at : DateTime" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
-      <mxGeometry x="720" y="820" width="220" height="210" as="geometry" />
+      <mxGeometry x="720" y="840" width="220" height="210" as="geometry" />
     </mxCell>
 
     <!-- ACTIVITY -->
     <mxCell id="Act" value="&lt;b&gt;Activity&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+volunteer_id : int&lt;br/&gt;+event_id : int&lt;br/&gt;+date : Date&lt;br/&gt;+hours : float&lt;br/&gt;+description : String&lt;br/&gt;+status : String&lt;br/&gt;+reviewed_at : DateTime&lt;br/&gt;+created_at : DateTime" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
-      <mxGeometry x="1060" y="820" width="220" height="210" as="geometry" />
+      <mxGeometry x="1060" y="840" width="220" height="210" as="geometry" />
     </mxCell>
 
     <!-- ORG MEMBERSHIP -->
     <mxCell id="OM" value="&lt;b&gt;OrgMembership&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+org_id : int&lt;br/&gt;+volunteer_id : int&lt;br/&gt;+department : String&lt;br/&gt;+status : String&lt;br/&gt;+join_source : String&lt;br/&gt;+notes : String&lt;br/&gt;+joined_at : DateTime&lt;br/&gt;+approved_at : DateTime" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
-      <mxGeometry x="1440" y="820" width="220" height="210" as="geometry" />
+      <mxGeometry x="1440" y="840" width="220" height="210" as="geometry" />
     </mxCell>
 
     <!-- EVENT RATING -->
     <mxCell id="ER" value="&lt;b&gt;EventRating&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+event_id : int&lt;br/&gt;+volunteer_id : int&lt;br/&gt;+rating : int&lt;br/&gt;+feedback : String&lt;br/&gt;+created_at : DateTime" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
-      <mxGeometry x="60" y="820" width="200" height="150" as="geometry" />
+      <mxGeometry x="60" y="840" width="200" height="150" as="geometry" />
     </mxCell>
 
-    <!-- ===== RELATIONSHIPS ===== -->
+    <!-- ===== RELATIONSHIPS (startLabel/endLabel embedded in edge style) ===== -->
 
-    <!-- User → Volunteer : is -->
-    <mxCell id="r_UV" value="is" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="User" target="Vol">
+    <!-- User → Volunteer : is  1 -- 0..1 -->
+    <mxCell id="r_UV" value="is" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..1;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="User" target="Vol">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_UV_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_UV"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_UV_t" value="0..1" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_UV"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- User → Supervisor : is -->
-    <mxCell id="r_US" value="is" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="User" target="Sup">
+    <!-- User → Supervisor : is  1 -- 0..1 -->
+    <mxCell id="r_US" value="is" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..1;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="User" target="Sup">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_US_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_US"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_US_t" value="0..1" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_US"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- User → Organization : creates -->
-    <mxCell id="r_UOrg" value="creates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="User" target="Org">
+    <!-- User → Organization : creates  1 -- 0..* -->
+    <mxCell id="r_UOrg" value="creates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="User" target="Org">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_UOrg_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_UOrg"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_UOrg_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_UOrg"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Supervisor → Event : creates -->
-    <mxCell id="r_SE" value="creates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Sup" target="Evt">
+    <!-- Supervisor → Event : creates  1 -- 0..* -->
+    <mxCell id="r_SE" value="creates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Sup" target="Evt">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_SE_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_SE"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_SE_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_SE"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Organization → OrgAdmin : has -->
-    <mxCell id="r_OOA" value="has" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Org" target="OA">
+    <!-- Organization → OrgAdmin : has  1 -- 1..* -->
+    <mxCell id="r_OOA" value="has" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=1..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Org" target="OA">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_OOA_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_OOA"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_OOA_t" value="1..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_OOA"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Organization → OrgMembership : enrols -->
-    <mxCell id="r_OOM" value="enrols" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Org" target="OM">
+    <!-- Organization → OrgMembership : enrols  1 -- 0..* -->
+    <mxCell id="r_OOM" value="enrols" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Org" target="OM">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_OOM_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_OOM"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_OOM_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_OOM"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Volunteer → EventApplication : applies -->
-    <mxCell id="r_VEA" value="applies" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Vol" target="EA">
+    <!-- Volunteer → EventApplication : applies  1 -- 0..* -->
+    <mxCell id="r_VEA" value="applies" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Vol" target="EA">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_VEA_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VEA"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_VEA_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VEA"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Volunteer → EventRating : rates -->
-    <mxCell id="r_VER" value="rates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Vol" target="ER">
+    <!-- Volunteer → EventRating : rates  1 -- 0..* -->
+    <mxCell id="r_VER" value="rates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Vol" target="ER">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_VER_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VER"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_VER_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VER"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Volunteer → Certificate : earns -->
-    <mxCell id="r_VCert" value="earns" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Vol" target="Cert">
+    <!-- Volunteer → Certificate : earns  1 -- 0..* -->
+    <mxCell id="r_VCert" value="earns" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Vol" target="Cert">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_VCert_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VCert"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_VCert_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VCert"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Volunteer → OrgMembership : joins -->
-    <mxCell id="r_VOM" value="joins" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Vol" target="OM">
+    <!-- Volunteer → OrgMembership : joins  1 -- 0..* -->
+    <mxCell id="r_VOM" value="joins" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Vol" target="OM">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_VOM_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VOM"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_VOM_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_VOM"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Event → EventApplication : generates -->
-    <mxCell id="r_EEA" value="generates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Evt" target="EA">
+    <!-- Event → EventApplication : generates  1 -- 0..* -->
+    <mxCell id="r_EEA" value="generates" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Evt" target="EA">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_EEA_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_EEA"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_EEA_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_EEA"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Event → Certificate : yields -->
-    <mxCell id="r_ECert" value="yields" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Evt" target="Cert">
+    <!-- Event → Certificate : yields  1 -- 0..* -->
+    <mxCell id="r_ECert" value="yields" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Evt" target="Cert">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_ECert_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_ECert"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_ECert_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_ECert"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Event → EventRating : receives -->
-    <mxCell id="r_EER" value="receives" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Evt" target="ER">
+    <!-- Event → EventRating : receives  1 -- 0..* -->
+    <mxCell id="r_EER" value="receives" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Evt" target="ER">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_EER_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_EER"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_EER_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_EER"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Supervisor → Activity : logs -->
-    <mxCell id="r_SA" value="logs" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Sup" target="Act">
+    <!-- Supervisor → Activity : logs  1 -- 0..* -->
+    <mxCell id="r_SA" value="logs" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Sup" target="Act">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_SA_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_SA"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_SA_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_SA"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
-    <!-- Supervisor → Certificate : issues -->
-    <mxCell id="r_SC" value="issues" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;" edge="1" parent="1" source="Sup" target="Cert">
+    <!-- Supervisor → Certificate : issues  1 -- 0..* -->
+    <mxCell id="r_SC" value="issues" style="endArrow=open;endFill=0;strokeColor=#6c8ebf;strokeWidth=1.5;fontSize=10;fontStyle=1;startLabel=1;endLabel=0..*;startFontSize=10;endFontSize=10;" edge="1" parent="1" source="Sup" target="Cert">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="r_SC_s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_SC"><mxGeometry x="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
-    <mxCell id="r_SC_t" value="0..*" style="resizable=0;html=1;align=right;verticalAlign=top;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="r_SC"><mxGeometry x="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry></mxCell>
 
   </root>
 </mxGraphModel>
