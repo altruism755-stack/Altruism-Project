@@ -10,8 +10,8 @@
     </mxCell>
 
     <!-- VOLUNTEER -->
-    <mxCell id="Vol" value="&lt;b&gt;Volunteer&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+name : String&lt;br/&gt;+phone : String&lt;br/&gt;+city : String&lt;br/&gt;+governorate : String&lt;br/&gt;+nationality : String&lt;br/&gt;+gender : String&lt;br/&gt;+date_of_birth : Date&lt;br/&gt;+national_id : String&lt;br/&gt;+education_level : String&lt;br/&gt;+university_name : String&lt;br/&gt;+hours_per_week : int&lt;br/&gt;+status : String" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
-      <mxGeometry x="40" y="280" width="220" height="290" as="geometry" />
+    <mxCell id="Vol" value="&lt;b&gt;Volunteer&lt;/b&gt;&lt;hr/&gt;+id : int&lt;br/&gt;+name : String&lt;br/&gt;+phone : String&lt;br/&gt;+city : String&lt;br/&gt;+governorate : String&lt;br/&gt;+nationality : String&lt;br/&gt;+gender : String&lt;br/&gt;+date_of_birth : Date&lt;br/&gt;+national_id : String&lt;br/&gt;+education_level : String&lt;br/&gt;+university_name : String&lt;br/&gt;+hours_per_week : int&lt;br/&gt;+prior_experience : int&lt;br/&gt;+status : String" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=11;whiteSpace=nowrap;" vertex="1" parent="1">
+      <mxGeometry x="40" y="280" width="220" height="308" as="geometry" />
     </mxCell>
 
     <!-- EVENT -->
