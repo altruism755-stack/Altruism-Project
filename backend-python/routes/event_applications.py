@@ -614,6 +614,7 @@ def mark_attendance(
         if event["status"] not in ("Active", "Completed"):
             raise HTTPException(409, "Attendance can only be marked for Active or Completed events")
 
+        reviewer_supervisor_id = None
         if current_user["role"] == "supervisor":
             sup = dict_row(db.execute(
                 "SELECT id, org_id FROM supervisors WHERE user_id = %s", (current_user["id"],)
@@ -623,6 +624,7 @@ def mark_attendance(
             if event.get("created_by_supervisor_id") != sup["id"]:
                 raise HTTPException(403, "You can only mark attendance for events you manage")
             caller_org_id = sup["org_id"]
+            reviewer_supervisor_id = sup["id"]
         else:
             org = get_org_for_admin(db, current_user["id"])
             if org["id"] != event["org_id"]:
@@ -659,9 +661,10 @@ def mark_attendance(
         description = body.get("description", "")
         event_date = str(event.get("date") or "")
 
-        # Participation-only orgs: activities land as Completed immediately (no approval step).
-        # Hours-based orgs: activities land as Pending (supervisor/admin approves later).
-        act_status = "Pending" if tracks_hours else "Completed"
+        # All attendance marking auto-approves the activity immediately.
+        # Hours-based orgs: Approved (hours logged and confirmed by supervisor action).
+        # Participation-only orgs: Completed (no hours to approve).
+        act_status = "Approved" if tracks_hours else "Completed"
 
         updated = 0
         for rec in records:
@@ -697,18 +700,18 @@ def mark_attendance(
                 # Upsert the derived participation/hours record.
                 db.execute(
                     """
-                    INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO activities (volunteer_id, event_id, org_id, date, hours, description, status, reviewed_by, reviewed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
                     ON CONFLICT (volunteer_id, event_id) WHERE event_id IS NOT NULL
                     DO UPDATE SET
                         date        = EXCLUDED.date,
                         hours       = EXCLUDED.hours,
                         description = EXCLUDED.description,
                         status      = EXCLUDED.status,
-                        reviewed_by = NULL,
-                        reviewed_at = NULL
+                        reviewed_by = EXCLUDED.reviewed_by,
+                        reviewed_at = EXCLUDED.reviewed_at
                     """,
-                    (vol_id, event_id, caller_org_id, event_date, hours, description, act_status),
+                    (vol_id, event_id, caller_org_id, event_date, hours, description, act_status, reviewer_supervisor_id),
                 )
             else:
                 # Absent: remove any previously created activity so no phantom record remains.
