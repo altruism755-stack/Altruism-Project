@@ -155,16 +155,19 @@ def get_my_profile(current_user: dict = Depends(require_approved_org_admin)):
                 org["submitter_email"] = override["email"]
 
         pending_rows = dict_rows(db.execute(
-            "SELECT id, field, new_value, status, created_at "
+            "SELECT id, changes, status, created_at "
             "FROM org_profile_change_requests "
             "WHERE org_id = %s AND status = 'pending' ORDER BY created_at DESC",
             (org["id"],),
         ).fetchall())
-        # Build a field → new_value dict for easy frontend consumption.
-        pending_dict = {row["field"]: row["new_value"] for row in pending_rows}
+        # Flatten all pending changes into a single field→value dict for frontend.
+        pending_dict = {}
+        for row in pending_rows:
+            if isinstance(row.get("changes"), dict):
+                pending_dict.update(row["changes"])
         return {
             "current": org,
-            "organization": org,          # backward-compat alias
+            "organization": org,
             "pending": pending_dict,
             "pending_changes": pending_rows,
             "has_pending": len(pending_rows) > 0,
@@ -185,12 +188,15 @@ def update_my_profile(
         if not payload:
             org_now = _decode_org_json(dict(org))
             pending = dict_rows(db.execute(
-                "SELECT id, field, new_value, status, created_at "
+                "SELECT id, changes, status, created_at "
                 "FROM org_profile_change_requests "
                 "WHERE org_id = %s AND status = 'pending' ORDER BY created_at DESC",
                 (org["id"],),
             ).fetchall())
-            pending_dict = {row["field"]: row["new_value"] for row in pending}
+            pending_dict: dict = {}
+            for row in pending:
+                if isinstance(row.get("changes"), dict):
+                    pending_dict.update(row["changes"])
             return {"organization": org_now, "current": org_now, "applied": [], "queued": [],
                     "pending_changes": pending, "pending": pending_dict,
                     "has_pending": len(pending) > 0, "pending_changes_count": len(pending),
@@ -215,27 +221,24 @@ def update_my_profile(
             )
             applied = list(edits.keys())
 
-        for field in SENSITIVE_FIELDS:
-            new_val = payload.get(field)
-            if new_val is None or new_val == org.get(field):
-                continue
+        sensitive_changes = {
+            field: payload[field]
+            for field in SENSITIVE_FIELDS
+            if field in payload and payload[field] != org.get(field)
+        }
+        if sensitive_changes:
             db.execute(
-                "DELETE FROM org_profile_change_requests "
-                "WHERE org_id = %s AND field = %s AND status = 'pending'",
-                (org["id"], field),
+                "INSERT INTO org_profile_change_requests (org_id, requested_by, changes) "
+                "VALUES (%s, %s, %s)",
+                (org["id"], current_user["id"], json.dumps(sensitive_changes)),
             )
-            db.execute(
-                "INSERT INTO org_profile_change_requests (org_id, requested_by, field, new_value) "
-                "VALUES (%s, %s, %s, %s)",
-                (org["id"], current_user["id"], field, new_val),
-            )
-            queued.append(field)
+            queued = list(sensitive_changes.keys())
 
         org_after = _decode_org_json(dict_row(db.execute(
             "SELECT * FROM organizations WHERE id = %s", (org["id"],)
         ).fetchone()))
         pending = dict_rows(db.execute(
-            "SELECT id, field, new_value, status, created_at "
+            "SELECT id, changes, status, created_at "
             "FROM org_profile_change_requests "
             "WHERE org_id = %s AND status = 'pending' ORDER BY created_at DESC",
             (org["id"],),
@@ -250,7 +253,10 @@ def update_my_profile(
         else:
             message = "No changes to save."
 
-        pending_dict = {row["field"]: row["new_value"] for row in pending}
+        pending_dict = {}
+        for row in pending:
+            if isinstance(row.get("changes"), dict):
+                pending_dict.update(row["changes"])
         return {
             "organization": org_after,
             "current": org_after,
@@ -283,7 +289,7 @@ def list_my_org_admins(current_user: dict = Depends(require_approved_org_admin))
         # This acts as a one-time lazy migration for legacy organizations.
         if not rows:
             db.execute(
-                "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, 'creator') ON CONFLICT DO NOTHING",
+                "INSERT INTO org_admins (user_id, org_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                 (current_user["id"], org_id),
             )
             rows = _fetch_org_admins(db, org_id)
@@ -307,7 +313,7 @@ def add_my_org_admin(body: AddOrgAdminBody, current_user: dict = Depends(require
         if user["id"] == current_user["id"]:
             raise HTTPException(403, "You cannot grant yourself admin access")
         db.execute(
-            "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, 'admin') ON CONFLICT DO NOTHING",
+            "INSERT INTO org_admins (user_id, org_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (user["id"], org_id),
         )
         return {"message": f"{body.email} is now an organization admin"}
@@ -332,14 +338,13 @@ def remove_my_org_admin(admin_id: int, current_user: dict = Depends(require_appr
 def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admin)):
     """Flat, denormalized CSV export for analytics tools (Power BI, etc.).
 
-    Schema v1.1 column order (analytics-optimised):
+    Schema v1.2 column order (analytics-optimised):
       export_version, volunteer_id, org_id, email, name,
-      join_source, channel_detail, status, is_active,
-      joined_at, activity_id, governorate, city
+      join_source, status, is_active, joined_at, activity_id,
+      governorate, city
 
     status values: applied | accepted | inactive | unknown
     is_active: 1 when status = 'accepted', 0 for all other states.
-    channel_detail is non-empty only when join_source = 'campaign'.
     joined_at: full ISO 8601 UTC (YYYY-MM-DDTHH:MM:SSZ).
     All nulls replaced with empty strings or 0 for Power BI compatibility.
     """
@@ -353,11 +358,6 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
                 LOWER(TRIM(u.email))                                        AS email,
                 v.name,
                 COALESCE(ov.join_source, 'other')                          AS join_source,
-                CASE
-                    WHEN ov.join_source = 'campaign'
-                    THEN LOWER(TRIM(COALESCE(ov.channel_detail, '')))
-                    ELSE ''
-                END                                                         AS channel_detail,
                 CASE ov.status
                     WHEN 'pending'  THEN 'applied'
                     WHEN 'active'   THEN 'accepted'
@@ -365,10 +365,10 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
                     ELSE            'unknown'
                 END                                                         AS status,
                 CASE WHEN ov.status = 'active' THEN 1 ELSE 0 END           AS is_active,
-                COALESCE(ov.joined_at::text, '')                           AS joined_at,
+                COALESCE(ov.joined_at::text, '')                            AS joined_at,
                 ''                                                          AS activity_id,
-                COALESCE(ov.governorate_snapshot, '')                       AS governorate,
-                COALESCE(ov.city_snapshot,        '')                       AS city
+                COALESCE(v.governorate, '')                                 AS governorate,
+                COALESCE(v.city, '')                                        AS city
             FROM volunteers v
             JOIN users u ON u.id = v.user_id
             JOIN org_volunteers ov ON v.id = ov.volunteer_id
@@ -380,7 +380,7 @@ def export_volunteers_csv(current_user: dict = Depends(require_approved_org_admi
 
     fieldnames = [
         "export_version", "volunteer_id", "org_id", "email", "name",
-        "join_source", "channel_detail", "status", "is_active",
+        "join_source", "status", "is_active",
         "joined_at", "activity_id", "governorate", "city",
     ]
     output = io.StringIO()
@@ -405,8 +405,8 @@ _EXPORT_COLUMNS = [
     "education_level", "university_name", "faculty", "field_of_study", "study_year",
     "languages", "skills", "cause_areas", "availability",
     "hours_per_week", "prior_experience", "prior_org", "experiences", "about_me",
-    "department", "supervisor_name",
-    "membership_status", "join_source", "channel_detail", "joined_at", "is_active",
+    "department",
+    "membership_status", "join_source", "joined_at", "is_active",
 ]
 
 # Columns that store JSON-encoded arrays in the DB → joined with "; " for spreadsheets.
@@ -480,7 +480,6 @@ def _fetch_export_rows(db, org_id: int) -> list[dict]:
             ov.department,
             ov.status AS membership_status,
             COALESCE(ov.join_source, 'other') AS join_source,
-            COALESCE(ov.channel_detail, '') AS channel_detail,
             COALESCE(ov.joined_at::text, '') AS joined_at,
             CASE WHEN ov.status = 'active' THEN 1 ELSE 0 END AS is_active
         FROM volunteers v
@@ -615,16 +614,14 @@ def list_organizations():
             """
             SELECT o.id, o.name, o.description, o.categories, o.founded_year, o.hq_city, o.org_type,
                    o.logo_url, o.website, o.student_only,
-                   t.color, t.secondary_color, t.initials,
                    COUNT(CASE WHEN ov.status = 'active'  THEN 1 END) AS total_volunteers,
                    COUNT(CASE WHEN ov.status = 'pending' THEN 1 END) AS pending_requests,
                    COUNT(CASE WHEN e.status IN ('active','upcoming') THEN 1 END) AS active_activities
             FROM organizations o
-            LEFT JOIN org_theme t ON t.org_id = o.id
             LEFT JOIN org_volunteers ov ON ov.org_id = o.id
             LEFT JOIN events e ON e.org_id = o.id
             WHERE o.status = 'approved'
-            GROUP BY o.id, t.color, t.secondary_color, t.initials
+            GROUP BY o.id
             """
         ).fetchall())
         return {"organizations": orgs}
@@ -732,11 +729,9 @@ def join_organization(org_id: int, current_user: dict = Depends(require_roles("v
         _now = _utcnow()
         db.execute(
             "INSERT INTO org_volunteers "
-            "(org_id, volunteer_id, status, join_source, "
-            " governorate_snapshot, city_snapshot, joined_at) "
-            "VALUES (%s, %s, 'pending', 'website', %s, %s, %s)",
-            (org_id, vol["id"],
-             vol.get("governorate") or None, vol.get("city") or None, _now),
+            "(org_id, volunteer_id, status, join_source, joined_at) "
+            "VALUES (%s, %s, 'pending', 'website', %s)",
+            (org_id, vol["id"], _now),
         )
         vol_name = dict_row(db.execute(
             "SELECT name FROM volunteers WHERE id = %s", (vol["id"],)
@@ -763,19 +758,14 @@ def approve_org_member(
         _assert_org_access(db, org_id, current_user["id"])
 
         vol = dict_row(db.execute(
-            "SELECT v.governorate, v.city, v.user_id, v.name, u.email "
+            "SELECT v.user_id, v.name, u.email "
             "FROM volunteers v JOIN users u ON u.id = v.user_id WHERE v.id = %s", (vol_id,)
         ).fetchone())
-        gov_snap = (vol or {}).get("governorate") or None
-        city_snap = (vol or {}).get("city") or None
         db.execute(
             "UPDATE org_volunteers SET status = 'active', department = %s, "
-            "joined_at = NOW(), "
-            "approved_at = NOW(), "
-            "governorate_snapshot = %s, city_snapshot = %s "
+            "joined_at = NOW(), approved_at = NOW() "
             "WHERE org_id = %s AND volunteer_id = %s",
-            (body.get("department"),
-             gov_snap, city_snap, org_id, vol_id),
+            (body.get("department"), org_id, vol_id),
         )
         # Notify volunteer
         org = dict_row(db.execute("SELECT name FROM organizations WHERE id = %s", (org_id,)).fetchone())
@@ -916,10 +906,9 @@ def add_volunteer_manually(
 
         db.execute(
             "INSERT INTO org_volunteers "
-            "(org_id, volunteer_id, status, join_source, "
-            " city_snapshot, joined_at, added_by_admin_id, notes) "
-            "VALUES (%s, %s, 'active', 'manual', %s, %s, %s, %s)",
-            (org_id, volunteer_id, city, _now, current_user["id"], body.notes),
+            "(org_id, volunteer_id, status, join_source, joined_at, added_by_admin_id, notes) "
+            "VALUES (%s, %s, 'active', 'manual', %s, %s, %s)",
+            (org_id, volunteer_id, _now, current_user["id"], body.notes),
         )
 
         return {"message": "Volunteer added successfully (Manual)", "volunteer_id": volunteer_id}

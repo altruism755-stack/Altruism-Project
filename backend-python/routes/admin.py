@@ -153,14 +153,10 @@ def list_profile_changes(
 ):
     """List organization profile change requests, defaulting to pending ones."""
     with get_db() as db:
-        # Join all 7 sensitive columns in one go — avoids N extra queries per row.
         query = (
-            "SELECT r.id, r.org_id, r.field, r.new_value, r.status, r.created_at, r.reviewed_at, "
+            "SELECT r.id, r.org_id, r.changes, r.status, r.created_at, r.reviewed_at, "
             "o.name as org_name, o.logo_url as org_logo, "
-            "u.email as requested_by_email, "
-            "o.name as cur_name, o.official_email as cur_official_email, "
-            "o.org_type as cur_org_type, o.founded_year as cur_founded_year, "
-            "o.org_size as cur_org_size, o.hq_city as cur_hq_city "
+            "u.email as requested_by_email "
             "FROM org_profile_change_requests r "
             "JOIN organizations o ON r.org_id = o.id "
             "JOIN users u ON r.requested_by = u.id"
@@ -171,16 +167,12 @@ def list_profile_changes(
             params.append(status)
         query += " ORDER BY r.created_at DESC"
         rows = dict_rows(db.execute(query, params).fetchall())
-        for row in rows:
-            field = row["field"]
-            row["field_label"] = _FIELD_LABELS.get(field, field.replace("_", " ").title())
-            row["current_value"] = row.get(f"cur_{field}") if field in _SENSITIVE_COLUMNS else None
         return {"changes": rows, "total": len(rows)}
 
 
 @router.post("/profile-changes/{change_id}/approve")
 def approve_profile_change(change_id: int, current_user: dict = Depends(require_platform_admin)):
-    """Approve a pending profile change — applies the new value to the organization."""
+    """Approve a pending profile change — applies all fields in the changes JSONB to the organization."""
     with get_db() as db:
         change = dict_row(db.execute(
             "SELECT * FROM org_profile_change_requests WHERE id = %s", (change_id,)
@@ -189,12 +181,14 @@ def approve_profile_change(change_id: int, current_user: dict = Depends(require_
             raise HTTPException(404, "Change request not found")
         if change["status"] != "pending":
             raise HTTPException(400, f"Change request is already {change['status']}")
-        field = change["field"]
-        if field not in _SENSITIVE_COLUMNS:
-            raise HTTPException(400, f"Field '{field}' is not a recognized sensitive field")
+        changes: dict = change.get("changes") or {}
+        valid = {k: v for k, v in changes.items() if k in _SENSITIVE_COLUMNS}
+        if not valid:
+            raise HTTPException(400, "Change request contains no recognized sensitive fields")
+        sets = ", ".join(f"{k} = %s" for k in valid)
         db.execute(
-            f"UPDATE organizations SET {field} = %s WHERE id = %s",
-            (change["new_value"], change["org_id"]),
+            f"UPDATE organizations SET {sets} WHERE id = %s",
+            (*valid.values(), change["org_id"]),
         )
         db.execute(
             "UPDATE org_profile_change_requests SET status = 'approved', reviewed_at = NOW() WHERE id = %s",
@@ -204,16 +198,16 @@ def approve_profile_change(change_id: int, current_user: dict = Depends(require_
             "SELECT admin_user_id FROM organizations WHERE id = %s", (change["org_id"],)
         ).fetchone())
         if org:
-            label = _FIELD_LABELS.get(field, field)
+            labels = ", ".join(_FIELD_LABELS.get(f, f) for f in valid)
             create_notification(
                 db,
                 user_id=org["admin_user_id"],
                 type="profile_change_approved",
                 title="Profile Change Approved",
-                message=f"Your requested change to '{label}' has been approved and applied to your profile.",
+                message=f"Your requested change to '{labels}' has been approved and applied to your profile.",
                 action_url="/org/profile",
             )
-        return {"message": f"Change to '{_FIELD_LABELS.get(field, field)}' approved and applied"}
+        return {"message": f"Changes approved and applied"}
 
 
 @router.post("/profile-changes/{change_id}/reject")
@@ -237,15 +231,15 @@ def reject_profile_change(
             "SET status = 'rejected', reviewed_at = NOW() WHERE id = %s",
             (change_id,),
         )
-        field = change["field"]
+        changes: dict = change.get("changes") or {}
         org = dict_row(db.execute(
             "SELECT admin_user_id FROM organizations WHERE id = %s", (change["org_id"],)
         ).fetchone())
         org_admin_user_id = (org or {}).get("admin_user_id")
         if not org_admin_user_id:
             raise HTTPException(500, f"Organization has no admin user assigned (org_id={change['org_id']})")
-        label = _FIELD_LABELS.get(field, field)
-        msg = f"Your requested change to '{label}' was not approved."
+        labels = ", ".join(_FIELD_LABELS.get(f, f) for f in changes)
+        msg = f"Your requested change to '{labels}' was not approved."
         if reason:
             msg += f" Reason: {reason}"
         create_notification(
@@ -256,7 +250,7 @@ def reject_profile_change(
             message=msg,
             action_url="/org/profile",
         )
-        return {"message": f"Change to '{_FIELD_LABELS.get(field, field)}' rejected"}
+        return {"message": "Change request rejected"}
 
 
 # ── Volunteer management ────────────────────────────────────────────────────

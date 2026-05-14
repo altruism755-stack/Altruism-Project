@@ -54,7 +54,6 @@ def list_events(
             "e.duration, e.max_volunteers, e.required_skills, e.status, "
             "e.acceptance_mode, e.registration_open, e.created_at, "
             "o.name as org_name, o.student_only as org_student_only, "
-            "t.initials as org_initials, t.color as org_color, "
             "(SELECT COUNT(*) FROM event_applications ea "
             " WHERE ea.event_id = e.id AND ea.status = 'approved' AND ea.cancelled_at IS NULL"
             ") AS current_volunteers, "
@@ -64,7 +63,7 @@ def list_events(
             "  ) >= e.max_volunteers THEN TRUE ELSE FALSE END AS is_full "
             "FROM events e "
             "LEFT JOIN organizations o ON e.org_id = o.id "
-            "LEFT JOIN org_theme t ON t.org_id = o.id WHERE 1=1"
+            "WHERE 1=1"
         )
         params: list = []
 

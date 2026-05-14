@@ -162,23 +162,24 @@ def init_schema():
     """
     Create all tables, indexes, and constraints that don't yet exist.
     Safe to call on every application startup.
-    Reflects the refactored schema after migration 006.
+    Reflects the clean schema after migration 007.
     """
     conn = get_connection()
     try:
-        # ── Core tables ───────────────────────────────────────────────────────
+        # ── 1. Users ──────────────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id          SERIAL PRIMARY KEY,
-                email       TEXT UNIQUE NOT NULL,
-                password    TEXT NOT NULL,
-                role        TEXT NOT NULL CHECK (role IN (
-                                'volunteer','supervisor','org_admin','platform_admin'
-                            )),
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                id         SERIAL PRIMARY KEY,
+                email      TEXT UNIQUE NOT NULL,
+                password   TEXT NOT NULL,
+                role       TEXT NOT NULL CHECK (role IN (
+                               'volunteer','supervisor','org_admin','platform_admin'
+                           )),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
 
+        # ── 2. Organizations ──────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS organizations (
                 id               SERIAL PRIMARY KEY,
@@ -210,15 +211,33 @@ def init_schema():
             )
         """)
 
+        # ── 3. Org admins ─────────────────────────────────────────────────────
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS org_theme (
-                org_id          INTEGER PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
-                color           TEXT DEFAULT '#16A34A',
-                secondary_color TEXT DEFAULT '#22C55E',
-                initials        TEXT
+            CREATE TABLE IF NOT EXISTS org_admins (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id),
+                org_id     INTEGER NOT NULL REFERENCES organizations(id),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE (user_id, org_id)
             )
         """)
 
+        # ── 4. Supervisors ────────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS supervisors (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER UNIQUE NOT NULL REFERENCES users(id),
+                name       TEXT NOT NULL,
+                phone      TEXT,
+                team       TEXT,
+                org_id     INTEGER NOT NULL REFERENCES organizations(id),
+                status     TEXT NOT NULL DEFAULT 'pending'
+                               CHECK (status IN ('active','pending')),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # ── 5. Volunteers ─────────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS volunteers (
                 id               SERIAL PRIMARY KEY,
@@ -234,11 +253,6 @@ def init_schema():
                 profile_picture  TEXT,
                 health_notes     TEXT,
                 about_me         TEXT,
-                skills           JSONB DEFAULT '[]',
-                languages        JSONB DEFAULT '[]',
-                cause_areas      JSONB DEFAULT '[]',
-                experiences      JSONB DEFAULT '[]',
-                availability     JSONB DEFAULT '[]',
                 hours_per_week   INTEGER DEFAULT 0,
                 education_level  TEXT,
                 university_name  TEXT,
@@ -254,51 +268,76 @@ def init_schema():
             )
         """)
 
+        # ── 5a. Volunteer attribute lookup tables ─────────────────────────────
+        # These replace the JSONB array columns for a clean normalized ERD.
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS supervisors (
-                id          SERIAL PRIMARY KEY,
-                user_id     INTEGER UNIQUE NOT NULL REFERENCES users(id),
-                name        TEXT NOT NULL,
-                phone       TEXT,
-                team        TEXT,
-                org_id      INTEGER NOT NULL REFERENCES organizations(id),
-                status      TEXT NOT NULL DEFAULT 'pending'
-                                CHECK (status IN ('active','pending')),
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            CREATE TABLE IF NOT EXISTS volunteer_skills (
+                id           SERIAL PRIMARY KEY,
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+                skill        TEXT NOT NULL,
+                UNIQUE (volunteer_id, skill)
             )
         """)
 
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS volunteer_languages (
+                id           SERIAL PRIMARY KEY,
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+                language     TEXT NOT NULL,
+                UNIQUE (volunteer_id, language)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS volunteer_cause_areas (
+                id           SERIAL PRIMARY KEY,
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+                cause_area   TEXT NOT NULL,
+                UNIQUE (volunteer_id, cause_area)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS volunteer_experiences (
+                id           SERIAL PRIMARY KEY,
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+                title        TEXT NOT NULL,
+                organization TEXT,
+                description  TEXT,
+                start_date   DATE,
+                end_date     DATE
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS volunteer_availability (
+                id           SERIAL PRIMARY KEY,
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+                day_of_week  TEXT NOT NULL,
+                time_slot    TEXT NOT NULL,
+                UNIQUE (volunteer_id, day_of_week, time_slot)
+            )
+        """)
+
+        # ── 6. Org–Volunteer membership ───────────────────────────────────────
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS org_volunteers (
-                id                   SERIAL PRIMARY KEY,
-                org_id               INTEGER NOT NULL REFERENCES organizations(id),
-                volunteer_id         INTEGER NOT NULL REFERENCES volunteers(id),
-                department           TEXT,
-                status               TEXT NOT NULL DEFAULT 'pending'
-                                         CHECK (status IN ('active','pending','inactive','rejected')),
-                join_source          TEXT DEFAULT 'other',
-                joined_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                governorate_snapshot TEXT,
-                city_snapshot        TEXT,
-                channel_detail       TEXT,
-                added_by_admin_id    INTEGER REFERENCES users(id),
-                notes                TEXT,
-                approved_at          TIMESTAMPTZ,
+                id                SERIAL PRIMARY KEY,
+                org_id            INTEGER NOT NULL REFERENCES organizations(id),
+                volunteer_id      INTEGER NOT NULL REFERENCES volunteers(id),
+                department        TEXT,
+                status            TEXT NOT NULL DEFAULT 'pending'
+                                      CHECK (status IN ('active','pending','inactive','rejected')),
+                join_source       TEXT DEFAULT 'other',
+                joined_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                added_by_admin_id INTEGER REFERENCES users(id),
+                notes             TEXT,
+                approved_at       TIMESTAMPTZ,
                 UNIQUE (org_id, volunteer_id)
             )
         """)
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS org_admins (
-                id          SERIAL PRIMARY KEY,
-                user_id     INTEGER NOT NULL REFERENCES users(id),
-                org_id      INTEGER NOT NULL REFERENCES organizations(id),
-                role        TEXT NOT NULL DEFAULT 'admin',
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE (user_id, org_id)
-            )
-        """)
-
+        # ── 7. Events ─────────────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS events (
                 id                       SERIAL PRIMARY KEY,
@@ -319,23 +358,39 @@ def init_schema():
             )
         """)
 
+        # ── 8. Event applications ─────────────────────────────────────────────
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS activities (
-                id            SERIAL PRIMARY KEY,
-                volunteer_id  INTEGER NOT NULL REFERENCES volunteers(id),
-                event_id      INTEGER REFERENCES events(id),
-                org_id        INTEGER NOT NULL REFERENCES organizations(id),
-                date          DATE NOT NULL,
-                hours         REAL,
-                description   TEXT,
-                status        TEXT NOT NULL DEFAULT 'pending'
-                                  CHECK (status IN ('pending','approved','rejected','completed')),
-                reviewed_by   INTEGER REFERENCES supervisors(id),
-                reviewed_at   TIMESTAMPTZ,
-                created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            CREATE TABLE IF NOT EXISTS event_applications (
+                id                SERIAL PRIMARY KEY,
+                volunteer_id      INTEGER NOT NULL REFERENCES volunteers(id),
+                event_id          INTEGER NOT NULL REFERENCES events(id),
+                status            TEXT NOT NULL DEFAULT 'pending'
+                                      CHECK (status IN ('pending','approved','rejected','waitlisted')),
+                attendance_status TEXT CHECK (attendance_status IN ('attended','absent')),
+                created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                cancelled_at      TIMESTAMPTZ
             )
         """)
 
+        # ── 9. Activities ─────────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS activities (
+                id           SERIAL PRIMARY KEY,
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id),
+                event_id     INTEGER REFERENCES events(id),
+                org_id       INTEGER NOT NULL REFERENCES organizations(id),
+                date         DATE NOT NULL,
+                hours        REAL,
+                description  TEXT,
+                status       TEXT NOT NULL DEFAULT 'pending'
+                                 CHECK (status IN ('pending','approved','rejected','completed')),
+                reviewed_by  INTEGER REFERENCES supervisors(id),
+                reviewed_at  TIMESTAMPTZ,
+                created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # ── 10. Certificates ──────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS certificates (
                 id                SERIAL PRIMARY KEY,
@@ -351,83 +406,73 @@ def init_schema():
             )
         """)
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS event_applications (
-                id                SERIAL PRIMARY KEY,
-                volunteer_id      INTEGER NOT NULL REFERENCES volunteers(id),
-                event_id          INTEGER NOT NULL REFERENCES events(id),
-                status            TEXT NOT NULL DEFAULT 'pending'
-                                      CHECK (status IN ('pending','approved','rejected','waitlisted')),
-                attendance_status TEXT CHECK (attendance_status IN ('attended','absent')),
-                created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                cancelled_at      TIMESTAMPTZ
-            )
-        """)
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS announcements (
-                id          SERIAL PRIMARY KEY,
-                org_id      INTEGER REFERENCES organizations(id),
-                title       TEXT NOT NULL,
-                content     TEXT,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS org_profile_change_requests (
-                id            SERIAL PRIMARY KEY,
-                org_id        INTEGER NOT NULL REFERENCES organizations(id),
-                requested_by  INTEGER NOT NULL REFERENCES users(id),
-                field         TEXT NOT NULL,
-                new_value     TEXT,
-                changes       JSONB,
-                status        TEXT NOT NULL DEFAULT 'pending'
-                                  CHECK (status IN ('pending','approved','rejected')),
-                created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                reviewed_at   TIMESTAMPTZ
-            )
-        """)
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS notifications (
-                id          SERIAL PRIMARY KEY,
-                user_id     INTEGER NOT NULL REFERENCES users(id),
-                type        TEXT NOT NULL,
-                title       TEXT NOT NULL,
-                message     TEXT NOT NULL,
-                is_read     BOOLEAN NOT NULL DEFAULT FALSE,
-                action_url  TEXT,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                id           SERIAL PRIMARY KEY,
-                actor_id     INTEGER REFERENCES users(id),
-                actor_role   TEXT,
-                action       TEXT NOT NULL,
-                entity_type  TEXT,
-                entity_id    INTEGER,
-                metadata     JSONB,
-                created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
+        # ── 11. Event ratings ─────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS event_ratings (
-                id            SERIAL PRIMARY KEY,
-                event_id      INTEGER NOT NULL REFERENCES events(id),
-                volunteer_id  INTEGER NOT NULL REFERENCES volunteers(id),
-                rating        INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-                feedback      TEXT,
-                created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                id           SERIAL PRIMARY KEY,
+                event_id     INTEGER NOT NULL REFERENCES events(id),
+                volunteer_id INTEGER NOT NULL REFERENCES volunteers(id),
+                rating       INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                feedback     TEXT,
+                created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE (event_id, volunteer_id)
             )
         """)
 
-        # ── Volunteer count view (replaces cached current_volunteers column) ──
+        # ── 12. Announcements ─────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id         SERIAL PRIMARY KEY,
+                org_id     INTEGER REFERENCES organizations(id),
+                title      TEXT NOT NULL,
+                content    TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # ── 13. Notifications ─────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id),
+                type       TEXT NOT NULL,
+                title      TEXT NOT NULL,
+                message    TEXT NOT NULL,
+                is_read    BOOLEAN NOT NULL DEFAULT FALSE,
+                action_url TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # ── 14. Org profile change requests ───────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS org_profile_change_requests (
+                id           SERIAL PRIMARY KEY,
+                org_id       INTEGER NOT NULL REFERENCES organizations(id),
+                requested_by INTEGER NOT NULL REFERENCES users(id),
+                changes      JSONB NOT NULL,
+                status       TEXT NOT NULL DEFAULT 'pending'
+                                 CHECK (status IN ('pending','approved','rejected')),
+                created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                reviewed_at  TIMESTAMPTZ
+            )
+        """)
+
+        # ── 15. Audit logs ────────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id          SERIAL PRIMARY KEY,
+                actor_id    INTEGER REFERENCES users(id),
+                actor_role  TEXT,
+                action      TEXT NOT NULL,
+                entity_type TEXT,
+                entity_id   INTEGER,
+                metadata    JSONB,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # ── View: approved volunteer count per event ──────────────────────────
         conn.execute("""
             CREATE OR REPLACE VIEW event_volunteer_counts AS
             SELECT
@@ -441,37 +486,60 @@ def init_schema():
 
         # ── Indexes ───────────────────────────────────────────────────────────
         index_ddls = [
-            "CREATE INDEX IF NOT EXISTS idx_volunteers_status     ON volunteers(status)",
-            "CREATE INDEX IF NOT EXISTS idx_volunteers_user_id    ON volunteers(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_supervisors_org_id    ON supervisors(org_id)",
+            # users
+            "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
+            # organizations
+            "CREATE INDEX IF NOT EXISTS idx_organizations_status        ON organizations(status)",
             "CREATE INDEX IF NOT EXISTS idx_organizations_admin_user_id ON organizations(admin_user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_organizations_status  ON organizations(status)",
+            # org_admins
+            "CREATE INDEX IF NOT EXISTS idx_org_admins_org_id  ON org_admins(org_id)",
+            "CREATE INDEX IF NOT EXISTS idx_org_admins_user_id ON org_admins(user_id)",
+            # supervisors
+            "CREATE INDEX IF NOT EXISTS idx_supervisors_org_id ON supervisors(org_id)",
+            # volunteers
+            "CREATE INDEX IF NOT EXISTS idx_volunteers_user_id ON volunteers(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_volunteers_status  ON volunteers(status)",
+            # volunteer attributes
+            "CREATE INDEX IF NOT EXISTS idx_vol_skills_volunteer_id      ON volunteer_skills(volunteer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vol_languages_volunteer_id   ON volunteer_languages(volunteer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vol_cause_areas_volunteer_id ON volunteer_cause_areas(volunteer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vol_experiences_volunteer_id ON volunteer_experiences(volunteer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vol_availability_volunteer_id ON volunteer_availability(volunteer_id)",
+            # org_volunteers
             "CREATE INDEX IF NOT EXISTS idx_org_volunteers_volunteer_id ON org_volunteers(volunteer_id)",
             "CREATE INDEX IF NOT EXISTS idx_org_volunteers_org_status   ON org_volunteers(org_id, status)",
-            "CREATE INDEX IF NOT EXISTS idx_events_org_id              ON events(org_id)",
-            "CREATE INDEX IF NOT EXISTS idx_events_supervisor          ON events(created_by_supervisor_id)",
-            "CREATE INDEX IF NOT EXISTS idx_events_status_starts_at    ON events(status, starts_at)",
-            "CREATE INDEX IF NOT EXISTS idx_activities_volunteer_date  ON activities(volunteer_id, date DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_activities_event_id        ON activities(event_id)",
-            "CREATE INDEX IF NOT EXISTS idx_activities_org_status      ON activities(org_id, status)",
-            "CREATE INDEX IF NOT EXISTS idx_activities_reviewed_by     ON activities(reviewed_by)",
-            "CREATE INDEX IF NOT EXISTS idx_activities_vol_status_org  ON activities(volunteer_id, status, org_id)",
-            "CREATE INDEX IF NOT EXISTS idx_certificates_volunteer_id  ON certificates(volunteer_id)",
-            "CREATE INDEX IF NOT EXISTS idx_certificates_org_id        ON certificates(org_id)",
-            "CREATE INDEX IF NOT EXISTS idx_certificates_event_id      ON certificates(event_id)",
+            # events
+            "CREATE INDEX IF NOT EXISTS idx_events_org_id           ON events(org_id)",
+            "CREATE INDEX IF NOT EXISTS idx_events_supervisor        ON events(created_by_supervisor_id)",
+            "CREATE INDEX IF NOT EXISTS idx_events_status_starts_at  ON events(status, starts_at)",
+            # event_applications
             "CREATE INDEX IF NOT EXISTS idx_event_applications_volunteer    ON event_applications(volunteer_id)",
             "CREATE INDEX IF NOT EXISTS idx_event_applications_event_status ON event_applications(event_id, status)",
             "CREATE INDEX IF NOT EXISTS idx_event_applications_waitlist     ON event_applications(event_id, status, created_at)",
             "CREATE INDEX IF NOT EXISTS idx_event_applications_attendance   ON event_applications(event_id, attendance_status) WHERE cancelled_at IS NULL",
+            # activities
+            "CREATE INDEX IF NOT EXISTS idx_activities_volunteer_date ON activities(volunteer_id, date DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_activities_event_id       ON activities(event_id)",
+            "CREATE INDEX IF NOT EXISTS idx_activities_org_status     ON activities(org_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_activities_reviewed_by    ON activities(reviewed_by)",
+            "CREATE INDEX IF NOT EXISTS idx_activities_vol_status_org ON activities(volunteer_id, status, org_id)",
+            # certificates
+            "CREATE INDEX IF NOT EXISTS idx_certificates_volunteer_id ON certificates(volunteer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_certificates_org_id       ON certificates(org_id)",
+            "CREATE INDEX IF NOT EXISTS idx_certificates_event_id     ON certificates(event_id)",
+            # event_ratings
+            "CREATE INDEX IF NOT EXISTS idx_event_ratings_event_id ON event_ratings(event_id)",
+            # announcements
             "CREATE INDEX IF NOT EXISTS idx_announcements_org_created ON announcements(org_id, created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_org_admins_org_id ON org_admins(org_id)",
-            "CREATE INDEX IF NOT EXISTS idx_org_profile_change_requests_status ON org_profile_change_requests(status, created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_org_profile_change_requests_org_id ON org_profile_change_requests(org_id)",
+            # notifications
             "CREATE INDEX IF NOT EXISTS idx_notifications_user_id   ON notifications(user_id)",
             "CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at DESC)",
+            # org_profile_change_requests
+            "CREATE INDEX IF NOT EXISTS idx_org_change_requests_org_id ON org_profile_change_requests(org_id)",
+            "CREATE INDEX IF NOT EXISTS idx_org_change_requests_status ON org_profile_change_requests(status, created_at DESC)",
+            # audit_logs
             "CREATE INDEX IF NOT EXISTS idx_audit_logs_actor  ON audit_logs(actor_id, created_at DESC)",
             "CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id, created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_event_ratings_event_id ON event_ratings(event_id)",
         ]
         for ddl in index_ddls:
             conn.execute(ddl)

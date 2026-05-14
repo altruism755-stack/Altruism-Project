@@ -116,9 +116,8 @@ def get_my_profile(current_user: dict = Depends(require_roles("supervisor"))):
         if not sup:
             raise HTTPException(404, "Supervisor profile not found")
         org = dict_row(db.execute(
-            "SELECT o.id, o.name, o.description, o.categories, o.tracks_hours, "
-            "t.color, t.initials FROM organizations o "
-            "LEFT JOIN org_theme t ON t.org_id = o.id WHERE o.id = %s",
+            "SELECT o.id, o.name, o.description, o.categories, o.tracks_hours "
+            "FROM organizations o WHERE o.id = %s",
             (sup["org_id"],),
         ).fetchone())
         return {"supervisor": sup, "organization": org}

@@ -174,26 +174,15 @@ def register(request: Request, body: RegisterBody):
                     body.additionalNotes or "",
                 ),
             )
-            # Store UI theme separately
-            new_org = dict_row(db.execute(
-                "SELECT id FROM organizations WHERE admin_user_id = %s ORDER BY created_at DESC LIMIT 1",
-                (user_id,),
-            ).fetchone())
-            if new_org:
-                db.execute(
-                    "INSERT INTO org_theme (org_id, initials) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                    (new_org["id"], initials),
-                )
             org = dict_row(db.execute(
-                "SELECT o.*, t.color, t.secondary_color, t.initials FROM organizations o "
-                "LEFT JOIN org_theme t ON t.org_id = o.id WHERE o.admin_user_id = %s",
+                "SELECT * FROM organizations WHERE admin_user_id = %s ORDER BY created_at DESC LIMIT 1",
                 (user_id,),
             ).fetchone())
             # Invariant: creator is always an org admin from day one.
             # ON CONFLICT DO NOTHING is safe against the UNIQUE(user_id, org_id) constraint.
             if org:
                 db.execute(
-                    "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, 'creator') ON CONFLICT DO NOTHING",
+                    "INSERT INTO org_admins (user_id, org_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                     (user_id, org["id"]),
                 )
             token = generate_token({"id": user_id, "email": body.email, "role": "org_admin"})

@@ -1,15 +1,12 @@
 """Seed the database with realistic demo data.
 
-Schema: post-006_schema_refactor migration.
+Schema: post-007_clean_schema migration.
 - volunteers.email dropped  → email lives only in users
 - supervisors.email dropped → email lives only in users
-- org_volunteers.joined_date/is_active/source dropped → joined_at, status
+- org_theme table removed entirely
+- org_admins.role column removed
+- org_volunteers: supervisor_id, channel_detail, governorate_snapshot, city_snapshot dropped
 - events.date + events.time merged → events.starts_at TIMESTAMPTZ
-- event_applications.org_id dropped → derivable via events
-- event_applications.applied_date → created_at
-- platform_admins table dropped → users.role = 'platform_admin'
-- organizations: category/color/secondary_color/initials/founded/location dropped
-  → org_theme table; categories JSONB; hq_city
 - status values all lowercase
 - certificate.type lowercase
 """
@@ -35,11 +32,12 @@ def seed():
 
         for table in [
             "notifications", "org_profile_change_requests",
-            "event_applications", "announcements",
+            "event_ratings", "event_applications", "announcements",
             "certificates", "activities", "org_volunteers",
+            "volunteer_availability", "volunteer_experiences",
+            "volunteer_cause_areas", "volunteer_languages", "volunteer_skills",
             "events", "supervisors", "volunteers",
-            "org_admins", "org_theme",
-            "organizations", "users",
+            "org_admins", "organizations", "users",
         ]:
             try:
                 db.execute(f"DELETE FROM {table}")
@@ -124,26 +122,15 @@ def seed():
             json.dumps(["Student Entrepreneurship", "Education", "Sustainability", "Innovation"]),
         ))
 
-        # ──────────── ORG THEME ────────────
-        org_themes = [
-            (1, "RS", "#D97706", "#F59E0B"),
-            (2, "RC", "#DC2626", "#EF4444"),
-            (3, "EN", "#0891B2", "#06B6D4"),
-        ]
-        _executemany(db,
-            "INSERT INTO org_theme (org_id, initials, color, secondary_color) VALUES (%s, %s, %s, %s)",
-            org_themes,
-        )
-
         # ──────────── ORG ADMINS ────────────
         org_admins = [
-            (1, 1, "creator"),
-            (2, 1, "admin"),
-            (3, 2, "creator"),
-            (4, 3, "creator"),
+            (1, 1),
+            (1, 2),
+            (2, 1),
+            (4, 3),
         ]
         _executemany(db,
-            "INSERT INTO org_admins (user_id, org_id, role) VALUES (%s, %s, %s)",
+            "INSERT INTO org_admins (user_id, org_id) VALUES (%s, %s)",
             org_admins,
         )
 
@@ -311,34 +298,85 @@ def seed():
             volunteers,
         )
 
+        # ──────────── VOLUNTEER SKILLS ────────────
+        vol_skills = [
+            (1, "Community Outreach"), (1, "Event Planning"), (1, "Photography & Videography"),
+            (2, "Administrative Support"), (2, "Event Planning"), (2, "Community Outreach"),
+            (3, "Photography & Videography"), (3, "Social Media Management"), (3, "Graphic Design"),
+            (4, "Software Development"), (4, "Administrative Support"),
+            (5, "Administrative Support"), (5, "Fundraising"),
+            (6, "Administrative Support"), (6, "Event Planning"), (6, "Environmental Work"),
+            (7, "Administrative Support"), (7, "Community Outreach"),
+            (8, "Graphic Design"), (8, "Social Media Management"),
+            (9, "Teaching / Tutoring"), (9, "Community Outreach"),
+            (10, "Medical / First Aid"), (10, "Community Outreach"),
+            (11, "Community Outreach"), (11, "Event Planning"), (11, "Fundraising"),
+            (12, "Translation"), (12, "Administrative Support"),
+        ]
+        _executemany(db,
+            "INSERT INTO volunteer_skills (volunteer_id, skill) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            vol_skills,
+        )
+
+        # ──────────── VOLUNTEER LANGUAGES ────────────
+        vol_langs = [
+            (1, "Arabic"), (1, "English"),
+            (2, "Arabic"), (2, "English"),
+            (3, "Arabic"), (3, "English"),
+            (4, "Arabic"), (4, "English"), (4, "French"),
+            (5, "Arabic"), (5, "English"),
+            (6, "Arabic"), (6, "English"),
+            (7, "Arabic"), (7, "English"),
+            (8, "Arabic"), (8, "English"),
+            (9, "Arabic"), (9, "English"),
+            (10, "Arabic"), (10, "English"),
+            (11, "Arabic"), (11, "English"),
+            (12, "Arabic"), (12, "English"), (12, "French"),
+        ]
+        _executemany(db,
+            "INSERT INTO volunteer_languages (volunteer_id, language) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            vol_langs,
+        )
+
+        # ──────────── VOLUNTEER CAUSE AREAS ────────────
+        all_causes = [
+            "Social & Humanitarian", "Children & Youth", "Education & Skills",
+            "Health & Emergency", "Environment",
+        ]
+        vol_causes = [(vid, cause) for vid in range(1, 13) for cause in all_causes]
+        _executemany(db,
+            "INSERT INTO volunteer_cause_areas (volunteer_id, cause_area) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            vol_causes,
+        )
+
         # ──────────── ORG-VOLUNTEER MEMBERSHIPS ────────────
-        # Columns: org_id, volunteer_id, supervisor_id, department, status, joined_at, join_source, channel_detail
+        # Columns: org_id, volunteer_id, department, status, joined_at, join_source
         org_vols = [
-            # Resala (sup 1, 2)
-            (1, 1,  1, "Programs",  "active",  "2025-09-01", "self_registration", "website"),
-            (1, 2,  1, "HR",        "active",  "2025-10-15", "self_registration", "referral"),
-            (1, 3,  2, "Media",     "active",  "2025-11-01", "self_registration", "campaign"),
-            (1, 4,  2, "IT",        "active",  "2026-01-20", "manual_import",     "website"),
-            (1, 5,  1, "Finance",   "active",  "2025-08-10", "self_registration", "referral"),
-            (1, 8,  2, "Media",     "active",  "2026-02-05", "self_registration", "website"),
-            (1, 11, 1, "Programs",  "pending", "2026-04-01", "self_registration", "campaign"),
-            # Red Crescent (sup 3, 4)
-            (2, 1,  3, "Outreach",  "active",  "2025-09-20", "self_registration", "referral"),
-            (2, 6,  3, "Logistics", "active",  "2025-12-01", "manual_import",     "website"),
-            (2, 7,  3, "Field",     "active",  "2026-01-05", "self_registration", "campaign"),
-            (2, 10, 4, "Medical",   "active",  "2026-03-01", "self_registration", "website"),
-            (2, 9,  4, "Outreach",  "active",  "2026-02-10", "self_registration", "referral"),
-            (2, 12, 4, "Translation","pending","2026-04-05", "self_registration", "website"),
-            # Enactus (sup 5, 6)
-            (3, 4,  6, "Tech",        "active",  "2026-01-15", "self_registration", "campaign"),
-            (3, 10, 5, "Health",      "active",  "2026-03-10", "self_registration", "website"),
-            (3, 11, 5, "Mentorship",  "active",  "2026-02-12", "self_registration", "referral"),
-            (3, 12, 6, "Translation", "active",  "2026-03-08", "self_registration", "campaign"),
+            # Resala
+            (1, 1,  "Programs",   "active",  "2025-09-01", "self_registration"),
+            (1, 2,  "HR",         "active",  "2025-10-15", "self_registration"),
+            (1, 3,  "Media",      "active",  "2025-11-01", "self_registration"),
+            (1, 4,  "IT",         "active",  "2026-01-20", "manual_import"),
+            (1, 5,  "Finance",    "active",  "2025-08-10", "self_registration"),
+            (1, 8,  "Media",      "active",  "2026-02-05", "self_registration"),
+            (1, 11, "Programs",   "pending", "2026-04-01", "self_registration"),
+            # Red Crescent
+            (2, 1,  "Outreach",   "active",  "2025-09-20", "self_registration"),
+            (2, 6,  "Logistics",  "active",  "2025-12-01", "manual_import"),
+            (2, 7,  "Field",      "active",  "2026-01-05", "self_registration"),
+            (2, 10, "Medical",    "active",  "2026-03-01", "self_registration"),
+            (2, 9,  "Outreach",   "active",  "2026-02-10", "self_registration"),
+            (2, 12, "Translation","pending", "2026-04-05", "self_registration"),
+            # Enactus
+            (3, 4,  "Tech",        "active",  "2026-01-15", "self_registration"),
+            (3, 10, "Health",      "active",  "2026-03-10", "self_registration"),
+            (3, 11, "Mentorship",  "active",  "2026-02-12", "self_registration"),
+            (3, 12, "Translation", "active",  "2026-03-08", "self_registration"),
         ]
         _executemany(db,
             "INSERT INTO org_volunteers "
-            "(org_id, volunteer_id, supervisor_id, department, status, joined_at, join_source, channel_detail) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            "(org_id, volunteer_id, department, status, joined_at, join_source) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
             org_vols,
         )
 

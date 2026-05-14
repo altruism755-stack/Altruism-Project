@@ -329,12 +329,12 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     COALESCE(ov.department, '')                                      AS department,
                     ov.status                                                        AS membership_status,
                     ov.join_source,
-                    COALESCE(ov.channel_detail, '')                                  AS channel_detail,
                     COALESCE(ov.joined_at::text, '')                                 AS joined_at,
-                    COALESCE(ov.governorate_snapshot, '')                            AS governorate_at_join,
-                    COALESCE(ov.city_snapshot, '')                                   AS city_at_join,
+                    COALESCE(v.governorate, '')                                      AS governorate_at_join,
+                    COALESCE(v.city, '')                                             AS city_at_join,
                     CASE WHEN ov.status = 'active' THEN 1 ELSE 0 END                AS is_active
                 FROM org_volunteers ov
+                JOIN volunteers v ON v.id = ov.volunteer_id
                 WHERE ov.org_id = %s
             """, (oid,)).fetchall()
             zf.writestr("dim_volunteer_org_membership.csv", _to_csv(rows))
