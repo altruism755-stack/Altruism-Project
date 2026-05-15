@@ -286,7 +286,7 @@ def update_my_event(event_id: int, body: dict, current_user: dict = Depends(requ
 
 @router.get("/me/applications")
 def get_my_applications(
-    status: str = Query(default="Pending"),
+    status: str = Query(default="pending"),
     current_user: dict = Depends(require_roles("supervisor")),
 ):
     """Pending/all applications for events created by this supervisor."""
@@ -347,9 +347,9 @@ def approve_my_application(app_id: int, current_user: dict = Depends(require_rol
             raise HTTPException(404, "Application not found")
         if app["created_by_supervisor_id"] != sup["id"]:
             raise HTTPException(403, "You can only approve applications for events you manage")
-        if app["status"] == "Approved":
+        if app["status"] == "approved":
             raise HTTPException(400, "Application is already approved")
-        if app.get("event_status") != "Upcoming":
+        if app.get("event_status") != "upcoming":
             raise HTTPException(409, "Can only approve applications for upcoming events")
 
         capacity = app.get("max_volunteers") or 0
@@ -395,7 +395,7 @@ def reject_my_application(app_id: int, current_user: dict = Depends(require_role
             raise HTTPException(404, "Application not found")
         if app["created_by_supervisor_id"] != sup["id"]:
             raise HTTPException(403, "You can only reject applications for events you manage")
-        if app["status"] == "Rejected":
+        if app["status"] == "rejected":
             raise HTTPException(400, "Application is already rejected")
 
         db.execute("UPDATE event_applications SET status = 'rejected' WHERE id = %s", (app_id,))
@@ -454,13 +454,13 @@ def bulk_update_applications(body: dict, current_user: dict = Depends(require_ro
             if app["created_by_supervisor_id"] != sup["id"]:
                 raise HTTPException(403, f"Application {app['id']}: you can only manage applications for events you own")
             if action == "approve":
-                if app["status"] == "Approved":
+                if app["status"] == "approved":
                     raise HTTPException(400, f"Application {app['id']} is already approved")
-                if app.get("event_status") != "Upcoming":
-                    raise HTTPException(409, f"Application {app['id']}: can only approve for Upcoming events")
+                if app.get("event_status") != "upcoming":
+                    raise HTTPException(409, f"Application {app['id']}: can only approve for upcoming events")
                 event_approve_counts[app["event_id"]] = event_approve_counts.get(app["event_id"], 0) + 1
             else:
-                if app["status"] == "Rejected":
+                if app["status"] == "rejected":
                     raise HTTPException(400, f"Application {app['id']} is already rejected")
 
         # Capacity check per event.
@@ -476,7 +476,7 @@ def bulk_update_applications(body: dict, current_user: dict = Depends(require_ro
                         raise HTTPException(409, f"Event {event_id}: approving {batch_count} would exceed capacity ({current_approved}/{capacity})")
 
         # All checks passed — apply atomically.
-        new_status = "Approved" if action == "approve" else "Rejected"
+        new_status = "approved" if action == "approve" else "rejected"
         db.execute(
             "UPDATE event_applications SET status = %s WHERE id = ANY(%s)",
             (new_status, app_ids),
@@ -507,7 +507,7 @@ def bulk_update_applications(body: dict, current_user: dict = Depends(require_ro
 
 @router.get("/me/activities")
 def get_my_activities(
-    status: str = Query(default="Pending"),
+    status: str = Query(default="pending"),
     current_user: dict = Depends(require_roles("supervisor")),
 ):
     """Activity logs for events owned by this supervisor."""

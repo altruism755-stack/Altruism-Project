@@ -434,10 +434,10 @@ def bulk_mark_attendance(
                     pass
             if hours is None:
                 raise HTTPException(400, "hours is required (or set an event duration to use as default)")
-            act_status = "Pending"
+            act_status = "pending"
         else:
             hours = None
-            act_status = "Completed"
+            act_status = "completed"
 
         eligible_rows = db.execute(
             """

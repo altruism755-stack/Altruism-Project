@@ -190,7 +190,7 @@ def log_activity(body: dict, current_user: dict = Depends(require_roles("supervi
                 status = "pending"
         else:
             hours = None
-            status = "Completed"
+            status = "completed"
 
         existing_act = dict_row(db.execute(
             "SELECT id FROM activities WHERE volunteer_id = %s AND event_id = %s",

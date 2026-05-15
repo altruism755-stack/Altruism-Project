@@ -218,9 +218,9 @@ def export_star_schema(current_user: dict = Depends(require_roles("org_admin")))
                     COALESCE(v.date_of_birth::text, '')                              AS date_of_birth,
                     CASE
                         WHEN v.date_of_birth IS NULL THEN ''
-                        WHEN EXTRACT(YEAR FROM AGE(v.date_of_birth)) < 18 THEN '<18'
-                        WHEN EXTRACT(YEAR FROM AGE(v.date_of_birth)) < 25 THEN '18-24'
-                        WHEN EXTRACT(YEAR FROM AGE(v.date_of_birth)) < 35 THEN '25-34'
+                        WHEN EXTRACT(YEAR FROM AGE(v.date_of_birth::date)) < 18 THEN '<18'
+                        WHEN EXTRACT(YEAR FROM AGE(v.date_of_birth::date)) < 25 THEN '18-24'
+                        WHEN EXTRACT(YEAR FROM AGE(v.date_of_birth::date)) < 35 THEN '25-34'
                         ELSE '35+'
                     END                                                              AS age_band,
                     COALESCE(v.city, '')                                             AS city,

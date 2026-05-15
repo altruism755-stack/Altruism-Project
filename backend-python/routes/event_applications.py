@@ -144,8 +144,8 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
         if not event:
             raise HTTPException(404, "Event not found")
 
-        # Applications only allowed when event is Upcoming and registration is open.
-        if event.get("status") != "Upcoming":
+        # Applications only allowed when event is upcoming and registration is open.
+        if event.get("status") != "upcoming":
             raise HTTPException(409, "Applications are only accepted for upcoming events")
         if not event.get("registration_open", True):
             raise HTTPException(409, "Registration for this event is currently closed")
@@ -279,8 +279,8 @@ def apply_to_event(body: dict, current_user: dict = Depends(require_roles("volun
                     )
 
             if is_full:
-                return {"message": "Event is full — added to waitlist for manual review", "status": "Waitlisted", "auto_accepted": False}
-            return {"message": "Application submitted", "status": "Pending", "auto_accepted": False}
+                return {"message": "Event is full — added to waitlist for manual review", "status": "waitlisted", "auto_accepted": False}
+            return {"message": "Application submitted", "status": "pending", "auto_accepted": False}
 
 
 @router.delete("/{app_id}")
@@ -309,11 +309,11 @@ def cancel_application(app_id: int, current_user: dict = Depends(require_roles("
         if app["volunteer_id"] != vol["id"]:
             raise HTTPException(403, "You can only cancel your own applications")
 
-        # Prevent cancellation if the event is already Active or Completed.
-        if app.get("event_status") in ("Active", "Completed"):
+        # Prevent cancellation if the event is already active or completed.
+        if app.get("event_status") in ("active", "completed"):
             raise HTTPException(409, "Cannot cancel an application for an event that is already active or completed")
 
-        was_approved = app["status"] == "Approved"
+        was_approved = app["status"] == "approved"
         event_id = app["event_id"]
 
         db.execute(
@@ -424,7 +424,7 @@ def approve_application(app_id: int, current_user: dict = Depends(require_roles(
         ).fetchone())
         if not app:
             raise HTTPException(404, "Application not found")
-        if app["status"] == "Approved":
+        if app["status"] == "approved":
             raise HTTPException(400, "Application is already approved")
 
         # Scope check.
@@ -439,8 +439,8 @@ def approve_application(app_id: int, current_user: dict = Depends(require_roles(
             if org["id"] != app["event_org_id"]:
                 raise HTTPException(403, FORBIDDEN)
 
-        # Only approve for Upcoming events.
-        if app.get("event_status") != "Upcoming":
+        # Only approve for upcoming events.
+        if app.get("event_status") != "upcoming":
             raise HTTPException(409, "Can only approve applications for upcoming events")
 
         # Enforce capacity inside the exclusive lock.
@@ -508,9 +508,9 @@ def promote_waitlisted(app_id: int, current_user: dict = Depends(require_roles("
                 409,
                 "This event uses automatic acceptance. Waitlist promotion is handled automatically.",
             )
-        if app["status"] != "Waitlisted":
-            raise HTTPException(400, f"Application is '{app['status']}', not Waitlisted")
-        if app["event_status"] != "Upcoming":
+        if app["status"] != "waitlisted":
+            raise HTTPException(400, f"Application is '{app['status']}', not waitlisted")
+        if app["event_status"] != "upcoming":
             raise HTTPException(409, "Can only promote waitlisted volunteers for upcoming events")
 
         db.execute("UPDATE event_applications SET status = 'pending' WHERE id = %s", (app_id,))
@@ -546,7 +546,7 @@ def reject_application(app_id: int, current_user: dict = Depends(require_roles("
         ).fetchone())
         if not app:
             raise HTTPException(404, "Application not found")
-        if app["status"] == "Rejected":
+        if app["status"] == "rejected":
             raise HTTPException(400, "Application is already rejected")
 
         # Scope check.
@@ -664,7 +664,7 @@ def mark_attendance(
         # All attendance marking auto-approves the activity immediately.
         # Hours-based orgs: Approved (hours logged and confirmed by supervisor action).
         # Participation-only orgs: Completed (no hours to approve).
-        act_status = "Approved" if tracks_hours else "Completed"
+        act_status = "approved" if tracks_hours else "completed"
 
         updated = 0
         for rec in records:
@@ -696,7 +696,7 @@ def mark_attendance(
                 continue
             updated += 1
 
-            if att_status == "Attended":
+            if att_status == "attended":
                 # Upsert the derived participation/hours record.
                 db.execute(
                     """

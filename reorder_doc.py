@@ -110,13 +110,21 @@ for c in children:
         break
 
 # ── 3. Swap body sections: List of Figures before List of Tables ──────────────
+# All three searches must match Heading1 to avoid hitting plain-text TOC entries.
+def is_h1(c):
+    pPr = c.find(qn('w:pPr'))
+    if pPr is None:
+        return False
+    ps = pPr.find(qn('w:pStyle'))
+    return ps is not None and ps.get(qn('w:val'), '') == 'Heading1'
+
 children = list(body)
 idx_bt = next(i for i, c in enumerate(children)
-              if c.tag == qn('w:p') and ptxt(c).strip() == 'List of Tables')
+              if c.tag == qn('w:p') and is_h1(c) and ptxt(c).strip() == 'List of Tables')
 idx_bf = next(i for i, c in enumerate(children)
-              if c.tag == qn('w:p') and ptxt(c).strip() == 'List of Figures')
+              if c.tag == qn('w:p') and is_h1(c) and ptxt(c).strip() == 'List of Figures')
 idx_ba = next(i for i, c in enumerate(children)
-              if c.tag == qn('w:p') and 'List of Abbreviations' in ptxt(c))
+              if c.tag == qn('w:p') and is_h1(c) and 'List of Abbreviations' in ptxt(c))
 
 tables_sec  = [deepcopy(c) for c in children[idx_bt:idx_bf]]
 figures_sec = [deepcopy(c) for c in children[idx_bf:idx_ba]]
