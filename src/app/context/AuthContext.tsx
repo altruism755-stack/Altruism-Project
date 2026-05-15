@@ -164,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshOrgStatus = async (): Promise<"pending" | "approved" | "rejected" | null> => {
-    const currentToken = localStorage.getItem("altruism_token");
+    const currentToken = localStorage.getItem("altruism_token") || sessionStorage.getItem("altruism_token");
     if (!currentToken || currentToken.startsWith("demo-")) return orgStatus;
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
@@ -190,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("altruism_token");
     localStorage.removeItem("altruism_profile");
     localStorage.removeItem("altruism_org_status");
+    sessionStorage.removeItem("altruism_token");
   };
 
   return (

@@ -335,7 +335,7 @@ export function VolunteerOrgDashboard() {
                         </div>
 
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 13, color: "#64748B", marginBottom: 8 }}>
-                          <span>📅 {formatDate(evt.date)}</span>
+                          <span>📅 {formatDate(evt.starts_at || evt.date)}</span>
                           {evt.time && <span>🕐 {formatTime(evt.time)}{evt.duration ? ` · ${evt.duration}h` : ""}</span>}
                           {evt.location && <span>📍 {evt.location}</span>}
                         </div>

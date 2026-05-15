@@ -92,7 +92,7 @@ export function OrgPendingPage() {
             {/* CTAs */}
             <div className="flex flex-col gap-3" style={{ alignItems: "stretch" }}>
               <a
-                href="mailto:support@altruism.org"
+                href="mailto:support@altruism.app"
                 style={{
                   height: 42, backgroundColor: GREEN, color: "#fff",
                   border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600,
@@ -177,7 +177,6 @@ export function OrgPendingPage() {
               <li>Platform admins verify your organization details and documents</li>
               <li>Once approved, you can log in and access your full dashboard</li>
               <li>You'll be able to manage volunteers, supervisors, and activities</li>
-              <li>Optionally import existing data via CSV upload</li>
             </ul>
           </div>
 
@@ -194,7 +193,7 @@ export function OrgPendingPage() {
               ← Back
             </button>
             <a
-              href="mailto:support@altruism.org"
+              href="mailto:support@altruism.app"
               style={{
                 height: 40, padding: "0 20px", backgroundColor: "transparent",
                 color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 8,

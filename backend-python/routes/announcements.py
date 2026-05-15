@@ -28,12 +28,16 @@ def _resolve_org_for_admin(db, user_id: int) -> dict:
 
 @router.get("")
 def list_announcements(
-    org_ids: Optional[str] = Query(None),
+    org_ids: Optional[list[str]] = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
     with get_db() as db:
         if org_ids:
-            ids = [int(i) for i in org_ids.split(",") if i.strip().isdigit()]
+            # Support both multi-value (?org_ids=1&org_ids=2) and legacy comma-joined (?org_ids=1,2)
+            raw: list[str] = []
+            for item in org_ids:
+                raw.extend(item.split(","))
+            ids = [int(i) for i in raw if i.strip().isdigit()]
             if not ids:
                 return {"announcements": []}
             placeholders = ",".join(["%s"] * len(ids))

@@ -77,7 +77,7 @@ export function NewsFeed() {
 
   // Merge events and announcements into a combined feed sorted by date
   const feedItems: any[] = [];
-  upcomingEvents.forEach((e) => feedItems.push({ ...e, _type: "event", _sortDate: e.date }));
+  upcomingEvents.forEach((e) => feedItems.push({ ...e, _type: "event", _sortDate: e.starts_at || e.date }));
   announcements.forEach((a) => feedItems.push({ ...a, _type: "announcement", _sortDate: a.created_at }));
   feedItems.sort((a, b) => (b._sortDate || "").localeCompare(a._sortDate || ""));
 
@@ -160,7 +160,7 @@ export function NewsFeed() {
                           <div style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", marginBottom: 6 }}>{item.name}</div>
                           {item.description && <div style={{ fontSize: 13, color: "#64748B", marginBottom: 8, lineHeight: 1.5 }}>{item.description}</div>}
                           <div className="flex items-center gap-4 flex-wrap" style={{ fontSize: 12, color: "#94A3B8" }}>
-                            <span>{item.date}</span>
+                            <span>{(item.starts_at || item.date || "").slice(0, 10)}</span>
                             {item.time && <span>{item.time}</span>}
                             {item.location && <span>{item.location}</span>}
                             {item.duration && <span>{item.duration} hrs</span>}

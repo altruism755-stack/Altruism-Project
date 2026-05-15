@@ -190,10 +190,10 @@ export function LandingPage() {
       <section style={{ background: "linear-gradient(160deg, #0F172A 0%, #0D2818 60%, #0F172A 100%)", padding: "96px 32px" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto" }}>
           <div className="text-center" style={{ marginBottom: 48 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Potential Use Cases</div>
-            <h2 style={{ fontSize: 36, fontWeight: 800, color: C.white, letterSpacing: "-0.02em" }}>Organizations Similar to Our Target Users</h2>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>For Organizations</div>
+            <h2 style={{ fontSize: 36, fontWeight: 800, color: C.white, letterSpacing: "-0.02em" }}>Trusted by organizations like these</h2>
             <p style={{ fontSize: 16, color: C.gray400, maxWidth: 480, margin: "16px auto 0", lineHeight: 1.6 }}>
-              These are examples of organizations that could use Altruism to manage volunteers.
+              From humanitarian aid to student activities — Altruism adapts to how your organization works.
             </p>
           </div>
 
@@ -287,10 +287,7 @@ export function LandingPage() {
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.white, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Contact</div>
                 <div style={{ marginBottom: 10 }}>
-                  <a href="mailto:altruism755@gmail.com" style={{ fontSize: 13, color: C.gray500, textDecoration: "none" }}>altruism755@gmail.com</a>
-                </div>
-                <div>
-                  <a href="tel:01208212210" style={{ fontSize: 13, color: C.gray500, textDecoration: "none" }}>01208212210</a>
+                  <a href="mailto:support@altruism.app" style={{ fontSize: 13, color: C.gray500, textDecoration: "none" }}>support@altruism.app</a>
                 </div>
               </div>
             </div>

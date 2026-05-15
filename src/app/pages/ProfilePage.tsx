@@ -611,7 +611,7 @@ export function ProfilePage() {
 
             {/* Calendar */}
             <CalendarWidget events={upcomingEvents.map((e: any) => ({
-                date: e.date,
+                date: (e.starts_at || e.date || "").slice(0, 10),
                 name: e.name,
                 time: e.time,
                 location: e.location,

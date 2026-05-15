@@ -147,7 +147,7 @@ export function LoginPage() {
                 <input type="checkbox" id="rememberMe" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: GREEN }} />
                 <label htmlFor="rememberMe" style={{ fontSize: 14, color: "#64748B", cursor: "pointer" }}>Remember me</label>
               </div>
-              <a href="#" style={{ fontSize: 14, color: "#2563EB", textDecoration: "none" }}>Forgot password?</a>
+              <span style={{ fontSize: 14, color: "#94A3B8", cursor: "default" }}>Forgot password?</span>
             </div>
 
             <button type="submit" disabled={isLoading} style={{ width: "100%", height: 42, backgroundColor: GREEN, color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: isLoading ? "wait" : "pointer", opacity: isLoading ? 0.7 : 1 }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = GREEN_HOVER)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = GREEN)}>

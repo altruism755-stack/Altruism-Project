@@ -649,7 +649,7 @@ function EventCard({ event: e, onViewActivities, isOwned, onOpen }: { event: any
             )}
           </div>
           <div style={{ fontSize: 13, color: "#64748B" }}>
-            {e.date}{e.time ? ` · ${fmt12h(e.time)}` : ""}
+            {(e.starts_at || e.date || "").slice(0, 10)}{e.time ? ` · ${fmt12h(e.time)}` : ""}
             {e.location ? ` · 📍 ${e.location}` : ""}
             {e.duration ? ` · ${e.duration} hrs` : ""}
           </div>

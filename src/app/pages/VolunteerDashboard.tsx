@@ -65,7 +65,7 @@ export function VolunteerDashboard() {
         const orgIdSet = new Set(activeOrgIds);
         const newEvents = (evtRes.events || [])
           .filter((e: any) => orgIdSet.has(e.org_id))
-          .map((e: any) => ({ ...e, _kind: "event", _sortKey: e.date || "" }));
+          .map((e: any) => ({ ...e, _kind: "event", _sortKey: e.starts_at || e.date || "" }));
 
         const annRes = await api.getAnnouncements(activeOrgIds).catch(() => ({ announcements: [] }));
         const newAnns = (annRes.announcements || [])
@@ -214,7 +214,7 @@ export function VolunteerDashboard() {
                     <span style={{ fontSize: 12, color: "#94A3B8" }}>{item.org_name}</span>
                   </div>
                   <span style={{ flexShrink: 0, fontSize: 12, color: "#94A3B8" }}>
-                    {relativeDate(item._kind === "event" ? item.date : item.created_at)}
+                    {relativeDate(item._kind === "event" ? (item.starts_at || item.date) : item.created_at)}
                   </span>
                 </div>
               ))}
@@ -286,7 +286,7 @@ export function VolunteerDashboard() {
               ) : (
                 upcomingEvents.map((e: any, idx: number) => (
                   <div key={e.id} className="flex items-center gap-3 py-3" style={{ borderBottom: idx < upcomingEvents.length - 1 ? "1px solid #F1F5F9" : "none" }}>
-                    <span style={{ backgroundColor: "#DCFCE7", color: "#15803D", fontSize: 11, fontWeight: 600, borderRadius: 6, padding: "2px 8px", whiteSpace: "nowrap" }}>{e.date}</span>
+                    <span style={{ backgroundColor: "#DCFCE7", color: "#15803D", fontSize: 11, fontWeight: 600, borderRadius: 6, padding: "2px 8px", whiteSpace: "nowrap" }}>{(e.starts_at || e.date || "").slice(0, 10)}</span>
                     <span style={{ fontSize: 14, color: "#1E293B" }}>{e.name}</span>
                   </div>
                 ))

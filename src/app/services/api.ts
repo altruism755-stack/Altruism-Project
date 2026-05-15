@@ -16,7 +16,7 @@ interface RequestOptions extends RequestInit {
 const MAX_RETRIES = 3;
 
 function getToken(): string | null {
-  return localStorage.getItem("altruism_token");
+  return localStorage.getItem("altruism_token") || sessionStorage.getItem("altruism_token");
 }
 
 function isRetryable(method: string, opts: RequestOptions): boolean {
@@ -96,11 +96,12 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
 async function parseResponse(res: Response): Promise<any> {
   if (!res.ok) {
     if (res.status === 401) {
-      // Expired or invalid token — clear persisted session and force a clean login.
+      // Expired or invalid token — clear both storage locations and force a clean login.
       localStorage.removeItem("altruism_token");
       localStorage.removeItem("altruism_user");
       localStorage.removeItem("altruism_profile");
       localStorage.removeItem("altruism_org_status");
+      sessionStorage.removeItem("altruism_token");
       window.location.href = "/login";
     }
     const body = await res.json().catch(() => ({}));

@@ -509,7 +509,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
 
   const openEdit = (ev: any) => {
     setEditing(ev);
-    setForm({ name: ev.name, description: ev.description || "", location: ev.location || "", date: ev.date, time: ev.time || "", duration: String(ev.duration || ""), maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "", status: ev.status, acceptanceMode: ev.acceptance_mode || "manual" });
+    setForm({ name: ev.name, description: ev.description || "", location: ev.location || "", date: (ev.starts_at || ev.date || "").slice(0, 10), time: ev.time || "", duration: String(ev.duration || ""), maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "", status: ev.status, acceptanceMode: ev.acceptance_mode || "manual" });
     setShowPanel(true);
   };
 
@@ -528,7 +528,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     setAttendanceApplicants([]);
     setAttendanceSelected(new Set());
     setAttendanceHours("");
-    setAttendanceDate(ev.date || "");
+    setAttendanceDate((ev.starts_at || ev.date || "").slice(0, 10));
     setAttendanceDesc("");
     setAttendanceResult(null);
     // Load approved applications for this event
@@ -546,7 +546,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     try {
       const res = await api.markBulkAttendance(attendanceEvent.id, {
         volunteer_ids: Array.from(attendanceSelected),
-        date: attendanceDate || attendanceEvent.date,
+        date: attendanceDate || (attendanceEvent.starts_at || attendanceEvent.date || "").slice(0, 10),
         hours: attendanceHours ? Number(attendanceHours) : undefined,
         description: attendanceDesc,
       });
@@ -636,7 +636,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
           <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 520, maxHeight: "85vh", backgroundColor: "#fff", borderRadius: 14, zIndex: 61, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #E2E8F0" }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: "#1E293B" }}>Mark Attendance</div>
-              <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>{attendanceEvent.name} · {attendanceEvent.date}</div>
+              <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>{attendanceEvent.name} · {(attendanceEvent.starts_at || attendanceEvent.date || "").slice(0, 10)}</div>
             </div>
 
             {attendanceResult ? (
@@ -838,7 +838,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                   </div>
                   {ev.description && <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0", lineHeight: 1.5 }}>{ev.description.slice(0, 90)}{ev.description.length > 90 ? "…" : ""}</p>}
                   <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>
-                    📅 {ev.date}{ev.time ? " · " + ev.time : ""}
+                    📅 {(ev.starts_at || ev.date || "").slice(0, 10)}{ev.time ? " · " + ev.time : ""}
                     {ev.location ? " · 📍 " + ev.location : ""}
                   </div>
                   <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 8 }}>

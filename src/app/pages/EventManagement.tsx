@@ -66,7 +66,7 @@ export function EventManagement() {
     setEditingEvent(ev);
     setForm({
       name: ev.name, description: ev.description || "", location: ev.location || "",
-      date: ev.date, time: ev.time || "", duration: String(ev.duration || ""),
+      date: (ev.starts_at || ev.date || "").slice(0, 10), time: ev.time || "", duration: String(ev.duration || ""),
       maxVolunteers: String(ev.max_volunteers || ""), requiredSkills: ev.required_skills || "",
       status: ev.status, acceptanceMode: ev.acceptance_mode || "manual",
     });
@@ -224,7 +224,7 @@ export function EventManagement() {
                     )}
 
                     <div className="flex flex-col gap-1" style={{ marginBottom: 10 }}>
-                      <div style={{ fontSize: 13, color: "#64748B" }}>📅 {ev.date}{ev.time ? " at " + ev.time : ""}</div>
+                      <div style={{ fontSize: 13, color: "#64748B" }}>📅 {(ev.starts_at || ev.date || "").slice(0, 10)}{ev.time ? " at " + ev.time : ""}</div>
                       {ev.location && <div style={{ fontSize: 13, color: "#64748B" }}>📍 {ev.location}</div>}
                       <div style={{ fontSize: 13, color: "#64748B" }}>
                         👥 {ev.current_volunteers || 0} / {ev.max_volunteers || "∞"} volunteers
