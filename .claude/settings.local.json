@@ -9,7 +9,9 @@
       "Read(//c/Users/vvmar/Downloads/**)",
       "Bash(npm install *)",
       "Bash(python scripts/office/validate.py \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\Graduation_Project_Filled.docx\")",
-      "Bash(python reorder_doc.py)"
+      "Bash(python reorder_doc.py)",
+      "Bash(python final_review.py)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
