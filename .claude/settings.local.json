@@ -8,7 +8,8 @@
       "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\Graduation_Project_Template.docx\" \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\template_unpacked\")",
       "Read(//c/Users/vvmar/Downloads/**)",
       "Bash(npm install *)",
-      "Bash(python scripts/office/validate.py \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\Graduation_Project_Filled.docx\")"
+      "Bash(python scripts/office/validate.py \"C:\\\\Users\\\\vvmar\\\\Downloads\\\\Graduation_Project_Filled.docx\")",
+      "Bash(python reorder_doc.py)"
     ]
   }
 }
