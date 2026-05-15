@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -76,7 +77,7 @@ export function SupervisorDashboard() {
       // We reuse the org events participants or fetch separately via activities endpoint scoped to org.
       // Simpler: pull from the org events list and deduplicate — but we need a volunteer list.
       // For now, we keep a lightweight fetch via the activities list's volunteer names or store separately.
-    } catch (e) { console.error("Failed to load supervisor dashboard:", e); }
+    } catch (e) { devError("Failed to load supervisor dashboard:", e); }
     finally { setLoading(false); }
   }, []);
 
@@ -86,21 +87,21 @@ export function SupervisorDashboard() {
     try {
       await api.approveMyApplication(id);
       setApplications((a) => a.filter((app) => app.id !== id));
-    } catch (e) { console.error("Approve application failed:", e); }
+    } catch (e) { devError("Approve application failed:", e); }
   };
 
   const handleRejectApplication = async (id: number) => {
     try {
       await api.rejectMyApplication(id);
       setApplications((a) => a.filter((app) => app.id !== id));
-    } catch (e) { console.error("Reject application failed:", e); }
+    } catch (e) { devError("Reject application failed:", e); }
   };
 
   const handleApproveActivity = async (id: number) => {
     try {
       await api.approveActivity(id);
       setActivities((a) => a.filter((act) => act.id !== id));
-    } catch (e) { console.error("Approve activity failed:", e); }
+    } catch (e) { devError("Approve activity failed:", e); }
   };
 
   const handleApproveAndCertify = async () => {
@@ -121,7 +122,7 @@ export function SupervisorDashboard() {
       setIssuedCertId(cert?.id ?? null);
       setCertFile(null);
       setCertUploadError("");
-    } catch (e) { console.error("Approve+certify failed:", e); }
+    } catch (e) { devError("Approve+certify failed:", e); }
     setCertBusy(false);
   };
 
@@ -145,7 +146,7 @@ export function SupervisorDashboard() {
     try {
       await api.rejectActivity(id);
       setActivities((a) => a.filter((act) => act.id !== id));
-    } catch (e) { console.error("Reject activity failed:", e); }
+    } catch (e) { devError("Reject activity failed:", e); }
   };
 
   const handleCreateEvent = async () => {

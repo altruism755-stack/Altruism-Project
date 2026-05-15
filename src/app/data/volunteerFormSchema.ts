@@ -363,8 +363,8 @@ export function getExperienceFieldError(
 }
 
 export function validateCauseAreas(areas: string[]): string {
-  if (areas.length === 0 || areas.length === 5) return "";
-  return "Choose all 5 interests, or clear your selection to skip this step";
+  if (areas.length <= 5) return "";
+  return "You can select up to 5 interests.";
 }
 
 // ── Canonical volunteer payload shape (frontend → backend) ───────────

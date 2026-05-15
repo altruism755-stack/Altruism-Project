@@ -422,8 +422,12 @@ export const api = {
 
   // Announcements
   getAnnouncements: (orgIds?: number[]) => {
-    const qs = orgIds && orgIds.length ? `?org_ids=${orgIds.join(",")}` : "";
-    return request(`/announcements${qs}`);
+    if (orgIds && orgIds.length) {
+      const params = new URLSearchParams();
+      orgIds.forEach((id) => params.append("org_ids", String(id)));
+      return request(`/announcements?${params.toString()}`);
+    }
+    return request("/announcements");
   },
   createAnnouncement: (data: { title: string; content: string }) =>
     request("/announcements", { method: "POST", body: JSON.stringify(data) }),

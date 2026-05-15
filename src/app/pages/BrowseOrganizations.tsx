@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -39,7 +40,7 @@ export function BrowseOrganizations() {
         );
         setMyOrgIds(activeIds);
         setPendingOrgIds(pendingIds);
-      } catch (e) { console.error(e); }
+      } catch (e) { devError(e); }
       finally { setLoading(false); }
     };
     fetchData();

@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -8,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { OrgLogo } from "../components/OrgLogos";
 import { EyeIcon, EyeOffIcon } from "../components/icons/PasswordIcons";
 import { CalendarWidget } from "./profile/CalendarWidget";
+import { AlertDialog } from "../components/ConfirmDialog";
 import {
   GOVERNORATES, SKILLS_LIST, AVAILABILITY_SPECIFIC,
   PROFICIENCY_LEVELS, EDUCATION_LEVELS, STUDY_YEARS,
@@ -144,6 +146,7 @@ export function ProfilePage() {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [allApplications, setAllApplications] = useState<any[]>([]);
   const [cancellingAppId, setCancellingAppId] = useState<number | null>(null);
+  const [cancelErrorMsg, setCancelErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -265,7 +268,7 @@ export function ProfilePage() {
         priorOrg: volRes.prior_org || "",
         hoursPerWeek: volRes.hours_per_week ?? null,
       });
-    } catch (e) { console.error("Failed to load profile:", e); }
+    } catch (e) { devError("Failed to load profile:", e); }
     finally { setLoading(false); }
   };
 
@@ -349,7 +352,7 @@ export function ProfilePage() {
       setTouched(createEmptyTouched());
       fetchProfile();
     } catch (e: any) {
-      console.error("Failed to save profile:", e);
+      devError("Failed to save profile:", e);
       // Surface a friendly explanation rather than failing silently.
       const raw = typeof e?.message === "string" ? e.message : "";
       let friendly = "We couldn't save your changes. Please try again.";
@@ -456,6 +459,12 @@ export function ProfilePage() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
+      <AlertDialog
+        open={!!cancelErrorMsg}
+        title="Could Not Cancel"
+        message={cancelErrorMsg ?? ""}
+        onClose={() => setCancelErrorMsg(null)}
+      />
       <Navbar role="volunteer" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%" }}>
@@ -651,7 +660,7 @@ if (actions.length === 0) return null;
                     return prev.filter((e) => e.id !== cancelled.event_id);
                   });
                 } catch (e: any) {
-                  alert(e?.message || "Failed to cancel application.");
+                  setCancelErrorMsg(e?.message || "Failed to cancel application.");
                 } finally {
                   setCancellingAppId(null);
                 }

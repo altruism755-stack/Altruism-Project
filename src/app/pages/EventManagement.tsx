@@ -1,9 +1,11 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { Pagination, usePagination } from "../components/Pagination";
 import { EVENT_STATUS, type EventStatus } from "../types";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const GREEN = "#16A34A";
 type Tab = EventStatus;
@@ -32,12 +34,13 @@ export function EventManagement() {
   const [editingEvent, setEditingEvent] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
 
   const fetchEvents = async () => {
     try {
       const res = await api.getEvents(orgId ? { org_id: String(orgId) } : {});
       setAllEvents(res.events || []);
-    } catch (e) { console.error("Failed to load activities:", e); }
+    } catch (e) { devError("Failed to load activities:", e); }
     finally { setLoading(false); }
   };
 
@@ -89,16 +92,22 @@ export function EventManagement() {
       }
       setShowPanel(false);
       fetchEvents();
-    } catch (e) { console.error("Failed to save:", e); }
+    } catch (e) { devError("Failed to save:", e); }
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const handleDelete = (id: number, name: string) => {
+    setConfirmDelete({ id, name });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setConfirmDelete(null);
     try {
       await api.deleteEvent(id);
       fetchEvents();
-    } catch (e) { console.error("Failed to delete:", e); }
+    } catch (e) { devError("Failed to delete:", e); }
   };
 
   const inputStyle = {
@@ -116,6 +125,15 @@ export function EventManagement() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Activity"
+        message={`Delete "${confirmDelete?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmDelete(null)}
+      />
       <Navbar role="org" />
 
       <div className="flex-1 px-8 py-6" style={{ maxWidth: 1280, margin: "0 auto", width: "100%", position: "relative" }}>
@@ -296,8 +314,8 @@ export function EventManagement() {
                       <input type="number" min="0" step="0.5" value={form.duration} onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Max Volunteers</label>
-                      <input type="number" min="0" value={form.maxVolunteers} onChange={(e) => setForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={inputStyle} />
+                      <label style={labelStyle}>Max Volunteers <span style={{ color: "#94A3B8", fontWeight: 400 }}>(0 = unlimited)</span></label>
+                      <input type="number" min="0" placeholder="0 = unlimited" value={form.maxVolunteers} onChange={(e) => setForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={inputStyle} />
                     </div>
                   </div>
 

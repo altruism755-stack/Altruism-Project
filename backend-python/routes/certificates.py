@@ -174,8 +174,9 @@ async def upload_certificate_file(
         # Remove old file if one exists
         old_url = cert.get("file_url")
         if old_url:
-            old_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), old_url.lstrip("/"))
-            if os.path.exists(old_path):
+            uploads_root = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads"))
+            old_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), old_url.lstrip("/")))
+            if old_path.startswith(uploads_root) and os.path.exists(old_path):
                 os.remove(old_path)
 
         os.makedirs(CERT_UPLOAD_DIR, exist_ok=True)

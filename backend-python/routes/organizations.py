@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from typing import Any, Optional
 
 from database import get_db, dict_row, dict_rows
-from auth import get_current_user, require_roles, require_approved_org_admin, get_org_for_admin
+from auth import get_current_user, require_roles, get_org_for_admin
 from routes.notifications import create_notification
 
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")

@@ -21,12 +21,14 @@ import { OrgPendingPage } from "./pages/OrgPendingPage";
 import { OrgProfilePage } from "./pages/OrgProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { PlatformAdminDashboard } from "./pages/PlatformAdminDashboard";
+import { VolunteerDetail } from "./pages/VolunteerDetail";
+import { VolunteerDashboard } from "./pages/VolunteerDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function ErrorPage() {
   const error = useRouteError() as any;
   const msg = error?.message || error?.statusText || String(error) || "Unknown error";
-  const stack = error?.stack;
+  const stack = import.meta.env.DEV ? error?.stack : undefined;
   return (
     <div style={{ padding: 32, fontFamily: "Inter, system-ui, sans-serif" }}>
       <h1 style={{ color: "#DC2626" }}>Page Error</h1>
@@ -80,10 +82,12 @@ export const router = createBrowserRouter([
 
       // Supervisor routes
       { path: "/supervisor", element: <ProtectedRoute allowedRoles={["supervisor"]}><SupervisorDashboard /></ProtectedRoute> },
+      { path: "/supervisor/volunteers/:id", element: <ProtectedRoute allowedRoles={["supervisor"]}><VolunteerDetail /></ProtectedRoute> },
       { path: "/supervisor/notifications", element: <ProtectedRoute allowedRoles={["supervisor"]}><NotificationsPage /></ProtectedRoute> },
 
       // Volunteer routes
       { path: "/dashboard", element: <Navigate to="/dashboard/profile" replace /> },
+      { path: "/dashboard/home", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerDashboard /></ProtectedRoute> },
       { path: "/dashboard/profile", element: <ProtectedRoute allowedRoles={["volunteer"]}><ProfilePage /></ProtectedRoute> },
       { path: "/dashboard/orgs", element: <ProtectedRoute allowedRoles={["volunteer"]}><BrowseOrganizations /></ProtectedRoute> },
       { path: "/dashboard/org/:orgId", element: <ProtectedRoute allowedRoles={["volunteer"]}><VolunteerOrgDashboard /></ProtectedRoute> },

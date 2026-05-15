@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -83,7 +84,7 @@ export function VolunteerOrgDashboard() {
           if (pAct + pApp === 0) setActiveTab("events");
         }
       } catch (e) {
-        console.error("Failed to load org dashboard:", e);
+        devError("Failed to load org dashboard:", e);
       } finally {
         setLoading(false);
       }

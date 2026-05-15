@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -22,7 +23,7 @@ export function ReportsPage() {
       ]);
       setSummary(sumRes);
       setReport(reportRes.report || []);
-    } catch (e) { console.error("Failed to load reports:", e); }
+    } catch (e) { devError("Failed to load reports:", e); }
     finally { setLoading(false); }
   };
 
@@ -44,7 +45,7 @@ const handleExportStarSchema = async () => {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("Failed to export star schema:", e);
+      devError("Failed to export star schema:", e);
     } finally {
       setExportingSchema(false);
     }

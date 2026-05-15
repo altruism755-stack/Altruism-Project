@@ -90,7 +90,19 @@ def delete_supervisor(supervisor_id: int, current_user: dict = Depends(require_r
         ).fetchone()
         if not result:
             raise HTTPException(404, "Supervisor not found in your organization")
-        # Disown their events so events are not orphaned — org admin retains them.
+        # Block deletion if the supervisor owns any active or upcoming events.
+        active_events = db.execute(
+            "SELECT COUNT(*) as cnt FROM events "
+            "WHERE created_by_supervisor_id = %s AND status IN ('active', 'upcoming')",
+            (supervisor_id,),
+        ).fetchone()["cnt"]
+        if active_events > 0:
+            raise HTTPException(
+                409,
+                f"Cannot remove supervisor: they manage {active_events} active or upcoming "
+                "event(s). Reassign or complete those events first.",
+            )
+        # Disown their completed events so they are not orphaned.
         db.execute(
             "UPDATE events SET created_by_supervisor_id = NULL WHERE created_by_supervisor_id = %s",
             (supervisor_id,),

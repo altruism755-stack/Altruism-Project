@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -40,7 +41,7 @@ export function VolunteerOrgProfile() {
         const volOrgs: any[] = volRes.organizations || [];
         setMyOrgIds(new Set(volOrgs.filter((o: any) => o.membership_status === "active").map((o: any) => o.id)));
         setPendingOrgIds(new Set(volOrgs.filter((o: any) => o.membership_status === "pending").map((o: any) => o.id)));
-      } catch (e) { console.error(e); }
+      } catch (e) { devError(e); }
       finally { setLoading(false); }
     };
     fetchData();

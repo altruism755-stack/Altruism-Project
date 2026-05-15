@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -75,7 +76,7 @@ export function VolunteerDashboard() {
           .slice(0, 5);
         setWhatsNew(merged);
       }
-    } catch (e) { console.error("Failed to load dashboard:", e); }
+    } catch (e) { devError("Failed to load dashboard:", e); }
     finally { setLoading(false); }
   };
 

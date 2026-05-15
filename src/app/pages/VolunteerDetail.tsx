@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -29,7 +30,7 @@ export function VolunteerDetail() {
       const res = await api.getVolunteer(Number(id));
       setVolunteer(res);
       setActivities(res.activities || []);
-    } catch (e) { console.error("Failed to load volunteer:", e); }
+    } catch (e) { devError("Failed to load volunteer:", e); }
     finally { setLoading(false); }
   };
 
@@ -39,14 +40,14 @@ export function VolunteerDetail() {
     try {
       await api.approveActivity(aid);
       setActivities((prev) => prev.map((a) => a.id === aid ? { ...a, status: "approved" } : a));
-    } catch (e) { console.error("Approve failed:", e); }
+    } catch (e) { devError("Approve failed:", e); }
   };
 
   const handleReject = async (aid: number) => {
     try {
       await api.rejectActivity(aid);
       setActivities((prev) => prev.map((a) => a.id === aid ? { ...a, status: "rejected" } : a));
-    } catch (e) { console.error("Reject failed:", e); }
+    } catch (e) { devError("Reject failed:", e); }
   };
 
   if (loading || !volunteer) return (

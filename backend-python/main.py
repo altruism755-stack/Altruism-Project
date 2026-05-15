@@ -116,7 +116,8 @@ app.mount("/uploads/certificates", StaticFiles(directory=certs_dir), name="cert_
 
 # Health check — lightweight metadata for frontend connection probes.
 @app.get("/api/health")
-def health():
+@_limiter.limit("30/minute")
+def health(request: Request):
     return {
         "status": "ok",
         "version": API_VERSION,

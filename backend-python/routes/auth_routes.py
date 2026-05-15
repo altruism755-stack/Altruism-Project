@@ -76,6 +76,8 @@ class LoginBody(BaseModel):
 def register(request: Request, body: RegisterBody):
     if not body.email or not body.password or not body.role:
         raise HTTPException(400, "Email, password, and role are required")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
 
     with get_db() as db:
         existing = db.execute("SELECT id FROM users WHERE email = %s", (body.email,)).fetchone()
@@ -87,8 +89,8 @@ def register(request: Request, body: RegisterBody):
         if body.role == "volunteer":
             if body.causeAreas is not None:
                 n = len(body.causeAreas)
-                if n != 0 and n != 5:
-                    raise HTTPException(422, "Please select exactly 5 interests, or leave it empty.")
+                if n > 5:
+                    raise HTTPException(422, "You can select up to 5 interests.")
 
             row = db.execute(
                 "INSERT INTO users (email, password, role) VALUES (%s, %s, 'volunteer') RETURNING id",

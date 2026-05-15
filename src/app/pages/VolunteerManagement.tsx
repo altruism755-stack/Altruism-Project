@@ -1,15 +1,13 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect, useRef } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
 import { Pagination, usePagination } from "../components/Pagination";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const GREEN = "#16A34A";
-
-function confirm(message: string): boolean {
-  return window.confirm(message);
-}
 
 export function VolunteerManagement() {
   const { profile } = useAuth();
@@ -53,7 +51,7 @@ export function VolunteerManagement() {
       URL.revokeObjectURL(url);
       showToast(`Exported ${count} volunteer${count === 1 ? "" : "s"}`, "success");
     } catch (e) {
-      console.error(e);
+      devError(e);
       showToast("Export failed. Please try again.", "error");
     } finally {
       setExporting(false);
@@ -63,6 +61,7 @@ export function VolunteerManagement() {
   // Approve modal state
   const [approveTarget, setApproveTarget] = useState<any | null>(null);
   const [assignForm, setAssignForm] = useState({ supervisor_id: "", department: "" });
+  const [confirmAction, setConfirmAction] = useState<{ type: "reject" | "kick"; id: number; name: string } | null>(null);
 
   const fetchData = async () => {
     try {
@@ -72,7 +71,7 @@ export function VolunteerManagement() {
       ]);
       setMembers(membersRes.volunteers || []);
       setSupervisors(supRes.supervisors || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     finally { setLoading(false); }
   };
 
@@ -100,27 +99,28 @@ export function VolunteerManagement() {
       });
       setApproveTarget(null);
       fetchData();
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     setActionLoading(null);
   };
 
-  const handleReject = async (volId: number, name: string) => {
-    if (!confirm(`Reject ${name}'s application?`)) return;
-    setActionLoading(volId);
-    try {
-      await api.rejectOrgMember(orgId, volId);
-      fetchData();
-    } catch (e) { console.error(e); }
-    setActionLoading(null);
+  const handleReject = (volId: number, name: string) => {
+    setConfirmAction({ type: "reject", id: volId, name });
   };
 
-  const handleKick = async (volId: number, name: string) => {
-    if (!confirm(`Remove ${name} from your organization? This cannot be undone.`)) return;
-    setActionLoading(volId);
+  const handleKick = (volId: number, name: string) => {
+    setConfirmAction({ type: "kick", id: volId, name });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { type, id } = confirmAction;
+    setConfirmAction(null);
+    setActionLoading(id);
     try {
-      await api.removeOrgMember(orgId, volId);
+      if (type === "reject") { await api.rejectOrgMember(orgId, id); }
+      else { await api.removeOrgMember(orgId, id); }
       fetchData();
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     setActionLoading(null);
   };
 
@@ -135,6 +135,19 @@ export function VolunteerManagement() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.type === "reject" ? "Reject Application" : "Remove Volunteer"}
+        message={
+          confirmAction?.type === "reject"
+            ? `Reject ${confirmAction.name}'s membership application?`
+            : `Remove ${confirmAction?.name} from your organization? This cannot be undone.`
+        }
+        confirmLabel={confirmAction?.type === "reject" ? "Reject" : "Remove"}
+        destructive
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
+      />
       <Navbar role="org" />
 
       {/* Approve modal */}

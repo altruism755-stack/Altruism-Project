@@ -60,6 +60,16 @@ export function LoginPage() {
     if (!validate()) return;
     const result = await login(email, password);
     if (result.ok) {
+      // When "Remember me" is unchecked, move the token to sessionStorage so it
+      // is cleared when the browser tab closes. AuthContext writes to localStorage
+      // first; we migrate it here immediately after a successful login.
+      if (!rememberMe) {
+        const token = localStorage.getItem("altruism_token");
+        if (token) {
+          sessionStorage.setItem("altruism_token", token);
+          localStorage.removeItem("altruism_token");
+        }
+      }
       if (result.isPlatformAdmin) navigate("/platform-admin");
       else if (result.role === "org_admin") {
         const status = result.orgStatus;

@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useEffect, useMemo, useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -128,7 +129,7 @@ export function OrgProfilePage() {
       setPendingChanges(res.pending_changes || []);
       setPendingDict(res.pending || {});
     } catch (e) {
-      console.error("Failed to load org profile", e);
+      devError("Failed to load org profile", e);
       if (authProfile && !authProfile._demo) {
         setOrg(authProfile);
         setState(orgStateFromRow(authProfile));

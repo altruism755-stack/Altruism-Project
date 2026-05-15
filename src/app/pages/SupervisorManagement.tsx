@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -17,7 +18,7 @@ export function SupervisorManagement() {
     try {
       const res = await api.getSupervisors();
       setSupervisors(res.supervisors || []);
-    } catch (e) { console.error("Failed to load supervisors:", e); }
+    } catch (e) { devError("Failed to load supervisors:", e); }
     finally { setLoading(false); }
   };
 
@@ -50,7 +51,7 @@ export function SupervisorManagement() {
     try {
       await api.deleteSupervisor(id);
       fetchSupervisors();
-    } catch (err) { console.error("Failed to delete supervisor:", err); }
+    } catch (err) { devError("Failed to delete supervisor:", err); }
   };
 
   if (loading) return (

@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { api } from "../services/api";
@@ -22,6 +23,10 @@ export function NewsFeed() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!volId) {
+        setLoading(false);
+        return;
+      }
       try {
         // First, fetch volunteer profile to know which orgs they belong to (Active only)
         const volRes = await api.getVolunteer(volId);
@@ -50,7 +55,7 @@ export function NewsFeed() {
 
         const applied = new Set<number>((appsRes.applications || []).map((a: any) => a.event_id));
         setAppliedEvents(applied);
-      } catch (e) { console.error("Failed to load feed:", e); }
+      } catch (e) { devError("Failed to load feed:", e); }
       finally { setLoading(false); }
     };
     fetchData();
@@ -62,7 +67,7 @@ export function NewsFeed() {
       await api.applyToEvent(eventId);
       setAppliedEvents((prev) => new Set([...prev, eventId]));
     } catch (e: any) {
-      console.error("Failed to apply:", e);
+      devError("Failed to apply:", e);
     }
     setApplyingTo(null);
   };

@@ -1,3 +1,4 @@
+import { devError } from "../lib/devLog";
 ﻿import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
@@ -9,6 +10,7 @@ import { StatusPill, LifecycleStepper } from "../components/StatusPill";
 import { resolveStepActions, type BackendLifecycle } from "../lib/lifecycle";
 import { Pagination, usePagination } from "../components/Pagination";
 import { EVENT_STATUS, MEMBER_STATUS, APP_STATUS } from "../types";
+import { ConfirmDialog, AlertDialog } from "../components/ConfirmDialog";
 
 const GREEN = "#16A34A";
 
@@ -37,6 +39,8 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
   const [approveTarget, setApproveTarget] = useState<any | null>(null);
   const [assignForm, setAssignForm] = useState({ supervisor_id: "", department: "" });
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
+  const [confirmState, setConfirmState] = useState<{ action: "reject" | "remove"; id: number; name: string } | null>(null);
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   const pending  = members.filter((m) => m.org_status === MEMBER_STATUS.Pending);
   const active   = members.filter((m) => m.org_status === MEMBER_STATUS.Active);
@@ -54,7 +58,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
   const doApprove = async () => {
     if (!approveTarget) return;
     if (supervisors.length > 0 && !assignForm.supervisor_id) {
-      alert("Please assign a supervisor before approving this volunteer.");
+      setAlertMsg("Please assign a supervisor before approving this volunteer.");
       return;
     }
     setBusy(approveTarget.id);
@@ -65,26 +69,52 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
       });
       setApproveTarget(null);
       onRefresh();
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     setBusy(null);
   };
 
-  const doReject = async (id: number, name: string) => {
-    if (!window.confirm(`Reject ${name}'s request?`)) return;
-    setBusy(id);
-    try { await api.rejectOrgMember(orgId, id); onRefresh(); } catch (e) { console.error(e); }
-    setBusy(null);
+  const doReject = (id: number, name: string) => {
+    setConfirmState({ action: "reject", id, name });
   };
 
-  const doRemove = async (id: number, name: string) => {
-    if (!window.confirm(`Remove ${name} from your organization?`)) return;
+  const doRemove = (id: number, name: string) => {
+    setConfirmState({ action: "remove", id, name });
+  };
+
+  const handleConfirm = async () => {
+    if (!confirmState) return;
+    const { action, id } = confirmState;
+    setConfirmState(null);
     setBusy(id);
-    try { await api.removeOrgMember(orgId, id); onRefresh(); } catch (e) { console.error(e); }
+    try {
+      if (action === "reject") { await api.rejectOrgMember(orgId, id); }
+      else { await api.removeOrgMember(orgId, id); }
+      onRefresh();
+    } catch (e) { devError(e); }
     setBusy(null);
   };
 
   return (
     <div>
+      <AlertDialog
+        open={!!alertMsg}
+        title="Action Required"
+        message={alertMsg ?? ""}
+        onClose={() => setAlertMsg(null)}
+      />
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.action === "reject" ? "Reject Request" : "Remove Member"}
+        message={
+          confirmState?.action === "reject"
+            ? `Reject ${confirmState.name}'s membership request?`
+            : `Remove ${confirmState?.name} from your organization? This cannot be undone.`
+        }
+        confirmLabel={confirmState?.action === "reject" ? "Reject" : "Remove"}
+        destructive
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmState(null)}
+      />
       {/* Approve modal */}
       {approveTarget && (
         <>
@@ -318,6 +348,7 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState<{ id: number; name: string } | null>(null);
 
   const doAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,15 +362,30 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
     setSaving(false);
   };
 
-  const doRemove = async (id: number, name: string) => {
-    if (!window.confirm(`Remove ${name} as supervisor?`)) return;
+  const doRemove = (id: number, name: string) => {
+    setConfirmRemove({ id, name });
+  };
+
+  const handleRemoveConfirm = async () => {
+    if (!confirmRemove) return;
+    const { id } = confirmRemove;
+    setConfirmRemove(null);
     setRemoving(id);
-    try { await api.deleteSupervisor(id); onRefresh(); } catch (e) { console.error(e); }
+    try { await api.deleteSupervisor(id); onRefresh(); } catch (e) { devError(e); }
     setRemoving(null);
   };
 
   return (
     <div className="flex gap-6 items-start">
+      <ConfirmDialog
+        open={!!confirmRemove}
+        title="Remove Supervisor"
+        message={`Remove ${confirmRemove?.name} as supervisor? This cannot be undone.`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={handleRemoveConfirm}
+        onCancel={() => setConfirmRemove(null)}
+      />
       {/* Add form */}
       <div style={{ flex: "0 0 340px" }}>
         <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24 }}>
@@ -403,6 +449,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
 
   // Event applications state
   const [applications, setApplications] = useState<any[]>([]);
@@ -424,7 +471,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     try {
       const res = await api.getOrgEventApplications(orgId);
       setApplications(res.applications || []);
-    } catch (e) { console.error("Failed to load applications:", e); }
+    } catch (e) { devError("Failed to load applications:", e); }
     setAppsLoaded(true);
   }, [orgId]);
 
@@ -439,7 +486,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     try {
       await api.approveApplication(id);
       setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "approved" } : a));
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     setAppBusy(null);
   };
 
@@ -448,7 +495,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     try {
       await api.rejectApplication(id);
       setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "rejected" } : a));
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     setAppBusy(null);
   };
 
@@ -472,7 +519,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     try {
       if (editing) await api.updateEvent(editing.id, data); else await api.createEvent(data);
       setShowPanel(false); onRefresh();
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
     setSaving(false);
   };
 
@@ -490,7 +537,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
       const approved = (res.applications || []).filter((a: any) => a.event_id === ev.id && a.status === APP_STATUS.Approved);
       setAttendanceApplicants(approved);
       setAttendanceSelected(new Set(approved.map((a: any) => a.volunteer_id)));
-    } catch (e) { console.error(e); }
+    } catch (e) { devError(e); }
   };
 
   const submitAttendance = async () => {
@@ -504,17 +551,32 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
         description: attendanceDesc,
       });
       setAttendanceResult(res);
-    } catch (e: any) { console.error(e); }
+    } catch (e: any) { devError(e); }
     setAttendanceLoading(false);
   };
 
-  const doDelete = async (id: number, name: string) => {
-    if (!window.confirm(`Delete "${name}"?`)) return;
-    try { await api.deleteEvent(id); onRefresh(); } catch (e) { console.error(e); }
+  const doDelete = (id: number, name: string) => {
+    setConfirmDelete({ id, name });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setConfirmDelete(null);
+    try { await api.deleteEvent(id); onRefresh(); } catch (e) { devError(e); }
   };
 
   return (
     <div style={{ position: "relative" }}>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Activity"
+        message={`Delete "${confirmDelete?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmDelete(null)}
+      />
       {/* Panel overlay */}
       {showPanel && (
         <>
@@ -535,7 +597,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label style={lStyle}>Duration (h)</label><input type="number" min="0" step="0.5" value={form.duration} onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))} style={iStyle} /></div>
-                  <div><label style={lStyle}>Max Volunteers</label><input type="number" min="0" value={form.maxVolunteers} onChange={(e) => setForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={iStyle} /></div>
+                  <div><label style={lStyle}>Max Volunteers <span style={{ color: "#94A3B8", fontWeight: 400 }}>(0 = unlimited)</span></label><input type="number" min="0" placeholder="0 = unlimited" value={form.maxVolunteers} onChange={(e) => setForm((f) => ({ ...f, maxVolunteers: e.target.value }))} style={iStyle} /></div>
                 </div>
                 <div><label style={lStyle}>Required Skills</label><input value={form.requiredSkills} onChange={(e) => setForm((f) => ({ ...f, requiredSkills: e.target.value }))} placeholder="Comma separated" style={iStyle} /></div>
                 <div><label style={lStyle}>Status</label>
@@ -1271,7 +1333,7 @@ export function OrgDashboard() {
       setEvents(evtRes.events || []);
       setOrgProfileData(profRes.organization || null);
       setOrgLifecycle(lcRes.lifecycle || null);
-    } catch (e) { console.error("Dashboard load error:", e); }
+    } catch (e) { devError("Dashboard load error:", e); }
     finally { setLoading(false); }
   }, [orgId]);
 
