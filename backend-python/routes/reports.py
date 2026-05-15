@@ -66,21 +66,16 @@ def report_summary(current_user: dict = Depends(require_roles("org_admin"))):
         row = db.execute(
             """
             SELECT
-                COUNT(ov.id)                                                          AS total_volunteers,
-                COUNT(ov.id) FILTER (WHERE ov.status = 'active')                     AS active_volunteers,
-                COUNT(ov.id) FILTER (WHERE ov.status = 'pending')                    AS pending_members,
-                COALESCE(SUM(a.hours) FILTER (WHERE a.status = 'approved'), 0)       AS total_hours,
-                COUNT(a.id)  FILTER (WHERE a.status = 'pending')                     AS pending_activities,
-                COUNT(e.id)                                                           AS total_events,
-                COUNT(e.id)  FILTER (WHERE e.status = 'completed')                   AS completed_events,
-                COUNT(e.id)  FILTER (WHERE e.status IN ('active','upcoming'))        AS active_events
-            FROM organizations o
-            LEFT JOIN org_volunteers ov ON ov.org_id = o.id
-            LEFT JOIN activities a ON a.org_id = o.id
-            LEFT JOIN events e ON e.org_id = o.id
-            WHERE o.id = %s
+                (SELECT COUNT(*)        FROM org_volunteers WHERE org_id = %s)                          AS total_volunteers,
+                (SELECT COUNT(*)        FROM org_volunteers WHERE org_id = %s AND status = 'active')    AS active_volunteers,
+                (SELECT COUNT(*)        FROM org_volunteers WHERE org_id = %s AND status = 'pending')   AS pending_members,
+                (SELECT COALESCE(SUM(hours), 0) FROM activities WHERE org_id = %s AND status = 'approved') AS total_hours,
+                (SELECT COUNT(*)        FROM activities WHERE org_id = %s AND status = 'pending')       AS pending_activities,
+                (SELECT COUNT(*)        FROM events WHERE org_id = %s)                                  AS total_events,
+                (SELECT COUNT(*)        FROM events WHERE org_id = %s AND status = 'completed')         AS completed_events,
+                (SELECT COUNT(*)        FROM events WHERE org_id = %s AND status IN ('active','upcoming')) AS active_events
             """,
-            (oid,),
+            (oid, oid, oid, oid, oid, oid, oid, oid),
         ).fetchone()
 
         return {
