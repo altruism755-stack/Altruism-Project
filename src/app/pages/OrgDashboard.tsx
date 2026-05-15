@@ -21,9 +21,9 @@ const lStyle: React.CSSProperties = {
   fontSize: 13, fontWeight: 500, color: "#1E293B", display: "block", marginBottom: 4,
 };
 const actStatus: Record<string, { bg: string; band: string; text: string; label: string }> = {
-  Upcoming:  { bg: "#DCFCE7", band: GREEN,    text: "#15803D", label: "Upcoming" },
-  Active:    { bg: "#FEF3C7", band: "#D97706", text: "#B45309", label: "Ongoing"  },
-  Completed: { bg: "#F1F5F9", band: "#94A3B8", text: "#64748B", label: "Completed"},
+  upcoming:  { bg: "#DCFCE7", band: GREEN,    text: "#15803D", label: "Upcoming" },
+  active:    { bg: "#FEF3C7", band: "#D97706", text: "#B45309", label: "Ongoing"  },
+  completed: { bg: "#F1F5F9", band: "#94A3B8", text: "#64748B", label: "Completed"},
 };
 
 // ─── Volunteers tab ───────────────────────────────────────────────────────────
@@ -381,7 +381,7 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
               <div style={{ fontSize: 13, color: "#64748B" }}>{s.email}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{s.team || "—"}</div>
               <div><span style={{ backgroundColor: "#DBEAFE", color: "#1D4ED8", fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "2px 8px" }}>{s.assigned_volunteers ?? 0}</span></div>
-              <div><span style={{ backgroundColor: s.status === "Active" ? "#DCFCE7" : "#FEF3C7", color: s.status === "Active" ? "#15803D" : "#B45309", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{s.status}</span></div>
+              <div><span style={{ backgroundColor: s.status === "active" ? "#DCFCE7" : "#FEF3C7", color: s.status === "active" ? "#15803D" : "#B45309", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : ""}</span></div>
               <button onClick={() => doRemove(s.id, s.name)} disabled={removing === s.id}
                 style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer", width: "fit-content" }}>
                 {removing === s.id ? "…" : "Remove"}
@@ -395,10 +395,10 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
 }
 
 // ─── Activities tab ────────────────────────────────────────────────────────────
-const emptyForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming", acceptanceMode: "manual" as "manual" | "auto" };
+const emptyForm = { name: "", description: "", location: "", date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "upcoming", acceptanceMode: "manual" as "manual" | "auto" };
 
 function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh: () => void; orgId: number }) {
-  const [sub, setSub] = useState<"Upcoming" | "Active" | "Completed" | "Applications">("Upcoming");
+  const [sub, setSub] = useState<"upcoming" | "active" | "completed" | "Applications">("upcoming");
   const [showPanel, setShowPanel] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -438,7 +438,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     setAppBusy(id);
     try {
       await api.approveApplication(id);
-      setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "Approved" } : a));
+      setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "approved" } : a));
     } catch (e) { console.error(e); }
     setAppBusy(null);
   };
@@ -447,18 +447,18 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     setAppBusy(id);
     try {
       await api.rejectApplication(id);
-      setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "Rejected" } : a));
+      setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: "rejected" } : a));
     } catch (e) { console.error(e); }
     setAppBusy(null);
   };
 
   const byStatus = events.filter((e) => e.status === sub);
-  const counts = { Upcoming: events.filter((e) => e.status === EVENT_STATUS.Upcoming).length, Active: events.filter((e) => e.status === EVENT_STATUS.Active).length, Completed: events.filter((e) => e.status === EVENT_STATUS.Completed).length };
+  const counts = { upcoming: events.filter((e) => e.status === EVENT_STATUS.Upcoming).length, active: events.filter((e) => e.status === EVENT_STATUS.Active).length, completed: events.filter((e) => e.status === EVENT_STATUS.Completed).length };
   const { page: evPage, setPage: setEvPage, totalPages: evTotalPages, pageItems: pageEvents, reset: resetEvPage } = usePagination(byStatus, 12);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { resetEvPage(); }, [sub]);
 
-  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, status: sub === "Active" ? "Active" : "Upcoming" }); setShowPanel(true); };
+  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, status: sub === "active" ? "active" : "upcoming" }); setShowPanel(true); };
 
   const openEdit = (ev: any) => {
     setEditing(ev);
@@ -540,9 +540,9 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                 <div><label style={lStyle}>Required Skills</label><input value={form.requiredSkills} onChange={(e) => setForm((f) => ({ ...f, requiredSkills: e.target.value }))} placeholder="Comma separated" style={iStyle} /></div>
                 <div><label style={lStyle}>Status</label>
                   <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={iStyle}>
-                    <option value="Upcoming">Upcoming</option>
-                    <option value="Active">Ongoing</option>
-                    <option value="Completed">Completed</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="active">Ongoing</option>
+                    <option value="completed">Completed</option>
                   </select>
                 </div>
                 <div>
@@ -649,7 +649,7 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
       {/* Sub-tabs + Add button */}
       <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
         <div className="flex gap-1" style={{ borderBottom: "2px solid #E2E8F0" }}>
-          {(["Upcoming", "Active", "Completed"] as const).map((s) => {
+          {(["upcoming", "active", "completed"] as const).map((s) => {
             const m = actStatus[s];
             return (
               <button key={s} onClick={() => setSub(s)} style={{
@@ -696,19 +696,19 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
           ) : (
             <div className="flex flex-col gap-3">
               {/* Group by status: Pending first */}
-              {["Pending", "Approved", "Rejected"].map((status) => {
+              {["pending", "approved", "rejected"].map((status) => {
                 const group = applications.filter((a) => a.status === status);
                 if (group.length === 0) return null;
                 const statusStyle: Record<string, { bg: string; text: string; band: string }> = {
-                  Pending:  { bg: "#FEF3C7", text: "#B45309", band: "#F59E0B" },
-                  Approved: { bg: "#DCFCE7", text: "#15803D", band: "#16A34A" },
-                  Rejected: { bg: "#FEE2E2", text: "#B91C1C", band: "#DC2626" },
+                  pending:  { bg: "#FEF3C7", text: "#B45309", band: "#F59E0B" },
+                  approved: { bg: "#DCFCE7", text: "#15803D", band: "#16A34A" },
+                  rejected: { bg: "#FEE2E2", text: "#B91C1C", band: "#DC2626" },
                 };
                 const ss = statusStyle[status];
                 return (
                   <div key={status}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                      {status} ({group.length})
+                      {status.charAt(0).toUpperCase() + status.slice(1)} ({group.length})
                     </div>
                     {group.map((app: any) => (
                       <div key={app.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderLeft: `4px solid ${ss.band}`, borderRadius: 10, padding: "14px 16px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -721,8 +721,8 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                           {app.volunteer_email && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{app.volunteer_email}</div>}
                         </div>
                         <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: ss.bg, color: ss.text, borderRadius: 20, padding: "3px 10px" }}>{status}</span>
-                          {status === "Pending" && (
+                          <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: ss.bg, color: ss.text, borderRadius: 20, padding: "3px 10px" }}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                          {status === "pending" && (
                             <>
                               <button
                                 onClick={() => doApproveApp(app.id)}
@@ -750,15 +750,15 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
       {/* Cards */}
       {sub !== "Applications" && byStatus.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14" style={{ backgroundColor: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", color: "#94A3B8" }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>{sub === "Upcoming" ? "📅" : sub === "Active" ? "⚡" : "✅"}</div>
-          <div style={{ fontSize: 14 }}>No {actStatus[sub as "Upcoming" | "Active" | "Completed"].label.toLowerCase()} activities</div>
-          {sub !== "Completed" && <button onClick={openCreate} style={{ marginTop: 12, height: 36, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Create Activity</button>}
+          <div style={{ fontSize: 36, marginBottom: 10 }}>{sub === "upcoming" ? "📅" : sub === "active" ? "⚡" : "✅"}</div>
+          <div style={{ fontSize: 14 }}>No {actStatus[sub as "upcoming" | "active" | "completed"].label.toLowerCase()} activities</div>
+          {sub !== "completed" && <button onClick={openCreate} style={{ marginTop: 12, height: 36, padding: "0 20px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Create Activity</button>}
         </div>
       ) : sub !== "Applications" && (
         <>
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
           {pageEvents.map((ev) => {
-            const m = actStatus[ev.status as "Upcoming" | "Active" | "Completed"] || actStatus.Completed;
+            const m = actStatus[ev.status as "upcoming" | "active" | "completed"] || actStatus.completed;
             const skills = (ev.required_skills || "").split(",").map((s: string) => s.trim()).filter(Boolean);
             return (
               <div key={ev.id} style={{ backgroundColor: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", overflow: "hidden" }}>

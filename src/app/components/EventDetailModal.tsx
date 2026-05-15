@@ -22,14 +22,15 @@ function fmt12h(time?: string): string {
 
 function statusBadge(status: string) {
   const styles: Record<string, { bg: string; color: string }> = {
-    Upcoming:  { bg: "#DBEAFE", color: "#1D4ED8" },
-    Active:    { bg: "#DCFCE7", color: "#15803D" },
-    Completed: { bg: "#F1F5F9", color: "#475569" },
+    upcoming:  { bg: "#DBEAFE", color: "#1D4ED8" },
+    active:    { bg: "#DCFCE7", color: "#15803D" },
+    completed: { bg: "#F1F5F9", color: "#475569" },
   };
-  const s = styles[status] || styles.Upcoming;
+  const s = styles[status] || styles.upcoming;
+  const label = status === "active" ? "Live Now" : status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <span style={{ fontSize: 12, fontWeight: 600, backgroundColor: s.bg, color: s.color, borderRadius: 4, padding: "2px 8px" }}>
-      {status === "Active" ? "Live Now" : status}
+      {label}
     </span>
   );
 }
@@ -80,7 +81,7 @@ function ApplicantRow({
   showAttendance: boolean;
   selected: boolean;
 }) {
-  const attColors: Record<string, string> = { Attended: GREEN, Absent: RED };
+  const attColors: Record<string, string> = { attended: GREEN, absent: RED };
   const savedAtt = app.attendance_status;
 
   return (
@@ -103,20 +104,20 @@ function ApplicantRow({
       </div>
       {showAttendance ? (
         <div className="flex gap-2" style={{ flexShrink: 0 }}>
-          {(["Attended", "Absent"] as AttendanceStatus[]).map((v) => (
+          {(["attended", "absent"] as AttendanceStatus[]).map((v) => (
             <button
               key={v}
               onClick={() => onDraftAtt(app.app_id, draft === (savedAtt === v) ? "" : v)}
               style={{
                 height: 26, padding: "0 10px",
                 backgroundColor: (draft ? (app as any)._draft === v : savedAtt === v)
-                  ? (v === "Attended" ? GREEN : RED)
+                  ? (v === "attended" ? GREEN : RED)
                   : "#F1F5F9",
                 color: (draft ? (app as any)._draft === v : savedAtt === v) ? "#fff" : "#64748B",
                 border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
               }}
             >
-              {v}
+              {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
           {savedAtt && (
@@ -219,7 +220,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
   const [busy, setBusy] = useState(false);
 
   // Applications tab state
-  const [appTab, setAppTab] = useState<"Pending" | "Approved" | "Rejected">("Pending");
+  const [appTab, setAppTab] = useState<"pending" | "approved" | "rejected">("pending");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
 
@@ -246,9 +247,9 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-activate: if event is Upcoming and current time has passed start time, trigger activate.
+  // Auto-activate: if event is upcoming and current time has passed start time, trigger activate.
   useEffect(() => {
-    if (!event || event.status !== "Upcoming") return;
+    if (!event || event.status !== "upcoming") return;
     if (!event.date || !event.time) return;
     const [h, m] = event.time.split(":").map(Number);
     const start = new Date(`${event.date}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
@@ -290,7 +291,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
     if (!event) return;
     setBusy(true);
     try {
-      await api.updateMyEvent(event.id, { status: "Completed" });
+      await api.updateMyEvent(event.id, { status: "completed" });
       await load();
       onEventUpdated();
     } catch (e: any) { setErr(e?.message || "Failed to complete event"); }
@@ -369,21 +370,21 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
 
   if (!event) return null;
 
-  const isUpcoming = event.status === "Upcoming";
-  const isActive = event.status === "Active";
-  const isCompleted = event.status === "Completed";
+  const isUpcoming = event.status === "upcoming";
+  const isActive = event.status === "active";
+  const isCompleted = event.status === "completed";
   const showAttendance = isActive || isCompleted;
 
   const applicantsByStatus = {
-    Pending:  event.applicants.filter((a) => a.status === "Pending"),
-    Approved: event.applicants.filter((a) => a.status === "Approved"),
-    Rejected: event.applicants.filter((a) => a.status === "Rejected"),
+    pending:  event.applicants.filter((a) => a.status === "pending"),
+    approved: event.applicants.filter((a) => a.status === "approved"),
+    rejected: event.applicants.filter((a) => a.status === "rejected"),
   };
   const currentList = applicantsByStatus[appTab];
   const currentIds = currentList.map((a) => a.app_id);
 
-  const canApprove = appTab === "Pending" && selected.size > 0;
-  const canReject  = (appTab === "Pending" || appTab === "Approved") && selected.size > 0;
+  const canApprove = appTab === "pending" && selected.size > 0;
+  const canReject  = (appTab === "pending" || appTab === "approved") && selected.size > 0;
 
   return (
     <ModalShell onClose={onClose}>
@@ -445,13 +446,13 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
           <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: "#64748B" }}>Volunteer Capacity</span>
             <span style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}>
-              {event.applicants.filter((a) => a.status === "Approved").length} / {event.max_volunteers}
+              {event.applicants.filter((a) => a.status === "approved").length} / {event.max_volunteers}
             </span>
           </div>
           <div style={{ height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}>
             <div style={{
               height: "100%",
-              width: `${Math.min(100, Math.round(event.applicants.filter((a) => a.status === "Approved").length / event.max_volunteers * 100))}%`,
+              width: `${Math.min(100, Math.round(event.applicants.filter((a) => a.status === "approved").length / event.max_volunteers * 100))}%`,
               backgroundColor: GREEN, borderRadius: 3,
             }} />
           </div>
@@ -464,7 +465,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
 
         {/* Status tabs */}
         <div className="flex gap-1" style={{ marginBottom: 12 }}>
-          {(["Pending", "Approved", "Rejected"] as const).map((tab) => (
+          {(["pending", "approved", "rejected"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => { setAppTab(tab); setSelected(new Set()); setPendingAction(null); }}
@@ -474,13 +475,13 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
                 color: appTab === tab ? "#fff" : "#64748B",
               }}
             >
-              {tab} <span style={{ opacity: 0.7 }}>({applicantsByStatus[tab].length})</span>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)} <span style={{ opacity: 0.7 }}>({applicantsByStatus[tab].length})</span>
             </button>
           ))}
         </div>
 
         {/* Bulk controls for Pending tab */}
-        {isOwned && appTab === "Pending" && currentList.length > 0 && !showAttendance && (
+        {isOwned && appTab === "pending" && currentList.length > 0 && !showAttendance && (
           <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
             <input
               type="checkbox"
@@ -499,7 +500,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
         )}
 
         {/* Approved tab: select for attendance or certificates */}
-        {isOwned && appTab === "Approved" && currentList.length > 0 && !showAttendance && (
+        {isOwned && appTab === "approved" && currentList.length > 0 && !showAttendance && (
           <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
             <input
               type="checkbox"
@@ -515,7 +516,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
         )}
 
         {/* Attendance save bar */}
-        {isOwned && showAttendance && appTab === "Approved" && attDirty && (
+        {isOwned && showAttendance && appTab === "approved" && attDirty && (
           <div style={{ marginBottom: 12, padding: "12px 14px", backgroundColor: "#F8FAFC", borderRadius: 10, border: "1px solid #E2E8F0" }}>
             {event.tracks_hours && (
               <div className="flex gap-2" style={{ marginBottom: 8, flexWrap: "wrap" }}>
@@ -596,9 +597,9 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
                     <div style={{ fontSize: 12, color: "#94A3B8" }}>{app.volunteer_email}</div>
                   </div>
                   {/* Attendance buttons (Active/Completed + Approved tab) */}
-                  {isOwned && showAttendance && appTab === "Approved" && (
+                  {isOwned && showAttendance && appTab === "approved" && (
                     <div className="flex gap-1" style={{ flexShrink: 0 }}>
-                      {(["Attended", "Absent"] as AttendanceStatus[]).map((v) => {
+                      {(["attended", "absent"] as AttendanceStatus[]).map((v) => {
                         const isDraft = draftVal === v;
                         const isSaved = !draftVal && app.attendance_status === v;
                         const active = isDraft || isSaved;
@@ -612,19 +613,19 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
                             }}
                             style={{
                               height: 26, padding: "0 9px",
-                              backgroundColor: active ? (v === "Attended" ? GREEN : RED) : "#F1F5F9",
+                              backgroundColor: active ? (v === "attended" ? GREEN : RED) : "#F1F5F9",
                               color: active ? "#fff" : "#64748B",
                               border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
                             }}
                           >
-                            {v}
+                            {v.charAt(0).toUpperCase() + v.slice(1)}
                           </button>
                         );
                       })}
                     </div>
                   )}
                   {/* Certificate button: only for Completed + Attended + owned */}
-                  {isOwned && isCompleted && appTab === "Approved" && app.attendance_status === "Attended" && (
+                  {isOwned && isCompleted && appTab === "approved" && app.attendance_status === "attended" && (
                     <Btn label="+ Cert" color={CYAN} small onClick={() => setCertVolunteer(app)} />
                   )}
                 </div>
@@ -634,7 +635,7 @@ export function EventDetailModal({ eventId, onClose, onEventUpdated, isOwned = t
         )}
 
         {/* Attendance legend */}
-        {showAttendance && appTab === "Approved" && currentList.length > 0 && (
+        {showAttendance && appTab === "approved" && currentList.length > 0 && (
           <div style={{ marginTop: 12, fontSize: 12, color: "#94A3B8" }}>
             Select Attended / Absent for each volunteer, then click <strong>Apply Attendance</strong>.
             {isCompleted && " Certificates are available for Attended volunteers."}

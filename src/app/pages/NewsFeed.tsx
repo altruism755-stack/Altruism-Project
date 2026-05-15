@@ -38,7 +38,7 @@ export function NewsFeed() {
 
         // Fetch events + announcements + applications in parallel, then filter to only our orgs
         const [evtRes, annRes, appsRes] = await Promise.all([
-          api.getEvents({ status: "Upcoming" }),
+          api.getEvents({ status: "upcoming" }),
           api.getAnnouncements(orgIds).catch(() => ({ announcements: [] })),
           api.getEventApplications().catch(() => ({ applications: [] })),
         ]);

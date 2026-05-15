@@ -10,21 +10,21 @@ export interface User {
 }
 
 export type AcceptanceMode = "manual" | "auto";
-export type EventStatus = "Upcoming" | "Active" | "Completed";
-export type ApplicationStatus = "Pending" | "Approved" | "Rejected" | "Waitlisted";
-export type AttendanceStatus = "Attended" | "Absent";
+export type EventStatus = "upcoming" | "active" | "completed";
+export type ApplicationStatus = "pending" | "approved" | "rejected" | "waitlisted";
+export type AttendanceStatus = "attended" | "absent";
 
 /** Status of a volunteer's membership in an org (org_volunteers.status). */
-export type OrgMemberStatus = "Pending" | "Active" | "Inactive" | "Rejected";
+export type OrgMemberStatus = "pending" | "active" | "inactive" | "rejected";
 
 /** Simplified membership indicator returned on org list endpoints. */
-export type MembershipStatus = "Active" | "Pending";
+export type MembershipStatus = "active" | "pending";
 
-/** Status of a logged activity/hour submission. "Completed" is used for participation-only logs. */
-export type ActivityStatus = "Pending" | "Approved" | "Rejected" | "Completed";
+/** Status of a logged activity/hour submission. "completed" is used for participation-only logs. */
+export type ActivityStatus = "pending" | "approved" | "rejected" | "completed";
 
 /** Status of a supervisor record. */
-export type SupervisorStatus = "Active" | "Pending";
+export type SupervisorStatus = "active" | "pending";
 
 /**
  * Canonical status constants — import these instead of inline string literals so
@@ -34,45 +34,45 @@ export type SupervisorStatus = "Active" | "Pending";
  *         if (e.status === EVENT_STATUS.Active) { ... }
  */
 export const EVENT_STATUS = {
-  Upcoming:  "Upcoming",
-  Active:    "Active",
-  Completed: "Completed",
+  Upcoming:  "upcoming",
+  Active:    "active",
+  Completed: "completed",
 } as const satisfies Record<string, EventStatus>;
 
 export const ATTENDANCE_STATUS = {
-  Attended: "Attended",
-  Absent:   "Absent",
+  Attended: "attended",
+  Absent:   "absent",
 } as const satisfies Record<string, AttendanceStatus>;
 
 export const APP_STATUS = {
-  Pending:    "Pending",
-  Approved:   "Approved",
-  Rejected:   "Rejected",
-  Waitlisted: "Waitlisted",
+  Pending:    "pending",
+  Approved:   "approved",
+  Rejected:   "rejected",
+  Waitlisted: "waitlisted",
 } as const satisfies Record<string, ApplicationStatus>;
 
 export const MEMBER_STATUS = {
-  Pending:  "Pending",
-  Active:   "Active",
-  Inactive: "Inactive",
-  Rejected: "Rejected",
+  Pending:  "pending",
+  Active:   "active",
+  Inactive: "inactive",
+  Rejected: "rejected",
 } as const satisfies Record<string, OrgMemberStatus>;
 
 export const ACTIVITY_STATUS = {
-  Pending:   "Pending",
-  Approved:  "Approved",
-  Rejected:  "Rejected",
-  Completed: "Completed",
+  Pending:   "pending",
+  Approved:  "approved",
+  Rejected:  "rejected",
+  Completed: "completed",
 } as const satisfies Record<string, ActivityStatus>;
 
 export const MEMBERSHIP_STATUS = {
-  Active:  "Active",
-  Pending: "Pending",
+  Active:  "active",
+  Pending: "pending",
 } as const satisfies Record<string, MembershipStatus>;
 
 export const SUPERVISOR_STATUS = {
-  Active:  "Active",
-  Pending: "Pending",
+  Active:  "active",
+  Pending: "pending",
 } as const satisfies Record<string, SupervisorStatus>;
 
 export interface Event {

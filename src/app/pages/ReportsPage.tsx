@@ -113,7 +113,7 @@ const handleExportStarSchema = async () => {
               <div style={{ fontSize: 14, color: "#1E293B" }}>{r.events_attended || 0}</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#16A34A" }}>{r.total_hours || 0}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{r.last_activity || "—"}</div>
-              <div><span style={{ backgroundColor: r.status === "Active" ? "#DCFCE7" : r.status === "Pending" ? "#FEF3C7" : "#FEE2E2", color: r.status === "Active" ? "#15803D" : r.status === "Pending" ? "#B45309" : "#B91C1C", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{r.status}</span></div>
+              <div><span style={{ backgroundColor: r.status === "active" ? "#DCFCE7" : r.status === "pending" ? "#FEF3C7" : "#FEE2E2", color: r.status === "active" ? "#15803D" : r.status === "pending" ? "#B45309" : "#B91C1C", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : ""}</span></div>
             </div>
           ))}
           {/* Totals row */}

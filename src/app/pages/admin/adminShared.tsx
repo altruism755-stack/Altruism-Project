@@ -26,15 +26,14 @@ export function EmptyState({ message }: { message: string }) {
   );
 }
 
-type BadgeVariant = "pending" | "approved" | "rejected" | "Active" | "Pending" | "Suspended";
+type BadgeVariant = "pending" | "approved" | "rejected" | "active" | "suspended";
 
 const BADGE_MAP: Record<BadgeVariant, { bg: string; color: string; label: string }> = {
   pending:   { bg: "#FEF3C7", color: "#B45309", label: "Pending" },
   approved:  { bg: "#DCFCE7", color: "#15803D", label: "Approved" },
   rejected:  { bg: "#FEE2E2", color: "#B91C1C", label: "Rejected" },
-  Active:    { bg: "#DCFCE7", color: "#15803D", label: "Active" },
-  Pending:   { bg: "#FEF3C7", color: "#B45309", label: "Pending" },
-  Suspended: { bg: "#FEE2E2", color: "#B91C1C", label: "Suspended" },
+  active:    { bg: "#DCFCE7", color: "#15803D", label: "Active" },
+  suspended: { bg: "#FEE2E2", color: "#B91C1C", label: "Suspended" },
 };
 
 export function Badge({ status }: { status: string }) {

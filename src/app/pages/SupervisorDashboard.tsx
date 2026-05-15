@@ -62,8 +62,8 @@ export function SupervisorDashboard() {
       const [profileRes, myEvtsRes, appsRes, actsRes, orgEvtsRes] = await Promise.all([
         api.getMyProfile(),
         api.getMyEvents(),
-        api.getMyApplications("Pending"),
-        api.getMyActivities("Pending"),
+        api.getMyApplications("pending"),
+        api.getMyActivities("pending"),
         api.getMyOrgEvents(),
       ]);
       setOrg(profileRes.organization);
@@ -608,11 +608,11 @@ function fmt12h(time?: string): string {
 
 function EventCard({ event: e, onViewActivities, isOwned, onOpen }: { event: any; onViewActivities: () => void; isOwned?: boolean; onOpen?: (id: number) => void }) {
   const statusStyle: Record<string, { bg: string; color: string; band: string; label: string }> = {
-    Upcoming:  { bg: "#DBEAFE", color: "#1D4ED8", band: "#2563EB", label: "Upcoming" },
-    Active:    { bg: "#DCFCE7", color: "#15803D", band: GREEN,      label: "Live Now" },
-    Completed: { bg: "#F1F5F9", color: "#475569", band: "#94A3B8",  label: "Completed" },
+    upcoming:  { bg: "#DBEAFE", color: "#1D4ED8", band: "#2563EB", label: "Upcoming" },
+    active:    { bg: "#DCFCE7", color: "#15803D", band: GREEN,      label: "Live Now" },
+    completed: { bg: "#F1F5F9", color: "#475569", band: "#94A3B8",  label: "Completed" },
   };
-  const st = statusStyle[e.status] || statusStyle.Upcoming;
+  const st = statusStyle[e.status] || statusStyle.upcoming;
   const fillPct = e.max_volunteers > 0 ? Math.min(100, Math.round(((e.current_volunteers || 0) / e.max_volunteers) * 100)) : 0;
   const eventMiniSteps = buildEventMiniSteps({
     status: e.status,
@@ -640,7 +640,7 @@ function EventCard({ event: e, onViewActivities, isOwned, onOpen }: { event: any
             {isOwned && (
               <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", borderRadius: 4, padding: "2px 8px" }}>Yours</span>
             )}
-            {e.status === "Upcoming" && isOwned && !e.registration_open && (
+            {e.status === "upcoming" && isOwned && !e.registration_open && (
               <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#FEF3C7", color: "#92400E", borderRadius: 4, padding: "2px 8px" }}>Reg. Closed</span>
             )}
             {e.supervisor_name && !isOwned && (

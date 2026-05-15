@@ -9,14 +9,14 @@ const GREEN = "#16A34A";
 type Tab = EventStatus;
 
 const statusMeta: Record<Tab, { bg: string; band: string; text: string; label: string }> = {
-  Upcoming:  { bg: "#DCFCE7", band: GREEN,     text: "#15803D", label: "Upcoming"  },
-  Active:    { bg: "#FEF3C7", band: "#D97706",  text: "#B45309", label: "Ongoing"   },
-  Completed: { bg: "#F1F5F9", band: "#94A3B8",  text: "#64748B", label: "Completed" },
+  upcoming:  { bg: "#DCFCE7", band: GREEN,     text: "#15803D", label: "Upcoming"  },
+  active:    { bg: "#FEF3C7", band: "#D97706",  text: "#B45309", label: "Ongoing"   },
+  completed: { bg: "#F1F5F9", band: "#94A3B8",  text: "#64748B", label: "Completed" },
 };
 
 const emptyForm = {
   name: "", description: "", location: "",
-  date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "Upcoming",
+  date: "", time: "", duration: "", maxVolunteers: "", requiredSkills: "", status: "upcoming",
   acceptanceMode: "manual" as "manual" | "auto",
 };
 
@@ -25,7 +25,7 @@ export function EventManagement() {
   const orgName = profile?.name || "Organization";
   const orgId: number = profile?.id || 0;
 
-  const [tab, setTab] = useState<Tab>("Upcoming");
+  const [tab, setTab] = useState<Tab>("upcoming");
   const [allEvents, setAllEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
@@ -135,7 +135,7 @@ export function EventManagement() {
 
         {/* Tabs */}
         <div className="flex gap-1" style={{ marginBottom: 24, borderBottom: "2px solid #E2E8F0" }}>
-          {(["Upcoming", "Active", "Completed"] as Tab[]).map((t) => {
+          {(["upcoming", "active", "completed"] as Tab[]).map((t) => {
             const meta = statusMeta[t];
             return (
               <button
@@ -180,7 +180,7 @@ export function EventManagement() {
           <>
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
             {pageEvents.map((ev) => {
-              const meta = statusMeta[ev.status as Tab] || statusMeta.Completed;
+              const meta = statusMeta[ev.status as Tab] || statusMeta.completed;
               const skills = (ev.required_skills || "").split(",").map((s: string) => s.trim()).filter(Boolean);
               return (
                 <div key={ev.id} style={{ backgroundColor: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", overflow: "hidden" }}>
@@ -309,9 +309,9 @@ export function EventManagement() {
                   <div>
                     <label style={labelStyle}>Status</label>
                     <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inputStyle}>
-                      <option value="Upcoming">Upcoming</option>
-                      <option value="Active">Ongoing</option>
-                      <option value="Completed">Completed</option>
+                      <option value="upcoming">Upcoming</option>
+                      <option value="active">Ongoing</option>
+                      <option value="completed">Completed</option>
                     </select>
                   </div>
 

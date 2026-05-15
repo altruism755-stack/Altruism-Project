@@ -45,7 +45,7 @@ export function VolunteerDashboard() {
     try {
       const [volRes, evtRes] = await Promise.all([
         api.getVolunteer(volId),
-        api.getEvents({ status: "Upcoming" }),
+        api.getEvents({ status: "upcoming" }),
       ]);
       setVolunteer(volRes);
       const activities = volRes.activities || [];
@@ -81,18 +81,18 @@ export function VolunteerDashboard() {
 
   useEffect(() => { fetchData(); }, [volId]);
 
-  const totalHours = myActivities.filter((a) => a.status === "Approved").reduce((s: number, a: any) => s + (a.hours || 0), 0);
+  const totalHours = myActivities.filter((a) => a.status === "approved").reduce((s: number, a: any) => s + (a.hours || 0), 0);
   const totalSubmitted = myActivities.length;
 
   // Hours logged this calendar month
   const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
   const hoursThisMonth = myActivities
-    .filter((a) => a.status === "Approved" && (a.date || "").startsWith(thisMonth))
+    .filter((a) => a.status === "approved" && (a.date || "").startsWith(thisMonth))
     .reduce((s: number, a: any) => s + (a.hours || 0), 0);
 
   // Days since last approved activity
   const lastActivityDate = myActivities
-    .filter((a) => a.status === "Approved")
+    .filter((a) => a.status === "approved")
     .map((a) => a.date)
     .filter(Boolean)
     .sort()

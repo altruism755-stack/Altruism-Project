@@ -38,8 +38,8 @@ export function VolunteerOrgProfile() {
         ]);
         setOrg(orgRes);
         const volOrgs: any[] = volRes.organizations || [];
-        setMyOrgIds(new Set(volOrgs.filter((o: any) => o.membership_status === "Active").map((o: any) => o.id)));
-        setPendingOrgIds(new Set(volOrgs.filter((o: any) => o.membership_status === "Pending").map((o: any) => o.id)));
+        setMyOrgIds(new Set(volOrgs.filter((o: any) => o.membership_status === "active").map((o: any) => o.id)));
+        setPendingOrgIds(new Set(volOrgs.filter((o: any) => o.membership_status === "pending").map((o: any) => o.id)));
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     };

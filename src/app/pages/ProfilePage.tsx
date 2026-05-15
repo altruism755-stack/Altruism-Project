@@ -29,14 +29,14 @@ import { APP_STATUS, MEMBER_STATUS, MEMBERSHIP_STATUS } from "../types";
 
 const GREEN = "#16A34A";
 const RED = "#DC2626";
-const APP_STATUS_ORDER = ["Pending", "Waitlisted", "Approved", "Rejected"] as const;
+const APP_STATUS_ORDER = ["pending", "waitlisted", "approved", "rejected"] as const;
 type AppStatus = (typeof APP_STATUS_ORDER)[number];
 
 const APP_STATUS_CONFIG: Record<AppStatus, { bg: string; text: string; label: string }> = {
-  Pending:   { bg: "#FEF3C7", text: "#B45309", label: "Pending" },
-  Waitlisted:{ bg: "#E0F2FE", text: "#0369A1", label: "Waitlisted" },
-  Approved:  { bg: "#DCFCE7", text: "#15803D", label: "Approved" },
-  Rejected:  { bg: "#FEE2E2", text: "#B91C1C", label: "Rejected" },
+  pending:   { bg: "#FEF3C7", text: "#B45309", label: "Pending" },
+  waitlisted:{ bg: "#E0F2FE", text: "#0369A1", label: "Waitlisted" },
+  approved:  { bg: "#DCFCE7", text: "#15803D", label: "Approved" },
+  rejected:  { bg: "#FEE2E2", text: "#B91C1C", label: "Rejected" },
 };
 
 function ApplicationsTracker({
@@ -88,8 +88,8 @@ function ApplicationsTracker({
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {sorted.map((app: any, idx: number) => {
-                const cfg = APP_STATUS_CONFIG[app.status as AppStatus] ?? APP_STATUS_CONFIG.Pending;
-                const canCancel = app.status === APP_STATUS.Pending || app.status === "Waitlisted" || app.status === APP_STATUS.Approved;
+                const cfg = APP_STATUS_CONFIG[app.status as AppStatus] ?? APP_STATUS_CONFIG.pending;
+                const canCancel = app.status === APP_STATUS.Pending || app.status === "waitlisted" || app.status === APP_STATUS.Approved;
                 const isCancelling = cancellingAppId === app.id;
                 return (
                   <div key={app.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: idx < sorted.length - 1 ? "1px solid #F1F5F9" : "none", gap: 10 }}>
@@ -201,7 +201,7 @@ export function ProfilePage() {
       if (activeOrgIds.length > 0) {
         try {
           const [evtRes, appsRes] = await Promise.all([
-            api.getEvents({ status: "Upcoming" }),
+            api.getEvents({ status: "upcoming" }),
             api.getEventApplications(),
           ]);
           const allApps: any[] = appsRes.applications || [];

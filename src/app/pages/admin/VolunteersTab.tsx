@@ -64,9 +64,9 @@ export function VolunteersTab({ onStatsRefresh }: Props) {
           style={{ height: 38, border: "1.5px solid #E2E8F0", borderRadius: 8, padding: "0 10px", fontSize: 14, outline: "none", backgroundColor: "#fff", color: "#1E293B" }}
         >
           <option value="">All Statuses</option>
-          <option value="Active">Active</option>
-          <option value="Pending">Pending</option>
-          <option value="Suspended">Suspended</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="suspended">Suspended</option>
         </select>
       </div>
 
@@ -96,18 +96,18 @@ export function VolunteersTab({ onStatsRefresh }: Props) {
               <div style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>{vol.active_orgs ?? 0}</div>
               <div style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>{vol.activity_count ?? 0}</div>
               <div className="flex gap-2">
-                {vol.status !== "Active" && (
+                {vol.status !== "active" && (
                   <button
-                    onClick={() => handleStatus(vol.id, "Active")}
+                    onClick={() => handleStatus(vol.id, "active")}
                     disabled={updatingId === vol.id}
                     style={{ ...btnStyle(GREEN, "#fff"), fontSize: 11, height: 28, padding: "0 10px", opacity: updatingId === vol.id ? 0.6 : 1 }}
                   >
                     Activate
                   </button>
                 )}
-                {vol.status !== "Suspended" && (
+                {vol.status !== "suspended" && (
                   <button
-                    onClick={() => handleStatus(vol.id, "Suspended")}
+                    onClick={() => handleStatus(vol.id, "suspended")}
                     disabled={updatingId === vol.id}
                     style={{ ...btnStyle("#fff", "#EF4444", "1px solid #FECACA"), fontSize: 11, height: 28, padding: "0 10px", opacity: updatingId === vol.id ? 0.6 : 1 }}
                   >

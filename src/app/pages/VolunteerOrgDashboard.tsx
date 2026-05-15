@@ -67,7 +67,7 @@ export function VolunteerOrgDashboard() {
       try {
         const [res, evtRes, appsRes, annRes] = await Promise.all([
           api.getVolunteerOrgDashboard(volId, Number(orgId)),
-          api.getEvents({ org_id: String(orgId), status: "Upcoming" }),
+          api.getEvents({ org_id: String(orgId), status: "upcoming" }),
           api.getEventApplications(),
           api.getAnnouncements([Number(orgId)]).catch(() => ({ announcements: [] })),
         ]);
@@ -177,7 +177,7 @@ export function VolunteerOrgDashboard() {
   const pendingApplications = data.pending_applications || [];
   const totalHours         = data.total_hours         || 0;
   const completedCount     = data.completed_activities || 0;
-  const memberStatus       = data.member_status       || "Pending";
+  const memberStatus       = data.member_status       || "pending";
 
   // Applications lookup: eventId → { status, appId, acceptance_mode }
   const appliedMap = new Map<number, { status: string; appId: number; mode?: string }>();
@@ -186,7 +186,7 @@ export function VolunteerOrgDashboard() {
   // Events the volunteer attended (Approved application + Completed event) — eligible for rating
   const rateableEventIds = new Set<number>(
     myApplications
-      .filter((a: any) => a.status === "Approved" && a.event_status === "Completed" && a.org_id === Number(orgId))
+      .filter((a: any) => a.status === "approved" && a.event_status === "completed" && a.org_id === Number(orgId))
       .map((a: any) => a.event_id)
   );
 
@@ -241,7 +241,7 @@ export function VolunteerOrgDashboard() {
         </div>
 
         {/* ── Status banners ── */}
-        {memberStatus === "Pending" && (
+        {memberStatus === "pending" && (
           <Banner icon="⏳" color="#F59E0B" bg="#FFFBEB" border="#FDE68A"
             title="Waiting for Approval"
             body="Your membership request is under review. You'll get a notification once the admin responds." />
@@ -375,9 +375,9 @@ export function VolunteerOrgDashboard() {
                           <>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#64748B", fontWeight: 500 }}>
                               <span style={{ fontSize: 16 }}>
-                                {appStatus === "Approved" ? "✅" : appStatus === "Rejected" ? "❌" : "⏳"}
+                                {appStatus === "approved" ? "✅" : appStatus === "rejected" ? "❌" : "⏳"}
                               </span>
-                              {appStatus === "Approved" ? "Confirmed" : appStatus === "Rejected" ? "Rejected" : "Pending"}
+                              {appStatus === "approved" ? "Confirmed" : appStatus === "rejected" ? "Rejected" : "Pending"}
                             </div>
                             {appStatus !== "Rejected" && appId && (
                               <button
@@ -395,7 +395,7 @@ export function VolunteerOrgDashboard() {
                               </button>
                             )}
                           </>
-                        ) : memberStatus !== "Active" ? (
+                        ) : memberStatus !== "active" ? (
                           <span style={{ fontSize: 12, color: "#94A3B8" }}>Join org to apply</span>
                         ) : isFull ? (
                           <span style={{ fontSize: 12, color: "#94A3B8" }}>Event full</span>
@@ -552,7 +552,7 @@ export function VolunteerOrgDashboard() {
         {activeTab === "pending" && (
           <div className="flex flex-col gap-3">
             {pendingApplications.length === 0 ? (
-              memberStatus === "Pending" ? (
+              memberStatus === "pending" ? (
                 <EmptyState icon="⏳" title="Membership pending"
                   body="Your request to join this organization is under review. Once approved, you'll be able to apply to events." />
               ) : (

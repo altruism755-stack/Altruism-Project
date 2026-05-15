@@ -124,7 +124,7 @@ def volunteer_hours(
             query += " AND a.date <= %s"
             params.append(date_to)
 
-        query += " GROUP BY v.id ORDER BY total_hours DESC"
+        query += " GROUP BY v.id, v.name, u.email, v.status ORDER BY total_hours DESC"
 
         report = dict_rows(db.execute(query, params).fetchall())
         total_hours = sum(r["total_hours"] for r in report)

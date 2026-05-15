@@ -125,7 +125,7 @@ export function SupervisorManagement() {
                   <div style={{ fontSize: 13, color: "#64748B" }}>{s.email}</div>
                   <div style={{ fontSize: 13, color: "#64748B" }}>{s.team || "—"}</div>
                   <div><span style={{ backgroundColor: "#DBEAFE", color: "#1D4ED8", fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "2px 8px" }}>{s.assigned_volunteers ?? 0}</span></div>
-                  <div><span style={{ backgroundColor: s.status === "Active" ? "#DCFCE7" : "#FEF3C7", color: s.status === "Active" ? "#15803D" : "#B45309", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{s.status}</span></div>
+                  <div><span style={{ backgroundColor: s.status === "active" ? "#DCFCE7" : "#FEF3C7", color: s.status === "active" ? "#15803D" : "#B45309", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : ""}</span></div>
                   <div className="flex gap-2">
                     <button style={{ height: 28, padding: "0 10px", backgroundColor: "transparent", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Manage</button>
                     <button onClick={() => handleRemove(s.id)} style={{ height: 28, padding: "0 10px", backgroundColor: "transparent", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Remove</button>

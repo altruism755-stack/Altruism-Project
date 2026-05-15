@@ -38,14 +38,14 @@ export function VolunteerDetail() {
   const handleApprove = async (aid: number) => {
     try {
       await api.approveActivity(aid);
-      setActivities((prev) => prev.map((a) => a.id === aid ? { ...a, status: "Approved" } : a));
+      setActivities((prev) => prev.map((a) => a.id === aid ? { ...a, status: "approved" } : a));
     } catch (e) { console.error("Approve failed:", e); }
   };
 
   const handleReject = async (aid: number) => {
     try {
       await api.rejectActivity(aid);
-      setActivities((prev) => prev.map((a) => a.id === aid ? { ...a, status: "Rejected" } : a));
+      setActivities((prev) => prev.map((a) => a.id === aid ? { ...a, status: "rejected" } : a));
     } catch (e) { console.error("Reject failed:", e); }
   };
 
@@ -57,7 +57,7 @@ export function VolunteerDetail() {
   );
 
   const filtered = tab === "All" ? activities : activities.filter((a) => a.status === tab);
-  const totalHours = activities.filter((a) => a.status === "Approved").reduce((s: number, a: any) => s + (a.hours || 0), 0);
+  const totalHours = activities.filter((a) => a.status === "approved").reduce((s: number, a: any) => s + (a.hours || 0), 0);
   const skills = (() => { try { return JSON.parse(volunteer.skills || "[]"); } catch { return []; } })();
 
   return (
@@ -123,7 +123,7 @@ export function VolunteerDetail() {
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#1E293B" }}>{a.hours}</div>
                     <div><span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status}</span></div>
                     <div className="flex gap-2">
-                      {a.status === "Pending" ? (
+                      {a.status === "pending" ? (
                         <>
                           <button onClick={() => handleApprove(a.id)} style={{ height: 28, padding: "0 10px", backgroundColor: GREEN, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Approve</button>
                           <button onClick={() => handleReject(a.id)} style={{ height: 28, padding: "0 10px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Reject</button>

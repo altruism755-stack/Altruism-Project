@@ -79,8 +79,8 @@ export function VolunteerManagement() {
   useEffect(() => { if (orgId) fetchData(); }, [orgId]);
   useEffect(() => { resetPage(); }, [tab, search]);
 
-  const pendingMembers = members.filter((m) => m.org_status === "Pending");
-  const activeMembers = members.filter((m) => m.org_status === "Active");
+  const pendingMembers = members.filter((m) => m.org_status === "pending");
+  const activeMembers = members.filter((m) => m.org_status === "active");
 
   const filtered = (tab === "pending" ? pendingMembers : activeMembers).filter((m) =>
     !search ||
