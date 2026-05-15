@@ -37,12 +37,9 @@ def seed():
             "volunteer_availability", "volunteer_experiences",
             "volunteer_cause_areas", "volunteer_languages", "volunteer_skills",
             "events", "supervisors", "volunteers",
-            "org_admins", "organizations", "users",
+            "org_admins", "organizations", "platform_admins", "users",
         ]:
-            try:
-                db.execute(f"DELETE FROM {table}")
-            except Exception:
-                pass
+            db.execute(f"DELETE FROM {table} WHERE TRUE")
 
         h = hash_password
 
@@ -405,6 +402,15 @@ def seed():
              "Borg El-Arab, Alexandria", "2025-12-20 07:00:00+02", 8, 35,
              "Community Outreach, Event Planning", "completed", 3),
 
+            (8, 2, "Medical Volunteer Training — Cairo",
+             "Hands-on first-aid and triage skills workshop for new Red Crescent medical volunteers.",
+             "Egyptian Red Crescent HQ, Nasr City, Cairo", "2026-04-12 09:00:00+02", 6, 20,
+             "Medical / First Aid, Community Outreach", "completed", 4),
+            (9, 2, "Emergency Response Drill — June",
+             "Full-scale emergency simulation training across four Red Crescent field teams in Greater Cairo.",
+             "Maadi Civil Defence Training Ground, Cairo", "2026-06-08 07:30:00+02", 8, 40,
+             "Medical / First Aid, Community Outreach", "upcoming", 4),
+
             (6, 3, "Entrepreneurship Bootcamp — Spring",
              "Three-day bootcamp for student entrepreneurs covering business modeling and pitching.",
              "AUC New Cairo Campus", "2026-05-15 09:00:00+02", 8, 25,
@@ -459,6 +465,19 @@ def seed():
             (26,  4, 7, "approved", "2026-03-25 10:00:00"),
             (27, 10, 7, "approved", "2026-03-26 11:00:00"),
             (28, 12, 7, "approved", "2026-03-28 09:30:00"),
+            # Event 8 — Medical Volunteer Training (Nourhan's completed event)
+            (29,  1, 8, "approved", "2026-03-20 10:00:00"),
+            (30, 10, 8, "approved", "2026-03-21 09:30:00"),
+            (31,  6, 8, "approved", "2026-03-22 11:00:00"),
+            (32,  9, 8, "approved", "2026-03-23 14:00:00"),
+            (33,  7, 8, "approved", "2026-03-24 09:00:00"),
+            # Event 9 — Emergency Response Drill (Nourhan's upcoming event)
+            (34,  1, 9, "pending",  "2026-05-10 10:00:00"),
+            (35, 10, 9, "approved", "2026-05-08 09:00:00"),
+            (36,  6, 9, "approved", "2026-05-09 11:00:00"),
+            (37,  9, 9, "pending",  "2026-05-11 14:00:00"),
+            (38,  7, 9, "pending",  "2026-05-12 10:30:00"),
+            (39,  2, 9, "approved", "2026-05-07 15:00:00"),
         ]
         _executemany(db,
             "INSERT INTO event_applications (id, volunteer_id, event_id, status, created_at) "
@@ -507,6 +526,18 @@ def seed():
 
             (27, 11, 6, 3, "2026-04-15", 4, "Pitch coaching for student teams preparing bootcamp submissions.", "approved"),
             (28, 11, 2, 1, "2026-04-28", 3, "Volunteer outreach on campus for Youth Leadership Forum.", "pending"),
+
+            # Activities for Nourhan's events (event 8 — completed; event 9 — upcoming prep)
+            (29,  1, 8, 2, "2026-04-12", 6, "Led triage simulation station; assessed 25 trainees on first-aid protocols.", "approved"),
+            (30, 10, 8, 2, "2026-04-12", 6, "Ran CPR and AED demo sessions for 20 new medical volunteers.", "approved"),
+            (31,  6, 8, 2, "2026-04-12", 6, "Coordinated equipment setup and managed supply checklist for the training day.", "approved"),
+            (32,  9, 8, 2, "2026-04-12", 6, "Conducted post-training evaluations and compiled skills assessment report.", "approved"),
+            (33,  7, 8, 2, "2026-04-12", 6, "Assisted logistics team; transported and stocked medical kits at four stations.", "approved"),
+
+            (34, 10, 9, 2, "2026-05-20", 4, "Pre-drill briefing: mapped team assignments and reviewed emergency protocol booklets.", "pending"),
+            (35,  6, 9, 2, "2026-05-22", 3, "Site preparation for drill ground: zone marking and equipment distribution.", "pending"),
+            (36,  1, 9, 2, "2026-05-25", 3, "Volunteer coordination meeting — attendance tracking and role confirmations.", "pending"),
+            (37,  9, 9, 2, "2026-05-26", 2, "Printed and distributed drill scenario cards to all four field team leaders.", "pending"),
         ]
         _executemany(db,
             "INSERT INTO activities (id, volunteer_id, event_id, org_id, date, hours, description, status) "
@@ -528,6 +559,12 @@ def seed():
             (9,  7, 2, 5, "completion",    8, "2025-12-28"),
             (10,10, 3, 7, "completion",    5, "2026-04-12"),
             (11,10, 2, 5, "completion",    8, "2025-12-28"),
+            # Certificates from Nourhan's Medical Volunteer Training (event 8)
+            (12,  1, 2, 8, "achievement",  6, "2026-04-18"),
+            (13, 10, 2, 8, "achievement",  6, "2026-04-18"),
+            (14,  6, 2, 8, "completion",   6, "2026-04-18"),
+            (15,  9, 2, 8, "completion",   6, "2026-04-18"),
+            (16,  7, 2, 8, "completion",   6, "2026-04-18"),
         ]
         _executemany(db,
             "INSERT INTO certificates (id, volunteer_id, org_id, event_id, type, hours, issued_date) "
@@ -574,6 +611,17 @@ def seed():
              "Yara Hassan applied to 'Blood Donation Drive'.", False, "/admin/applications", "2026-04-13 10:06:00"),
             (3, "membership",  "Pending Volunteer",
              "Menna Tarek is pending approval as a Red Crescent volunteer.", True, "/admin/volunteers", "2026-04-05 13:00:00"),
+            # Notifications for Nourhan Ali (user_id=13)
+            (13, "application", "New Event Application",
+             "Yara Hassan applied to 'Emergency Response Drill — June'.", False, "/supervisor/applications", "2026-05-10 10:01:00"),
+            (13, "application", "New Event Application",
+             "Omar Farouk applied to 'Emergency Response Drill — June'.", False, "/supervisor/applications", "2026-05-11 14:01:00"),
+            (13, "application", "New Event Application",
+             "يوسف بكر applied to 'Emergency Response Drill — June'.", False, "/supervisor/applications", "2026-05-12 10:31:00"),
+            (13, "activity",    "Activity Pending Review",
+             "Layla Samir submitted an activity log for 'Emergency Response Drill — June'.", False, "/supervisor/activities", "2026-05-20 16:00:00"),
+            (13, "activity",    "Activity Pending Review",
+             "Hana Youssef submitted an activity log for 'Emergency Response Drill — June'.", False, "/supervisor/activities", "2026-05-22 09:30:00"),
         ]
         _executemany(db,
             "INSERT INTO notifications (user_id, type, title, message, is_read, action_url, created_at) "
@@ -587,6 +635,7 @@ def seed():
     print("  platform@altruism.org / Platform#1                 (platform admin)")
     print("  sherifaziz@resala.org / Admin#1234                 (Resala admin)")
     print("  amirakhalil@resala.org / Super#1234                (Resala supervisor)")
+    print("  nourhanali@redcrescent.org / Super#1234            (Red Crescent supervisor — Medical team)")
     print("  yarahassan@gmail.com / Vol#12345                   (volunteer demo)")
 
 

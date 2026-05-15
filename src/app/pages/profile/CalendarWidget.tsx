@@ -120,7 +120,7 @@ export function CalendarWidget({ events }: { events: CalEvent[] }) {
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
   // List events — all events sorted by date (not limited to current month)
-  const allEvents = [...events].sort((a, b) => a.date.localeCompare(b.date));
+  const allEvents = [...events].filter((e) => !!e.date).sort((a, b) => a.date.localeCompare(b.date));
   const monthEvents = allEvents.filter((e) => { const d = new Date(e.date); return d.getFullYear() === year && d.getMonth() === month; });
 
   const listEvents = selectedDay ? getDayEvents(selectedDay) : allEvents;
