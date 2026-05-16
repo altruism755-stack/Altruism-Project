@@ -125,7 +125,7 @@ export function validateOrgSize(v: string): string {
 }
 
 export function validateCategories(v: string[]): string {
-  return v.length === 0 ? "Please select at least one category." : "";
+  return "";
 }
 
 export function validateHqGovernorate(v: string): string {

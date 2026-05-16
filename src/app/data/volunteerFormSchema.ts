@@ -170,7 +170,7 @@ export function validateFullName(v: string): string {
 }
 
 export function validateSubmitterName(v: string): string {
-  if (!v.trim()) return "Submitter name is required.";
+  if (!v.trim()) return "";
   if (!/^[\u0600-\u06FF0-9a-zA-Z\s]+$/.test(v.trim()))
     return "Name must contain letters only — no numbers or special characters.";
   if (v.trim().split(/\s+/).length < 2)
@@ -179,7 +179,7 @@ export function validateSubmitterName(v: string): string {
 }
 
 export function validateSubmitterRole(v: string): string {
-  if (!v.trim()) return "Your role is required.";
+  if (!v.trim()) return "";
   if (v.trim().length < 2) return "Role must be at least 2 characters.";
   if (v.trim().length > 60) return "Role must be no more than 60 characters.";
   if (!/^[\u0600-\u06FFa-zA-Z\s\-\/\.]+$/.test(v.trim()))

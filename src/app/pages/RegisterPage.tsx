@@ -162,9 +162,9 @@ export function RegisterPage() {
   );
 
   const orgFormValid =
-    isOrgFormValid(orgFieldErrors) &&
     !orgAccountErrors.email && !orgAccountErrors.password &&
-    !orgAccountErrors.confirmPassword && !orgAccountErrors.documents &&
+    !orgAccountErrors.confirmPassword &&
+    !!orgState.orgName.trim() && !!orgState.orgType &&
     orgInfoAccurate && orgTermsAccepted;
 
   const step1Valid = STEP1_FIELDS.every((f) => !errors[f as keyof typeof errors]);
