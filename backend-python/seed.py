@@ -602,6 +602,18 @@ def seed():
              "Legal support, health screening, and psychosocial sessions for urban refugees.",
              "Ain Shams Community Centre, Cairo","2026-05-28 09:00:00+02",6,25,
              "Community Outreach, Medical / First Aid, Translation","upcoming",3),
+            (34, 2, "Field Volunteer Induction — Batch 4",
+             "Full-day onboarding for 20 new field volunteers: Red Crescent protocols, safety, and team roles.",
+             "Egyptian Red Crescent HQ, Nasr City","2026-03-18 09:00:00+02",7,20,
+             "Community Outreach, Administrative Support","completed",3),
+            (35, 2, "Mobile Medical Unit — Beni Suef",
+             "Three-day mobile clinic providing free consultations, dressings, and medication to rural communities.",
+             "Beni Suef Governorate — 5-village circuit","2026-02-10 07:00:00+02",9,18,
+             "Medical / First Aid, Community Outreach","completed",3),
+            (36, 2, "International Humanitarian Law Workshop",
+             "Half-day workshop on IHL principles for Red Crescent field staff and senior volunteers.",
+             "Egyptian Red Crescent HQ, Nasr City","2026-07-05 09:00:00+02",4,25,
+             "Teaching / Tutoring, Administrative Support","upcoming",3),
             (14, 2, "First Aid Awareness Week — Schools Tour",
              "5-school tour delivering first-aid awareness sessions to secondary students.",
              "Various Schools — Nasr City & Heliopolis","2026-03-02 09:00:00+02",4,15,
@@ -670,6 +682,14 @@ def seed():
              "Ceremony recognising top-performing volunteers with certificates, awards, and networking.",
              "Cairo Marriott Hotel, Zamalek","2026-09-12 18:00:00+02",5,30,
              "Event Planning, Administrative Support","upcoming",11),
+            (37, 2, "Mass Casualty Simulation — October",
+             "Realistic mass-casualty incident drill testing triage, evacuation, and inter-team coordination for 60 volunteers.",
+             "Egyptian Red Crescent Training Centre, Maadi","2025-10-14 07:00:00+02",8,30,
+             "Medical / First Aid, Community Outreach","completed",3),
+            (38, 2, "Winter Blood Drive — Mansoura & Tanta",
+             "Multi-city blood donation campaign coordinated with Delta region hospitals to address winter shortages.",
+             "Mansoura University Hospital & Tanta Blood Bank","2025-11-22 08:00:00+02",6,45,
+             "Medical / First Aid, Community Outreach","completed",3),
 
             # ── Enactus (org 3, supervisors 5 & 6) ──
             (6,  3, "Entrepreneurship Bootcamp — Spring",
@@ -810,6 +830,45 @@ def seed():
             (78, 24,14,"approved","2026-02-22 08:30:00"),
             (79,  9,14,"approved","2026-02-23 09:00:00"),
 
+            # Event 30 — Search & Rescue Camp (upcoming, supervisor 3 = Ahmed El-Masry)
+            (91,  1,30,"approved","2026-06-10 09:00:00"),
+            (92,  6,30,"approved","2026-06-11 10:00:00"),
+            (93, 10,30,"pending", "2026-06-12 11:00:00"),
+            (94,  7,30,"approved","2026-06-13 09:30:00"),
+            (95, 16,30,"pending", "2026-06-14 14:00:00"),
+            (96, 24,30,"approved","2026-06-15 08:00:00"),
+            (97, 19,30,"pending", "2026-06-16 10:00:00"),
+            (98,  9,30,"approved","2026-06-17 11:30:00"),
+            (99, 13,30,"pending", "2026-06-18 08:00:00"),
+            (100,25,30,"approved","2026-06-19 09:30:00"),
+
+            # Event 34 — Field Volunteer Induction (completed, supervisor 3)
+            (101, 1,34,"approved","2026-03-05 09:00:00"),
+            (102, 6,34,"approved","2026-03-06 10:00:00"),
+            (103, 7,34,"approved","2026-03-07 11:00:00"),
+            (104,10,34,"approved","2026-03-08 09:30:00"),
+            (105,16,34,"approved","2026-03-08 14:00:00"),
+            (106,19,34,"approved","2026-03-09 08:00:00"),
+            (107,23,34,"approved","2026-03-09 10:00:00"),
+            (108,24,34,"approved","2026-03-10 09:00:00"),
+            (109,25,34,"rejected","2026-03-10 11:00:00"),
+
+            # Event 35 — Mobile Medical Unit (completed, supervisor 3)
+            (110, 6,35,"approved","2026-01-28 09:00:00"),
+            (111,10,35,"approved","2026-01-29 10:00:00"),
+            (112,16,35,"approved","2026-01-30 08:30:00"),
+            (113, 9,35,"approved","2026-01-30 11:00:00"),
+            (114,24,35,"approved","2026-01-31 09:00:00"),
+            (115,19,35,"approved","2026-01-31 14:00:00"),
+
+            # Event 36 — IHL Workshop (upcoming, supervisor 3)
+            (116, 1,36,"pending", "2026-06-20 09:00:00"),
+            (117, 6,36,"approved","2026-06-21 10:00:00"),
+            (118, 7,36,"pending", "2026-06-22 11:00:00"),
+            (119,10,36,"approved","2026-06-23 09:30:00"),
+            (120,13,36,"approved","2026-06-24 14:00:00"),
+            (121,16,36,"pending", "2026-06-25 08:00:00"),
+
             # Event 15 — Social Innovation Hackathon (upcoming)
             (80, 15,15,"approved","2026-05-22 10:00:00"),
             (81,  4,15,"pending", "2026-05-23 09:00:00"),
@@ -826,6 +885,33 @@ def seed():
             (88, 22,17,"approved","2026-04-25 09:00:00"),
             (89,  9,17,"approved","2026-04-26 10:00:00"),
             (90, 12,17,"approved","2026-04-27 08:30:00"),
+
+            # Event 37 — Mass Casualty Simulation (completed, supervisor 3 Ahmed El-Masry)
+            (122, 1,37,"approved","2025-09-20 09:00:00"),
+            (123, 6,37,"approved","2025-09-21 10:00:00"),
+            (124, 7,37,"approved","2025-09-22 11:00:00"),
+            (125,10,37,"approved","2025-09-23 09:30:00"),
+            (126,16,37,"approved","2025-09-24 14:00:00"),
+            (127,19,37,"approved","2025-09-25 08:00:00"),
+            (128,23,37,"approved","2025-09-26 10:00:00"),
+            (129,24,37,"approved","2025-09-27 09:00:00"),
+            (130,25,37,"approved","2025-09-28 11:00:00"),
+            (131, 9,37,"approved","2025-09-28 13:00:00"),
+            (132,13,37,"rejected","2025-09-29 09:00:00"),
+
+            # Event 38 — Winter Blood Drive (completed, supervisor 3 Ahmed El-Masry)
+            (133, 1,38,"approved","2025-10-15 08:00:00"),
+            (134, 6,38,"approved","2025-10-16 09:00:00"),
+            (135, 7,38,"approved","2025-10-17 10:00:00"),
+            (136,10,38,"approved","2025-10-18 08:30:00"),
+            (137,16,38,"approved","2025-10-19 09:00:00"),
+            (138,19,38,"approved","2025-10-20 11:00:00"),
+            (139,23,38,"approved","2025-10-21 08:00:00"),
+            (140,24,38,"approved","2025-10-22 10:00:00"),
+            (141,25,38,"approved","2025-10-23 09:00:00"),
+            (142, 9,38,"approved","2025-10-24 11:30:00"),
+            (143,13,38,"approved","2025-10-25 08:00:00"),
+            (144,15,38,"approved","2025-10-26 09:00:00"),
         ]
         _executemany(db,
             "INSERT INTO event_applications (id, volunteer_id, event_id, status, created_at) "
@@ -891,7 +977,7 @@ def seed():
 
             # Event 4 — Blood Donation (upcoming prep)
             (38,10,4,2,"2026-04-25",3,"Training session for new medical-support volunteers.","approved"),
-            (39, 6,4,2,"2026-04-15",4,"Pre-event logistics planning for blood donation sites.","pending"),
+            (39, 6,4,2,"2026-04-15",4,"Pre-event logistics planning for blood donation sites.","approved"),
             (40, 9,4,2,"2026-04-22",3,"University outreach to recruit blood donors.","approved"),
 
             # Event 9 — Emergency Response Drill (upcoming prep)
@@ -900,9 +986,9 @@ def seed():
             (43, 1,9,2,"2026-05-25",3,"Volunteer coordination and role confirmations.","pending"),
 
             # Event 13 — Refugee Support Day (upcoming prep)
-            (44, 7,13,2,"2026-05-15",3,"Translation briefing for three language support teams.","pending"),
-            (45,16,13,2,"2026-05-16",3,"Health screening protocol walkthrough with medical team.","pending"),
-            (46,23,13,2,"2026-05-17",2,"Legal intake form preparation for refugee clients.","pending"),
+            (44, 7,13,2,"2026-05-15",3,"Translation briefing for three language support teams.","approved"),
+            (45,16,13,2,"2026-05-16",3,"Health screening protocol walkthrough with medical team.","approved"),
+            (46,23,13,2,"2026-05-17",2,"Legal intake form preparation for refugee clients.","approved"),
 
             # Event 7 — Digital Skills for Women
             (47, 4,7,3,"2026-04-05",5,"Taught e-commerce basics to 18 women entrepreneurs.","approved"),
@@ -921,6 +1007,69 @@ def seed():
             (56,22,17,3,"2026-05-08",4,"Delivered budgeting module to 30 university students.","approved"),
             (57, 9,17,3,"2026-05-08",4,"Facilitated savings and investment Q&A session.","approved"),
             (58,12,17,3,"2026-05-08",4,"Translation of workshop materials into English.","approved"),
+
+            # Event 30 — Search & Rescue Camp (Ahmed El-Masry, upcoming prep — auto-approved)
+            (64, 1,30,2,"2026-07-20",4,"Pre-camp volunteer briefing and equipment allocation.","approved"),
+            (65, 6,30,2,"2026-07-22",3,"Site reconnaissance at Suez facility; mapped four training zones.","approved"),
+            (66,10,30,2,"2026-07-24",4,"CPR and rescue technique pre-assessment for camp participants.","approved"),
+            (67, 7,30,2,"2026-07-25",3,"Admin: liability forms, ID collection, and attendance roster.","approved"),
+
+            # Event 4 — Blood Donation (extra activities, Ahmed El-Masry)
+            (68,19,4,2,"2026-04-18",3,"University outreach at Heliopolis campus; signed up 60 donors.","approved"),
+            (69,23,4,2,"2026-04-20",3,"Translated donor consent forms into French for expat donors.","approved"),
+            (70,24,4,2,"2026-04-22",4,"Pre-event medical readiness check across 3 donation sites.","approved"),
+
+            # Event 13 — Refugee Support Day (extra activities, Ahmed El-Masry — auto-approved)
+            (71,25,13,2,"2026-05-20",3,"Community outreach to refugee families for event registration.","approved"),
+            (72,13,13,2,"2026-05-21",2,"Venue setup: signage, flow plan, and translator station prep.","approved"),
+
+            # Event 34 — Field Volunteer Induction (completed, Ahmed El-Masry)
+            (73, 1,34,2,"2026-03-18",7,"Facilitated orientation module on Red Crescent field protocols.","approved"),
+            (74, 6,34,2,"2026-03-18",7,"Led safety briefing and emergency evacuation drill.","approved"),
+            (75, 7,34,2,"2026-03-18",7,"Ran Q&A session on volunteer rights and code of conduct.","approved"),
+            (76,10,34,2,"2026-03-18",7,"Delivered first-aid readiness assessment to 20 inductees.","approved"),
+            (77,16,34,2,"2026-03-18",7,"Coordinated catering, venue logistics, and attendance records.","approved"),
+            (78,19,34,2,"2026-03-18",7,"Managed ID verification and badge distribution.","approved"),
+            (79,23,34,2,"2026-03-18",7,"Assisted with Arabic–English translation of training materials.","approved"),
+            (80,24,34,2,"2026-03-18",7,"Conducted post-induction skills survey and compiled report.","approved"),
+
+            # Event 35 — Mobile Medical Unit (completed, Ahmed El-Masry)
+            (81, 6,35,2,"2026-02-10",9,"Triaged patients and administered wound care across 3 villages.","approved"),
+            (82,10,35,2,"2026-02-10",9,"Ran diabetes and blood pressure screening for 200+ patients.","approved"),
+            (83,16,35,2,"2026-02-11",9,"Dispensed medications and managed pharmacy supply log.","approved"),
+            (84, 9,35,2,"2026-02-11",9,"Conducted maternal health consultations at two village clinics.","approved"),
+            (85,24,35,2,"2026-02-12",9,"Administered vaccinations and updated health record cards.","approved"),
+            (86,19,35,2,"2026-02-12",9,"Logistics: cold-chain transport and supply restocking.","approved"),
+
+            # Event 36 — IHL Workshop (upcoming prep, Ahmed El-Masry — auto-approved)
+            (87, 6,36,2,"2026-06-28",3,"Compiled IHL case studies and prepared printed materials.","approved"),
+            (88,10,36,2,"2026-06-30",2,"Coordinated speaker schedule and venue logistics.","approved"),
+
+            # Event 37 — Mass Casualty Simulation (completed, Ahmed El-Masry — auto-approved)
+            (89, 1,37,2,"2025-10-14",8,"Led triage station Alpha; processed 18 simulated casualties.","approved"),
+            (90, 6,37,2,"2025-10-14",8,"Ran CPR and airway management drills at casualty station Bravo.","approved"),
+            (91, 7,37,2,"2025-10-14",8,"Coordinated evacuation relay and transport simulation logistics.","approved"),
+            (92,10,37,2,"2025-10-14",8,"Managed medical supply inventory and restocking during drill.","approved"),
+            (93,16,37,2,"2025-10-14",8,"Communications relay officer between field teams and command.","approved"),
+            (94,19,37,2,"2025-10-14",8,"Documented all casualty tags and final debrief report.","approved"),
+            (95,23,37,2,"2025-10-14",8,"Provided translation support for international observer team.","approved"),
+            (96,24,37,2,"2025-10-14",8,"First-aid station lead: wound dressing and vital monitoring.","approved"),
+            (97,25,37,2,"2025-10-14",8,"Logistics: equipment transport, tent setup, and teardown.","approved"),
+            (98, 9,37,2,"2025-10-14",8,"Acted as simulated patient and post-drill scenario analyst.","approved"),
+
+            # Event 38 — Winter Blood Drive (completed, Ahmed El-Masry — auto-approved)
+            (99, 1,38,2,"2025-11-22",6,"Registration desk management and donor ID verification — Mansoura site.","approved"),
+            (100, 6,38,2,"2025-11-22",6,"Pre-donation health screening and blood pressure checks.","approved"),
+            (101, 7,38,2,"2025-11-22",6,"Donor recruitment outreach on Mansoura University campus.","approved"),
+            (102,10,38,2,"2025-11-22",6,"Medical oversight of donation process; monitored 40 donors.","approved"),
+            (103,16,38,2,"2025-11-23",6,"Coordinated Tanta Blood Bank site logistics and volunteer schedule.","approved"),
+            (104,19,38,2,"2025-11-23",6,"Post-donation refreshment and recovery area management.","approved"),
+            (105,23,38,2,"2025-11-23",6,"Data entry: donor records, blood units collected, hospital dispatch.","approved"),
+            (106,24,38,2,"2025-11-23",6,"Liaised with hospital procurement team on collection targets.","approved"),
+            (107,25,38,2,"2025-11-23",6,"Social media coverage and real-time updates during drive.","approved"),
+            (108, 9,38,2,"2025-11-23",6,"Phlebotomy assistance under medical supervision.","approved"),
+            (109,13,38,2,"2025-11-23",6,"Volunteer coordination and shift handover documentation.","approved"),
+            (110,15,38,2,"2025-11-22",6,"Event planning and pre-drive logistics coordination.","approved"),
 
             # Event 6 — Entrepreneurship Bootcamp (upcoming prep)
             (59,15,6,3,"2026-05-01",4,"Tech infrastructure setup for bootcamp demo stations.","pending"),
@@ -973,6 +1122,50 @@ def seed():
             (28,16,2,14,"achievement", 4,"2026-03-08"),
             (29,24,2,14,"completion",  4,"2026-03-08"),
             (30, 9,2,14,"completion",  4,"2026-03-08"),
+
+            # Red Crescent — Event 34: Field Volunteer Induction (Ahmed El-Masry)
+            (43, 1,2,34,"completion",  7,"2026-03-22"),
+            (44, 6,2,34,"achievement", 7,"2026-03-22"),
+            (45, 7,2,34,"completion",  7,"2026-03-22"),
+            (46,10,2,34,"achievement", 7,"2026-03-22"),
+            (47,16,2,34,"completion",  7,"2026-03-22"),
+            (48,19,2,34,"completion",  7,"2026-03-22"),
+            (49,23,2,34,"completion",  7,"2026-03-22"),
+            (50,24,2,34,"completion",  7,"2026-03-22"),
+
+            # Red Crescent — Event 35: Mobile Medical Unit (Ahmed El-Masry)
+            (51, 6,2,35,"achievement", 9,"2026-02-18"),
+            (52,10,2,35,"achievement", 9,"2026-02-18"),
+            (53,16,2,35,"completion",  9,"2026-02-18"),
+            (54, 9,2,35,"completion",  9,"2026-02-18"),
+            (55,24,2,35,"completion",  9,"2026-02-18"),
+            (56,19,2,35,"completion",  9,"2026-02-18"),
+
+            # Red Crescent — Event 37: Mass Casualty Simulation (Ahmed El-Masry)
+            (57, 1,2,37,"achievement", 8,"2025-10-20"),
+            (58, 6,2,37,"achievement", 8,"2025-10-20"),
+            (59, 7,2,37,"completion",  8,"2025-10-20"),
+            (60,10,2,37,"achievement", 8,"2025-10-20"),
+            (61,16,2,37,"completion",  8,"2025-10-20"),
+            (62,19,2,37,"completion",  8,"2025-10-20"),
+            (63,23,2,37,"completion",  8,"2025-10-20"),
+            (64,24,2,37,"completion",  8,"2025-10-20"),
+            (65,25,2,37,"completion",  8,"2025-10-20"),
+            (66, 9,2,37,"completion",  8,"2025-10-20"),
+
+            # Red Crescent — Event 38: Winter Blood Drive (Ahmed El-Masry)
+            (67, 1,2,38,"completion",  6,"2025-11-28"),
+            (68, 6,2,38,"achievement", 6,"2025-11-28"),
+            (69, 7,2,38,"completion",  6,"2025-11-28"),
+            (70,10,2,38,"achievement", 6,"2025-11-28"),
+            (71,16,2,38,"completion",  6,"2025-11-28"),
+            (72,19,2,38,"completion",  6,"2025-11-28"),
+            (73,23,2,38,"completion",  6,"2025-11-28"),
+            (74,24,2,38,"completion",  6,"2025-11-28"),
+            (75,25,2,38,"completion",  6,"2025-11-28"),
+            (76, 9,2,38,"completion",  6,"2025-11-28"),
+            (77,13,2,38,"completion",  6,"2025-11-28"),
+            (78,15,2,38,"completion",  6,"2025-11-28"),
 
             # Enactus certificates
             (31, 4,3,7,"achievement",  5,"2026-04-10"),
@@ -1083,6 +1276,36 @@ def seed():
             (10,"application","New Event Application","Ibrahim Yasser applied to 'Youth Leadership Forum'.",False,"/supervisor/applications","2026-04-15 11:02:00"),
             (10,"activity","Activity Pending Review","Mona Kamal submitted a prep log for 'Youth Leadership Forum'.",False,"/supervisor/activities","2026-04-25 15:01:00"),
 
+            # Supervisor notifications — Ahmed El-Masry (user 12, Red Crescent)
+            (12,"application","New Event Application","Yara Hassan applied to 'National Blood Donation Drive — Spring'.",False,"/supervisor/applications","2026-04-13 10:05:00"),
+            (12,"application","New Event Application","Hossam Adel applied to 'National Blood Donation Drive — Spring'.",False,"/supervisor/applications","2026-04-14 09:15:00"),
+            (12,"application","New Event Application","Layla Samir applied to 'National Blood Donation Drive — Spring'.",True,"/supervisor/applications","2026-04-15 11:00:00"),
+            (12,"application","New Event Application","Yara Hassan applied to 'Search & Rescue Skills Camp — Suez'.",False,"/supervisor/applications","2026-06-10 09:05:00"),
+            (12,"application","New Event Application","Hana Youssef applied to 'Search & Rescue Skills Camp — Suez'.",False,"/supervisor/applications","2026-06-11 10:10:00"),
+            (12,"application","New Event Application","Omar Farouk applied to 'Search & Rescue Skills Camp — Suez'.",False,"/supervisor/applications","2026-06-13 09:35:00"),
+            (12,"application","New Event Application","Nermine Ashraf applied to 'Refugee Support Day — Ain Shams'.",True,"/supervisor/applications","2026-05-13 11:05:00"),
+            (12,"activity","Activity Hours Approved","Yara Hassan's prep log for 'National Blood Donation Drive' — 4 hrs approved.",False,"/supervisor/activities","2026-04-18 14:00:00"),
+            (12,"activity","Activity Hours Approved","Menna Tarek's prep log for 'Search & Rescue Skills Camp' — 4 hrs approved.",False,"/supervisor/activities","2026-07-20 09:30:00"),
+            (12,"activity","Activity Hours Approved","Layla Samir's field report for 'Refugee Support Day' — 3 hrs approved.",False,"/supervisor/activities","2026-05-21 10:00:00"),
+            (12,"membership","New Volunteer Joined","Nermine Ashraf joined Red Crescent as a Medical Support volunteer.",True,"/supervisor/volunteers","2026-03-20 11:00:00"),
+            (12,"activity","Activity Hours Approved","Omar Farouk's field report for 'Field Volunteer Induction' — 7 hrs approved.",False,"/supervisor/activities","2026-03-18 17:00:00"),
+            (12,"activity","Activity Hours Approved","Hossam Adel's prep log for 'Mobile Medical Unit — Beni Suef' — 9 hrs approved.",False,"/supervisor/activities","2026-02-10 20:00:00"),
+            (12,"application","New Event Application","Salma Ibrahim applied to 'Field Volunteer Induction — Batch 4'.",True,"/supervisor/applications","2026-03-07 10:00:00"),
+            (12,"application","New Event Application","Ibrahim Yasser applied to 'Mobile Medical Unit — Beni Suef'.",True,"/supervisor/applications","2026-01-30 09:00:00"),
+            (12,"application","New Event Application","Khalid Mansour applied to 'International Humanitarian Law Workshop'.",False,"/supervisor/applications","2026-06-22 11:00:00"),
+            (12,"application","New Event Application","Reem Saad applied to 'International Humanitarian Law Workshop'.",False,"/supervisor/applications","2026-06-24 14:30:00"),
+            (12,"certificate","Certificates Issued","14 certificates issued for 'Field Volunteer Induction — Batch 4'.",True,"/supervisor/activities","2026-03-22 09:00:00"),
+            (12,"certificate","Certificates Issued","12 certificates issued for 'Mobile Medical Unit — Beni Suef'.",True,"/supervisor/activities","2026-02-18 09:00:00"),
+            (12,"application","New Event Application","Yara Hassan applied to 'Mass Casualty Simulation — October'.",True,"/supervisor/applications","2025-09-20 09:10:00"),
+            (12,"application","New Event Application","Hossam Adel applied to 'Mass Casualty Simulation — October'.",False,"/supervisor/applications","2025-09-21 10:15:00"),
+            (12,"application","New Event Application","Layla Samir applied to 'Mass Casualty Simulation — October'.",True,"/supervisor/applications","2025-09-22 11:00:00"),
+            (12,"application","New Event Application","Yara Hassan applied to 'Winter Blood Drive — Mansoura & Tanta'.",False,"/supervisor/applications","2025-10-15 08:30:00"),
+            (12,"application","New Event Application","Omar Farouk applied to 'Winter Blood Drive — Mansoura & Tanta'.",True,"/supervisor/applications","2025-10-16 09:15:00"),
+            (12,"activity","Attendance Approved","10 volunteers' attendance at 'Mass Casualty Simulation' approved — hours recorded automatically.",True,"/supervisor/activities","2025-10-14 18:00:00"),
+            (12,"activity","Attendance Approved","12 volunteers' attendance at 'Winter Blood Drive' approved — hours recorded automatically.",True,"/supervisor/activities","2025-11-23 17:00:00"),
+            (12,"certificate","Certificates Issued","10 certificates issued for 'Mass Casualty Simulation — October'.",True,"/supervisor/activities","2025-10-20 09:00:00"),
+            (12,"certificate","Certificates Issued","12 certificates issued for 'Winter Blood Drive — Mansoura & Tanta'.",True,"/supervisor/activities","2025-11-28 09:00:00"),
+
             # Supervisor notifications — Nourhan Ali (user 13, Red Crescent)
             (13,"application","New Event Application","Yara Hassan applied to 'Emergency Response Drill — June'.",False,"/supervisor/applications","2026-05-10 10:01:00"),
             (13,"application","New Event Application","Omar Farouk applied to 'Emergency Response Drill — June'.",False,"/supervisor/applications","2026-05-11 14:01:00"),
@@ -1101,6 +1324,12 @@ def seed():
             "VALUES (%s, %s, %s, %s, %s, %s, %s)",
             notifs,
         )
+
+    # Reset sequences so auto-increment inserts don't collide with explicit seeded IDs
+    for _tbl, _col in [("events","id"),("event_applications","id"),("activities","id"),
+                       ("certificates","id"),("volunteers","id"),("supervisors","id"),
+                       ("org_admins","id"),("notifications","id"),("users","id"),("organizations","id")]:
+        db.execute(f"SELECT setval(pg_get_serial_sequence('{_tbl}', '{_col}'), COALESCE((SELECT MAX({_col}) FROM {_tbl}), 1))")
 
     print("Database seeded successfully!")
     print()

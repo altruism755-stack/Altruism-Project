@@ -38,7 +38,7 @@ const features = [
     ),
     gradient: "linear-gradient(135deg,#16A34A,#22C55E)",
     title: "Volunteer Management",
-    body: "Volunteers sign up, join organizations, and manage their profile, skills, availability, and volunteer history — all in one place.",
+    body: "Volunteers sign up, join organizations, and manage their profile, skills, availability, and full activity history — all in one place.",
   },
   {
     icon: (
@@ -52,8 +52,8 @@ const features = [
       </svg>
     ),
     gradient: "linear-gradient(135deg,#2563EB,#3B82F6)",
-    title: "Activity Coordination",
-    body: "Organizations post activities, supervisors manage attendance and approvals, and volunteers apply and track their hours — seamlessly.",
+    title: "Event & Activity Coordination",
+    body: "Organizations and supervisors post events with manual or auto-accept enrollment. Volunteers apply, attend, and log hours — all tracked end-to-end.",
   },
   {
     icon: (
@@ -65,7 +65,7 @@ const features = [
     ),
     gradient: "linear-gradient(135deg,#0891B2,#06B6D4)",
     title: "Reports & Certificates",
-    body: "Generate detailed volunteer hour reports, export data for analysis, and issue verified certificates to recognize contributions.",
+    body: "Supervisors issue verified digital certificates. Org admins export a full star-schema data warehouse — volunteers, events, hours, and certificates — for analytics.",
   },
   {
     icon: (
@@ -75,14 +75,34 @@ const features = [
     ),
     gradient: "linear-gradient(135deg,#7C3AED,#A78BFA)",
     title: "News Feed & Announcements",
-    body: "Volunteers stay up to date with announcements and upcoming activities from their organizations through a personalized news feed.",
+    body: "Volunteers see a personalized feed of upcoming events and announcements from their organizations. Stay informed without leaving the platform.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+    gradient: "linear-gradient(135deg,#D97706,#F59E0B)",
+    title: "Platform Administration",
+    body: "A dedicated platform admin panel to approve organizations, review profile change requests, manage volunteers, and control admin access across the platform.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+    ),
+    gradient: "linear-gradient(135deg,#0F766E,#14B8A6)",
+    title: "Lifecycle Tracking",
+    body: "Every event follows a clear lifecycle — from creation through enrollment, attendance, approval, and certification — with full audit visibility for admins.",
   },
 ];
 
 const steps = [
-  { num: "1", title: "Create your account", body: "Volunteers and organizations register in minutes. Organization admins add supervisors to their team directly from the dashboard." },
-  { num: "2", title: "Browse & apply", body: "Volunteers browse organizations, apply to join, and sign up for activities. Organizations review and approve members." },
-  { num: "3", title: "Track & certify", body: "Supervisors log attendance, organizations generate reports and issue certificates, and volunteers build their impact record." },
+  { num: "1", title: "Create your account", body: "Volunteers and organizations register in minutes. Once approved by the platform, org admins add supervisors and manage their team from the dashboard." },
+  { num: "2", title: "Browse & apply", body: "Volunteers browse organizations, join as members, and sign up for events — instantly via auto-accept or pending manual review by the supervisor." },
+  { num: "3", title: "Track & certify", body: "Supervisors log attendance and issue verified certificates. Org admins export a full data warehouse and generate reports for stakeholders." },
 ];
 
 export function LandingPage() {
@@ -120,8 +140,8 @@ export function LandingPage() {
             <h1 style={{ fontSize: 56, fontWeight: 800, color: C.white, lineHeight: 1.1, letterSpacing: "-0.03em", margin: "0 0 24px 0" }}>
               The bridge between volunteers and the organizations that need them
             </h1>
-            <p style={{ fontSize: 18, color: "#ffffff", lineHeight: 1.7, margin: "0 0 40px 0", maxWidth: 560, textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>
-              Altruism connects non-profit organizations and student entities with the volunteers who power them — with tools for activity coordination, reporting, and certificates built in.
+            <p style={{ fontSize: 18, color: "#ffffff", lineHeight: 1.7, margin: "0 0 40px 0", maxWidth: 520, textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>
+              From signup to certified report — one platform for volunteers, supervisors, and organizations to coordinate, track, and grow their impact.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <button onClick={() => navigate("/register")} style={{ backgroundColor: C.primary, color: C.white, border: "none", borderRadius: 10, height: 52, padding: "0 32px", fontSize: 16, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 24px rgba(22,163,74,0.35)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = C.primaryHover)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = C.primary)}>Join as a Volunteer</button>
@@ -139,11 +159,11 @@ export function LandingPage() {
           <div className="text-center" style={{ marginBottom: 56 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Features</div>
             <h2 style={{ fontSize: 36, fontWeight: 800, color: C.gray950, letterSpacing: "-0.02em", maxWidth: 560, margin: "0 auto", lineHeight: 1.2 }}>Everything your program needs</h2>
-            <p style={{ fontSize: 16, color: C.gray500, maxWidth: 480, margin: "16px auto 0", lineHeight: 1.6 }}>
-              Built for volunteers, organization admins, and supervisors — tools that cover the full volunteering lifecycle.
+            <p style={{ fontSize: 16, color: C.gray500, maxWidth: 520, margin: "16px auto 0", lineHeight: 1.6 }}>
+              Built for four roles — volunteers, supervisors, organization admins, and platform admins — covering the full volunteering lifecycle from signup to certified report.
             </p>
           </div>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: 28 }}>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: 28 }}>
             {features.map((f, i) => (
               <div key={f.title} onMouseEnter={() => setHoveredFeature(i)} onMouseLeave={() => setHoveredFeature(null)} style={{ backgroundColor: C.white, border: `1px solid ${hoveredFeature === i ? "transparent" : C.gray200}`, borderRadius: 16, padding: "32px", transition: "all 250ms cubic-bezier(0.4,0,0.2,1)", boxShadow: hoveredFeature === i ? "0 20px 48px rgba(0,0,0,0.12)" : "0 1px 3px rgba(0,0,0,0.04)", transform: hoveredFeature === i ? "translateY(-6px)" : "none" }}>
                 <div style={{ width: 52, height: 52, borderRadius: 14, background: f.gradient, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, boxShadow: `0 8px 20px ${i === 0 ? "rgba(22,163,74,0.25)" : i === 1 ? "rgba(37,99,235,0.25)" : i === 2 ? "rgba(8,145,178,0.25)" : "rgba(124,58,237,0.25)"}` }}>{f.icon}</div>
@@ -234,7 +254,7 @@ export function LandingPage() {
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                 </div>
                 <h3 style={{ fontSize: 24, fontWeight: 700, color: C.white, marginBottom: 12, lineHeight: 1.3 }}>Are you a volunteer?</h3>
-                <p style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", lineHeight: 1.7, marginBottom: 28, maxWidth: 340 }}>Browse organizations, apply to activities, follow your org's news feed, and build a certified record of your impact.</p>
+                <p style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", lineHeight: 1.7, marginBottom: 28, maxWidth: 340 }}>Browse organizations, apply to events, follow your org's news feed, download your certificates, and build a verified record of your impact.</p>
                 <button onClick={() => navigate("/register")} style={{ backgroundColor: C.white, color: C.primary, border: "none", borderRadius: 10, height: 48, padding: "0 28px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Sign Up Now</button>
               </div>
             </div>
@@ -245,7 +265,7 @@ export function LandingPage() {
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
                 </div>
                 <h3 style={{ fontSize: 24, fontWeight: 700, color: C.white, marginBottom: 12, lineHeight: 1.3 }}>Are you an organization?</h3>
-                <p style={{ fontSize: 15, color: C.gray400, lineHeight: 1.7, marginBottom: 28, maxWidth: 340 }}>Manage volunteers, add supervisors, coordinate activities, and generate detailed reports — all from one dashboard.</p>
+                <p style={{ fontSize: 15, color: C.gray400, lineHeight: 1.7, marginBottom: 28, maxWidth: 340 }}>Manage volunteers, add supervisors, coordinate events with auto or manual enrollment, issue certificates, and export a full data warehouse — all from one dashboard.</p>
                 <button onClick={() => navigate("/register?role=org")} style={{ backgroundColor: "transparent", color: C.white, border: "1.5px solid rgba(255,255,255,0.25)", borderRadius: 10, height: 48, padding: "0 28px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Get Started</button>
               </div>
             </div>

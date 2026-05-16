@@ -17,7 +17,7 @@ export function PlatformAdminDashboard() {
   const { user, logout } = useAuth();
 
   const [mainTab, setMainTab] = useState<MainTab>("organizations");
-  const [orgFilter, setOrgFilter] = useState<OrgFilterTab>("pending");
+  const [orgFilter, setOrgFilter] = useState<OrgFilterTab>("approved");
   const [stats, setStats] = useState<AdminStats>({});
 
   const loadStats = useCallback(async (): Promise<void> => {
@@ -54,10 +54,10 @@ export function PlatformAdminDashboard() {
 
         {/* Stats grid */}
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", marginBottom: 24 }}>
-          <StatCard label="Pending Review"   value={stats.pending_organizations ?? 0}   color="#F59E0B" onClick={() => { setMainTab("organizations"); setOrgFilter("pending");  }} active={mainTab === "organizations" && orgFilter === "pending"} />
+          <StatCard label="Pending Review"   value={stats.pending_organizations ?? 0}   color={(stats.pending_organizations ?? 0) > 0 ? "#F59E0B" : "#94A3B8"} onClick={() => { setMainTab("organizations"); setOrgFilter("pending");  }} active={mainTab === "organizations" && orgFilter === "pending"} />
           <StatCard label="Approved Orgs"    value={stats.approved_organizations ?? 0}  color={GREEN}   onClick={() => { setMainTab("organizations"); setOrgFilter("approved"); }} active={mainTab === "organizations" && orgFilter === "approved"} />
-          <StatCard label="Rejected Orgs"    value={stats.rejected_organizations ?? 0}  color="#EF4444" onClick={() => { setMainTab("organizations"); setOrgFilter("rejected"); }} active={mainTab === "organizations" && orgFilter === "rejected"} />
-          <StatCard label="Profile Changes"  value={stats.pending_profile_changes ?? 0} color="#F97316" onClick={() => setMainTab("profile_changes")} active={mainTab === "profile_changes"} />
+          <StatCard label="Rejected Orgs"    value={stats.rejected_organizations ?? 0}  color={(stats.rejected_organizations ?? 0) > 0 ? "#EF4444" : "#94A3B8"} onClick={() => { setMainTab("organizations"); setOrgFilter("rejected"); }} active={mainTab === "organizations" && orgFilter === "rejected"} />
+          <StatCard label="Profile Changes"  value={stats.pending_profile_changes ?? 0} color={(stats.pending_profile_changes ?? 0) > 0 ? "#F97316" : "#94A3B8"} onClick={() => setMainTab("profile_changes")} active={mainTab === "profile_changes"} />
           <StatCard label="Total Volunteers" value={stats.total_volunteers ?? 0}         color="#8B5CF6" onClick={() => setMainTab("volunteers")}      active={mainTab === "volunteers"} />
           <StatCard label="Total Users"      value={stats.total_users ?? 0}              color="#3B82F6" />
           <StatCard label="Platform Admins"  value={stats.total_platform_admins ?? 0}   color="#EC4899" onClick={() => setMainTab("admins")}           active={mainTab === "admins"} />

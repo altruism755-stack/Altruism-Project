@@ -10,10 +10,10 @@ import { MEMBERSHIP_STATUS } from "../types";
 const GREEN = "#16A34A";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  Pending: { bg: "#FEF3C7", text: "#B45309" },
-  Approved: { bg: "#DCFCE7", text: "#15803D" },
-  Rejected: { bg: "#FEE2E2", text: "#B91C1C" },
-  Completed: { bg: "#DBEAFE", text: "#1D4ED8" },
+  pending:   { bg: "#FEF3C7", text: "#B45309" },
+  approved:  { bg: "#DCFCE7", text: "#15803D" },
+  rejected:  { bg: "#FEE2E2", text: "#B91C1C" },
+  completed: { bg: "#DBEAFE", text: "#1D4ED8" },
 };
 
 function relativeDate(isoOrDate: string): string {
@@ -53,7 +53,7 @@ export function VolunteerDashboard() {
       const orgs = volRes.organizations || [];
       setMyActivities(activities);
       setMyOrgs(orgs);
-      setMyCertificates((volRes.certificates || []).filter((c: any) => c.file_url));
+      setMyCertificates(volRes.certificates || []);
       setUpcomingEvents((evtRes.events || []).slice(0, 3));
 
       // Build "What's New": events from active orgs, capped at 5
@@ -253,20 +253,24 @@ export function VolunteerDashboard() {
                       <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>
                         {cert.org_name}{cert.event_name ? ` · ${cert.event_name}` : ""} · {cert.issued_date}
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
-                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={() => api.downloadCertificateFile(cert.id, title).catch(() => {})}
-                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
-                        >
-                          Download
-                        </button>
-                      </div>
+                      {cert.file_url ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
+                            style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => api.downloadCertificateFile(cert.id, title).catch(() => {})}
+                            style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
+                          >
+                            Download
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "#94A3B8" }}>Certificate file not yet uploaded</span>
+                      )}
                     </div>
                   );
                 })
@@ -297,7 +301,7 @@ export function VolunteerDashboard() {
 
             <div className="flex flex-col gap-3">
               {myActivities.map((a: any) => {
-                const sc = statusColors[a.status] || statusColors.Pending;
+                const sc = statusColors[a.status] || statusColors.pending;
                 const hasHours = a.hours != null && a.hours > 0;
                 return (
                   <div key={a.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16 }}>
@@ -310,7 +314,7 @@ export function VolunteerDashboard() {
                         <span style={{ backgroundColor: "#DCFCE7", color: GREEN, fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>
                           {hasHours ? `${a.hours} hrs contributed` : "Participated"}
                         </span>
-                        <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status}</span>
+                        <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status ? a.status.charAt(0).toUpperCase() + a.status.slice(1) : ""}</span>
                       </div>
                     </div>
                     <div style={{ fontSize: 13, color: "#94A3B8" }}>{a.description}</div>

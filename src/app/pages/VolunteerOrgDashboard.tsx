@@ -11,9 +11,9 @@ const GREEN  = "#16A34A";
 const INDIGO = "#4F46E5";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  Pending:  { bg: "#FEF3C7", text: "#B45309" },
-  Approved: { bg: "#DCFCE7", text: "#15803D" },
-  Rejected: { bg: "#FEE2E2", text: "#B91C1C" },
+  pending:  { bg: "#FEF3C7", text: "#B45309" },
+  approved: { bg: "#DCFCE7", text: "#15803D" },
+  rejected: { bg: "#FEE2E2", text: "#B91C1C" },
 };
 
 const certTypeColors: Record<string, { bg: string; text: string }> = {
@@ -276,7 +276,7 @@ export function VolunteerOrgDashboard() {
                 const isApplied = appEntry !== undefined;
                 const appStatus = appEntry?.status;
                 const appId     = appEntry?.appId;
-                const asc       = appStatus ? (statusColors[appStatus] || statusColors.Pending) : null;
+                const asc       = appStatus ? (statusColors[appStatus] || statusColors.pending) : null;
                 const isFull    = evt.is_full || (evt.max_volunteers > 0 && evt.current_volunteers >= evt.max_volunteers);
                 const isAutoMode = evt.acceptance_mode === "auto";
                 const spotsLeft  = evt.max_volunteers > 0 ? Math.max(0, evt.max_volunteers - evt.current_volunteers) : null;
@@ -299,7 +299,7 @@ export function VolunteerOrgDashboard() {
                             <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: "#DCFCE7", color: "#15803D", borderRadius: 20, padding: "2px 10px", animation: "none" }}>🎉 You're in!</span>
                           )}
                           {isApplied && asc && !justAutoAccepted && (
-                            <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: asc.bg, color: asc.text, borderRadius: 20, padding: "2px 10px" }}>{appStatus}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: asc.bg, color: asc.text, borderRadius: 20, padding: "2px 10px" }}>{appStatus ? appStatus.charAt(0).toUpperCase() + appStatus.slice(1) : ""}</span>
                           )}
                           {isFull && !isApplied && (
                             <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#FEE2E2", color: "#B91C1C", borderRadius: 20, padding: "2px 10px" }}>Full</span>
@@ -404,7 +404,7 @@ export function VolunteerOrgDashboard() {
                 body={`Your supervisor will record your volunteer hours here after each activity at ${org.name}.`} />
             ) : (
               activities.map((a: any) => {
-                const sc = statusColors[a.status] || statusColors.Pending;
+                const sc = statusColors[a.status] || statusColors.pending;
                 const canRate = a.event_id && rateableEventIds.has(a.event_id);
                 const rs = ratingState[a.event_id] ?? { hover: 0, selected: 0, feedback: "", submitting: false, submitted: false };
                 return (
@@ -418,7 +418,7 @@ export function VolunteerOrgDashboard() {
                         {a.hours != null && (
                           <span style={{ backgroundColor: "#DCFCE7", color: GREEN, fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.hours} hrs</span>
                         )}
-                        <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status}</span>
+                        <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{a.status ? a.status.charAt(0).toUpperCase() + a.status.slice(1) : ""}</span>
                       </div>
                     </div>
                     {a.description && <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: canRate ? 12 : 0 }}>{a.description}</div>}

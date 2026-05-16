@@ -53,7 +53,9 @@ def list_events(
             "SELECT e.id, e.org_id, e.name, e.description, e.location, e.starts_at, "
             "e.duration, e.max_volunteers, e.required_skills, e.status, "
             "e.acceptance_mode, e.registration_open, e.created_at, "
+            "e.created_by_supervisor_id, "
             "o.name as org_name, o.student_only as org_student_only, "
+            "s.name as supervisor_name, "
             "(SELECT COUNT(*) FROM event_applications ea "
             " WHERE ea.event_id = e.id AND ea.status = 'approved' AND ea.cancelled_at IS NULL"
             ") AS current_volunteers, "
@@ -63,6 +65,7 @@ def list_events(
             "  ) >= e.max_volunteers THEN TRUE ELSE FALSE END AS is_full "
             "FROM events e "
             "LEFT JOIN organizations o ON e.org_id = o.id "
+            "LEFT JOIN supervisors s ON e.created_by_supervisor_id = s.id "
             "WHERE 1=1"
         )
         params: list = []
@@ -434,10 +437,10 @@ def bulk_mark_attendance(
                     pass
             if hours is None:
                 raise HTTPException(400, "hours is required (or set an event duration to use as default)")
-            act_status = "pending"
+            act_status = "approved"
         else:
             hours = None
-            act_status = "completed"
+            act_status = "approved"
 
         eligible_rows = db.execute(
             """
@@ -527,12 +530,12 @@ def bulk_mark_attendance(
         for vol_id, user_id in eligible_map.items():
             if user_id:
                 if tracks_hours:
-                    msg = f"Your attendance at '{event_name}' was recorded ({hours} hrs)."
+                    msg = f"Your attendance at '{event_name}' has been approved — {hours} hrs added to your profile."
                 else:
-                    msg = f"Your participation in '{event_name}' has been recorded."
+                    msg = f"Your participation in '{event_name}' has been approved."
                 create_notification(
-                    db, user_id, "activity_submitted",
-                    "Attendance Recorded", msg, "/dashboard/profile",
+                    db, user_id, "activity_approved",
+                    "Attendance Approved", msg, "/dashboard/profile",
                 )
 
         logger.info(

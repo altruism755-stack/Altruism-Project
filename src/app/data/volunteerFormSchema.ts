@@ -188,7 +188,7 @@ export function validateSubmitterRole(v: string): string {
 }
 
 export function validateOrgCity(v: string): string {
-  if (!v.trim()) return "City or district is required.";
+  if (!v.trim()) return "";
   if (v.trim().length < 2) return "City must be at least 2 characters.";
   if (v.trim().length > 60) return "City must be no more than 60 characters.";
   if (!/^[\u0600-\u06FF0-9a-zA-Z\s\-\.]+$/.test(v.trim()))
@@ -267,7 +267,7 @@ export function validatePhone(v: string): string {
 }
 
 export function validateOrgPhone(v: string): string {
-  if (!v) return "Phone number is required.";
+  if (!v) return "";
   if (!/^\d+$/.test(v)) return "Phone number must contain numbers only.";
   const isMobile   = ["010", "011", "012", "015"].some((p) => v.startsWith(p));
   const isLandline = /^0[2-9]/.test(v) && !isMobile;

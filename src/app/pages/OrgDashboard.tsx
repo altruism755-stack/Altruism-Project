@@ -342,7 +342,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
 
 // ─── Supervisors tab ──────────────────────────────────────────────────────────
 function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefresh: () => void }) {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", team: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", team: "", password: "" });
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -350,11 +350,12 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
 
   const doAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email) return;
+    if (!form.name || !form.email || !form.password) { setError("Name, email, and password are required"); return; }
+    if (form.password.length < 8) { setError("Password must be at least 8 characters"); return; }
     setSaving(true); setError("");
     try {
-      await api.createSupervisor({ name: form.name, email: form.email, phone: form.phone, team: form.team });
-      setForm({ name: "", email: "", phone: "", team: "" });
+      await api.createSupervisor({ name: form.name, email: form.email, phone: form.phone, team: form.team, password: form.password });
+      setForm({ name: "", email: "", phone: "", team: "", password: "" });
       onRefresh();
     } catch (err: any) { setError(err.message || "Failed to add supervisor"); }
     setSaving(false);
@@ -386,36 +387,67 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
       />
       {/* Add form */}
       <div style={{ flex: "0 0 340px" }}>
-        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", margin: "0 0 4px 0" }}>Add Supervisor</h3>
-          <p style={{ fontSize: 12, color: "#94A3B8", margin: "0 0 20px 0", lineHeight: 1.5 }}>
-            New supervisors receive the default password <strong>supervisor123</strong> to log in.
-          </p>
-          {error && <div style={{ fontSize: 13, color: "#DC2626", backgroundColor: "#FEE2E2", padding: "8px 12px", borderRadius: 6, marginBottom: 12 }}>{error}</div>}
-          <form onSubmit={doAdd} className="flex flex-col gap-4">
-            <div><label style={lStyle}>Full Name *</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={iStyle} /></div>
-            <div><label style={lStyle}>Email *</label><input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={iStyle} /></div>
-            <div><label style={lStyle}>Phone</label><input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={iStyle} /></div>
-            <div><label style={lStyle}>Department / Team</label><input value={form.team} onChange={(e) => setForm((f) => ({ ...f, team: e.target.value }))} style={iStyle} /></div>
-            <button type="submit" disabled={saving || !form.name || !form.email} style={{ height: 42, backgroundColor: saving ? "#86EFAC" : GREEN, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
-              {saving ? "Adding…" : "Add Supervisor"}
-            </button>
-          </form>
+        <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          {/* Header */}
+          <div style={{ background: "linear-gradient(135deg, #0891B2 0%, #0E7490 100%)", padding: "20px 24px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>👤</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Add Supervisor</div>
+              </div>
+            </div>
+          </div>
+          {/* Body */}
+          <div style={{ padding: "20px 24px 24px" }}>
+            {error && (
+              <div style={{ fontSize: 12, color: "#DC2626", backgroundColor: "#FEF2F2", border: "1px solid #FECACA", padding: "8px 12px", borderRadius: 8, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 14 }}>⚠️</span> {error}
+              </div>
+            )}
+            <form onSubmit={doAdd} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={lStyle}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={iStyle} placeholder="e.g. Sara Ahmed" />
+              </div>
+              <div>
+                <label style={lStyle}>Email <span style={{ color: "#DC2626" }}>*</span></label>
+                <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={iStyle} placeholder="supervisor@org.com" />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={lStyle}>Phone</label>
+                  <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={iStyle} placeholder="Optional" />
+                </div>
+                <div>
+                  <label style={lStyle}>Department</label>
+                  <input value={form.team} onChange={(e) => setForm((f) => ({ ...f, team: e.target.value }))} style={iStyle} placeholder="e.g. HR" />
+                </div>
+              </div>
+              <div>
+                <label style={lStyle}>Password <span style={{ color: "#DC2626" }}>*</span></label>
+                <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} style={iStyle} placeholder="Min. 8 characters" />
+              </div>
+              <button type="submit" disabled={saving || !form.name || !form.email || !form.password}
+                style={{ height: 42, background: saving ? "#86EFAC" : "linear-gradient(135deg, #0891B2 0%, #0E7490 100%)", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", marginTop: 2, letterSpacing: "0.01em" }}>
+                {saving ? "Adding…" : "➕ Add Supervisor"}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
       {/* Supervisors list */}
       <div style={{ flex: 1 }}>
         <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-          <div className="grid" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1.2fr", padding: "11px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0" }}>
-            {["Name", "Email", "Department", "Status", "Actions"].map((h) => (
+          <div className="grid" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 0.8fr 0.8fr 1.2fr", padding: "11px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0" }}>
+            {["Name", "Email", "Department", "Events", "Status", "Actions"].map((h) => (
               <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
             ))}
           </div>
           {supervisors.length === 0 ? (
             <div className="text-center py-12" style={{ color: "#94A3B8", fontSize: 14 }}>No supervisors yet. Add one using the form.</div>
           ) : supervisors.map((s) => (
-            <div key={s.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1.2fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9" }}>
+            <div key={s.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 0.8fr 0.8fr 1.2fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9" }}>
               <div className="flex items-center gap-3">
                 <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>
                   {(s.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
@@ -424,6 +456,7 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
               </div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{s.email}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{s.team || "—"}</div>
+              <div style={{ fontSize: 13, color: "#64748B" }}>{s.managed_events ?? 0}</div>
               <div><span style={{ backgroundColor: s.status === "active" ? "#DCFCE7" : "#FEF3C7", color: s.status === "active" ? "#15803D" : "#B45309", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : ""}</span></div>
               <button onClick={() => doRemove(s.id, s.name)} disabled={removing === s.id}
                 style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer", width: "fit-content" }}>
@@ -567,8 +600,8 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
     <div style={{ position: "relative" }}>
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Delete Activity"
-        message={`Delete "${confirmDelete?.name}"? This cannot be undone.`}
+        title="Delete Event"
+        message={`Delete "${confirmDelete?.name}"? All applications and attendance records for this event will also be removed. This cannot be undone.`}
         confirmLabel="Delete"
         destructive
         onConfirm={handleDeleteConfirm}
@@ -838,9 +871,14 @@ function ActivitiesTab({ events, onRefresh, orgId }: { events: any[]; onRefresh:
                     📅 {(ev.starts_at || ev.date || "").slice(0, 10)}{ev.time ? " · " + ev.time : ""}
                     {ev.location ? " · 📍 " + ev.location : ""}
                   </div>
-                  <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>
                     👥 {ev.current_volunteers || 0}/{ev.max_volunteers || "∞"} volunteers{ev.duration ? ` · ${ev.duration}h` : ""}
                   </div>
+                  {ev.supervisor_name && (
+                    <div style={{ fontSize: 12, color: "#64748B", marginBottom: 8 }}>
+                      👤 <span style={{ fontWeight: 500 }}>{ev.supervisor_name}</span>
+                    </div>
+                  )}
                   {skills.length > 0 && (
                     <div className="flex flex-wrap gap-1" style={{ marginBottom: 10 }}>
                       {skills.map((s: string, i: number) => <span key={i} style={{ fontSize: 10, backgroundColor: "#F1F5F9", color: "#64748B", padding: "2px 6px", borderRadius: 10 }}>{s}</span>)}
@@ -1384,7 +1422,7 @@ export function OrgDashboard() {
       desc: `${pendingActivityCount} activity submission${pendingActivityCount > 1 ? "s" : ""} awaiting approval.`,
       cta: "Review Hours",
       badge: pendingActivityCount,
-      onClick: () => navigate("/org/volunteers"),
+      onClick: () => setTab("activities"),
     });
   }
   if (activeEv.length > 0 && pending.length === 0 && pendingActivityCount === 0) {

@@ -298,7 +298,7 @@ export function OrgFormFields(props: OrgFormFieldsProps) {
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
             <label htmlFor="orgDescription" style={{ ...labelStyle, margin: 0 }}>
-              Description <span style={{ color: RED }}>*</span>
+              Description <span style={{ color: "#94A3B8", fontWeight: 400 }}>(optional)</span>
             </label>
             <span style={{
               fontSize: 11, fontWeight: 500,

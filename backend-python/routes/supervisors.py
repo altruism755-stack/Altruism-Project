@@ -28,11 +28,13 @@ def list_supervisors(current_user: dict = Depends(require_roles("org_admin"))):
         supervisors = dict_rows(db.execute(
             """
             SELECT s.*,
+                   u.email,
                    COUNT(e.id) AS managed_events
             FROM supervisors s
+            JOIN users u ON u.id = s.user_id
             LEFT JOIN events e ON e.created_by_supervisor_id = s.id
             WHERE s.org_id = %s
-            GROUP BY s.id
+            GROUP BY s.id, u.email
             """,
             (org["id"],),
         ).fetchall())
@@ -248,6 +250,30 @@ _VALID_TRANSITIONS = {
     "active": {"completed"},
     "completed": set(),
 }
+
+
+@router.delete("/me/events/{event_id}")
+def delete_my_event(event_id: int, current_user: dict = Depends(require_roles("supervisor"))):
+    """Supervisor deletes one of their own upcoming events."""
+    with get_db() as db:
+        sup = _get_supervisor_record(db, current_user["id"])
+
+        event = dict_row(db.execute(
+            "SELECT * FROM events WHERE id = %s AND created_by_supervisor_id = %s",
+            (event_id, sup["id"]),
+        ).fetchone())
+        if not event:
+            raise HTTPException(404, "Event not found or you do not own this event")
+        if event["status"] in ("active", "completed"):
+            raise HTTPException(409, "Cannot delete an event that is active or completed")
+
+        db.execute("DELETE FROM event_applications WHERE event_id = %s", (event_id,))
+        db.execute("DELETE FROM activities WHERE event_id = %s", (event_id,))
+        db.execute("DELETE FROM certificates WHERE event_id = %s", (event_id,))
+        db.execute("DELETE FROM events WHERE id = %s", (event_id,))
+        log_action(db, current_user["id"], current_user["role"], "delete_event",
+                   "event", event_id, {"name": event["name"]})
+        return {"message": "Event deleted"}
 
 
 @router.put("/me/events/{event_id}")

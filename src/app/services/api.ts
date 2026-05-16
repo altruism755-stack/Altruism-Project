@@ -162,6 +162,8 @@ export const api = {
     request("/supervisors/me/events", { method: "POST", body: JSON.stringify(data) }),
   updateMyEvent: (id: number, data: any) =>
     request(`/supervisors/me/events/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteMyEvent: (id: number) =>
+    request(`/supervisors/me/events/${id}`, { method: "DELETE" }),
 
   // Events
   getEvents: (params?: Record<string, string>) => {

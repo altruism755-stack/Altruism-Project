@@ -166,8 +166,32 @@ def list_profile_changes(
             query += " WHERE r.status = %s"
             params.append(status)
         query += " ORDER BY r.created_at DESC"
-        rows = dict_rows(db.execute(query, params).fetchall())
-        return {"changes": rows, "total": len(rows)}
+        raw_rows = dict_rows(db.execute(query, params).fetchall())
+        # Expand each JSONB changes dict into one flat row per field
+        expanded = []
+        for row in raw_rows:
+            changes_dict = row.get("changes") or {}
+            for field, new_val in changes_dict.items():
+                expanded.append({
+                    **{k: v for k, v in row.items() if k != "changes"},
+                    "field_label": _FIELD_LABELS.get(field, field.replace("_", " ").title()),
+                    "new_value": str(new_val) if new_val is not None else "",
+                    "current_value": None,  # fetched below
+                    "_field_key": field,
+                })
+        # Fill current_value from org table for each field
+        if expanded:
+            org_ids = list({r["org_id"] for r in expanded})
+            orgs_map = {}
+            for oid in org_ids:
+                org_row = db.execute("SELECT * FROM organizations WHERE id = %s", (oid,)).fetchone()
+                if org_row:
+                    orgs_map[oid] = dict(org_row)
+            for r in expanded:
+                org_data = orgs_map.get(r["org_id"], {})
+                r["current_value"] = str(org_data.get(r["_field_key"]) or "") or None
+                del r["_field_key"]
+        return {"changes": expanded, "total": len(expanded)}
 
 
 @router.post("/profile-changes/{change_id}/approve")

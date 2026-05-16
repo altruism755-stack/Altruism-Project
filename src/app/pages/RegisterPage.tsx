@@ -152,7 +152,7 @@ export function RegisterPage() {
       : orgAccount.confirmPassword !== orgAccount.password
         ? "Passwords do not match."
         : "",
-    documents: !orgDocumentFile ? "Please upload a supporting document." : "",
+    documents: "",
   }), [orgAccount, orgDocumentFile]);
 
   // Combined for display in the org JSX block (touched-keyed).
@@ -1590,9 +1590,9 @@ const checkboxCardStyle = (active: boolean, disabled = false): React.CSSProperti
                 <SectionHeader>Verification &amp; Submit</SectionHeader>
 
                 <div>
-                  <label style={labelStyle}>Supporting Documents <span style={{ color: RED }}>*</span></label>
+                  <label style={labelStyle}>Supporting Documents <span style={{ fontSize: 11, fontWeight: 400, color: "#94A3B8" }}>(Optional)</span></label>
                   <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0" }}>
-                    Upload your registration certificate, proof of activity, or any relevant documents.
+                    Upload your registration certificate, proof of activity, or any relevant documents. You can submit these later after registration.
                   </p>
                   <label style={{
                     display: "flex", alignItems: "center", gap: 10, cursor: "pointer",

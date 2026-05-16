@@ -194,7 +194,7 @@ export function ProfilePage() {
 
       const orgs: any[] = volRes.organizations || [];
       setMyOrgs(orgs);
-      setMyCertificates((volRes.certificates || []).filter((c: any) => c.file_url));
+      setMyCertificates(volRes.certificates || []);
 
       // Fetch events only from the volunteer's ACTIVE org memberships
       const activeOrgIds = orgs
@@ -589,20 +589,24 @@ export function ProfilePage() {
                       <span style={{ fontSize: 10, fontWeight: 600, backgroundColor: tc.bg, color: tc.text, borderRadius: 20, padding: "2px 8px" }}>{cert.type}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 6 }}>{cert.org_name} &middot; {cert.issued_date}</div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
-                        style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}.pdf`).catch(() => {})}
-                        style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
-                      >
-                        Download
-                      </button>
-                    </div>
+                    {cert.file_url ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => api.viewCertificateFile(cert.id).catch(() => {})}
+                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 6, cursor: "pointer" }}
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => api.downloadCertificateFile(cert.id, `certificate_${cert.type}_${cert.org_name}.pdf`).catch(() => {})}
+                          style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0", borderRadius: 6, cursor: "pointer" }}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#94A3B8" }}>Certificate file not yet uploaded</span>
+                    )}
                   </div>
                 );
               })}

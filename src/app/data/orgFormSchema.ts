@@ -117,11 +117,11 @@ export function validateOrgType(v: string): string {
 }
 
 export function validateFoundedYear(v: string): string {
-  return v ? "" : "Please select a founded year.";
+  return "";
 }
 
 export function validateOrgSize(v: string): string {
-  return v ? "" : "Please select an organization size.";
+  return "";
 }
 
 export function validateCategories(v: string[]): string {
@@ -129,7 +129,7 @@ export function validateCategories(v: string[]): string {
 }
 
 export function validateHqGovernorate(v: string): string {
-  return v ? "" : "Please select a governorate.";
+  return "";
 }
 
 export function validateOfficialEmail(v: string): string {
@@ -137,7 +137,7 @@ export function validateOfficialEmail(v: string): string {
 }
 
 export function validateDescription(v: string): string {
-  if (!v.trim()) return "Please describe your organization.";
+  if (!v.trim()) return "";
   if (v.trim().length < ORG_DESCRIPTION_MIN)
     return `Description must be at least ${ORG_DESCRIPTION_MIN} characters.`;
   if (v.length > ORG_DESCRIPTION_MAX)
@@ -146,7 +146,7 @@ export function validateDescription(v: string): string {
 }
 
 export function validateWebsite(v: string): string {
-  if (!v.trim()) return "Website is required.";
+  if (!v.trim()) return "";
   if (!/^https?:\/\/.+/.test(v.trim()))
     return "Please enter a valid URL starting with http:// or https://.";
   return "";

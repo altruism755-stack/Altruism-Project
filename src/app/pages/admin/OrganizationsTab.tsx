@@ -3,6 +3,7 @@ import { api } from "../../services/api";
 import { useToast } from "../../components/Toast";
 import type { Organization, OrgFilterTab } from "./adminTypes";
 import { GREEN, btnStyle, EmptyState, Badge, Detail, ConfirmModal } from "./adminShared";
+import { OrgLogoByName } from "../../components/OrgLogos";
 
 interface Props {
   filter: OrgFilterTab;
@@ -144,7 +145,11 @@ function OrgCard({
     <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3" style={{ flex: 1 }}>
-          {org.logo_url ? (
+          {OrgLogoByName({ name: org.name, size: 48 }) ? (
+            <div style={{ width: 48, height: 48, borderRadius: 10, overflow: "hidden", border: "1px solid #E2E8F0", flexShrink: 0, backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <OrgLogoByName name={org.name} size={48} />
+            </div>
+          ) : org.logo_url ? (
             <img src={org.logo_url} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #E2E8F0", flexShrink: 0 }} />
           ) : (
             <div style={{ width: 48, height: 48, borderRadius: 10, backgroundColor: org.color || "#E2E8F0", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
@@ -243,11 +248,15 @@ function OrgDetailModal({ org, approvingId, onClose, onApprove, onStartReject }:
           <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94A3B8", lineHeight: 1 }}>&times;</button>
         </div>
         <Badge status={org.status} />
-        {org.logo_url && (
-          <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12 }}>
+          {OrgLogoByName({ name: org.name, size: 80 }) ? (
+            <div style={{ width: 80, height: 80, borderRadius: 12, overflow: "hidden", border: "1px solid #E2E8F0", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <OrgLogoByName name={org.name} size={80} />
+            </div>
+          ) : org.logo_url ? (
             <img src={org.logo_url} alt="" style={{ width: 80, height: 80, borderRadius: 12, objectFit: "cover", border: "1px solid #E2E8F0" }} />
-          </div>
-        )}
+          ) : null}
+        </div>
         <Detail label="Type" value={org.org_type} />
         <Detail label="Category" value={org.category} />
         <Detail label="Founded Year" value={org.founded_year} />
