@@ -14,11 +14,9 @@ export function NewsFeed() {
   const volId = profile?.id || 0; // volunteer profile ID, not user.id
 
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
   const [appliedEvents, setAppliedEvents] = useState<Set<number>>(new Set());
   const [applyingTo, setApplyingTo] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"all" | "events" | "announcements">("all");
   const [myOrgIds, setMyOrgIds] = useState<number[]>([]);
 
   useEffect(() => {
@@ -41,17 +39,15 @@ export function NewsFeed() {
           return;
         }
 
-        // Fetch events + announcements + applications in parallel, then filter to only our orgs
-        const [evtRes, annRes, appsRes] = await Promise.all([
+        // Fetch events + applications in parallel, then filter to only our orgs
+        const [evtRes, appsRes] = await Promise.all([
           api.getEvents({ status: "upcoming" }),
-          api.getAnnouncements(orgIds).catch(() => ({ announcements: [] })),
           api.getEventApplications().catch(() => ({ applications: [] })),
         ]);
 
         const orgIdSet = new Set(orgIds);
         const filteredEvents = (evtRes.events || []).filter((e: any) => orgIdSet.has(e.org_id));
         setUpcomingEvents(filteredEvents);
-        setAnnouncements(annRes.announcements || []);
 
         const applied = new Set<number>((appsRes.applications || []).map((a: any) => a.event_id));
         setAppliedEvents(applied);
@@ -75,15 +71,11 @@ export function NewsFeed() {
   const isStudentOnlyBlocked = (item: any) =>
     item.org_student_only && profile?.education_level !== "University Student";
 
-  // Merge events and announcements into a combined feed sorted by date
-  const feedItems: any[] = [];
-  upcomingEvents.forEach((e) => feedItems.push({ ...e, _type: "event", _sortDate: e.starts_at || e.date }));
-  announcements.forEach((a) => feedItems.push({ ...a, _type: "announcement", _sortDate: a.created_at }));
-  feedItems.sort((a, b) => (b._sortDate || "").localeCompare(a._sortDate || ""));
+  const feedItems: any[] = upcomingEvents
+    .map((e) => ({ ...e, _type: "event", _sortDate: e.starts_at || e.date }))
+    .sort((a, b) => (b._sortDate || "").localeCompare(a._sortDate || ""));
 
-  const filteredItems = activeTab === "all" ? feedItems
-    : activeTab === "events" ? feedItems.filter((i) => i._type === "event")
-    : feedItems.filter((i) => i._type === "announcement");
+  const filteredItems = feedItems;
 
   if (loading) return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F8FAFC", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -114,28 +106,6 @@ export function NewsFeed() {
           </div>
         ) : (
           <>
-            {/* Tabs */}
-            <div className="flex gap-1" style={{ marginBottom: 24, borderBottom: "2px solid #E2E8F0" }}>
-              {([
-                { key: "all", label: "All" },
-                { key: "events", label: `Activities (${upcomingEvents.length})` },
-                { key: "announcements", label: `Announcements (${announcements.length})` },
-              ] as const).map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key as any)}
-                  style={{
-                    padding: "10px 20px", background: "none", border: "none", cursor: "pointer",
-                    fontSize: 14, fontWeight: activeTab === tab.key ? 600 : 400,
-                    color: activeTab === tab.key ? GREEN : "#64748B",
-                    borderBottom: activeTab === tab.key ? `2px solid ${GREEN}` : "2px solid transparent",
-                    marginBottom: -2,
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
 
             {/* Feed items */}
             <div className="flex flex-col gap-4">
@@ -214,25 +184,7 @@ export function NewsFeed() {
                   );
                 }
 
-                // Announcement
-                return (
-                  <div key={`ann-${item.id}`} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
-                    <div className="flex items-start gap-4">
-                      <div style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <OrgLogo orgId={item.org_id} size={44} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "#DBEAFE", color: "#1D4ED8", borderRadius: 4, padding: "2px 8px" }}>Announcement</span>
-                          <span style={{ fontSize: 12, color: "#94A3B8" }}>{item.org_name}</span>
-                        </div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: "#1E293B", marginBottom: 6 }}>{item.title}</div>
-                        {item.content && <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.5 }}>{item.content}</div>}
-                        <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 8 }}>{item.created_at?.split("T")[0] || ""}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
+                return null;
               })}
             </div>
           </>

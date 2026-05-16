@@ -56,7 +56,7 @@ export function VolunteerDashboard() {
       setMyCertificates((volRes.certificates || []).filter((c: any) => c.file_url));
       setUpcomingEvents((evtRes.events || []).slice(0, 3));
 
-      // Build "What's New": events + announcements from active orgs, capped at 5
+      // Build "What's New": events from active orgs, capped at 5
       const activeOrgIds: number[] = orgs
         .filter((o: any) => o.membership_status === MEMBERSHIP_STATUS.Active)
         .map((o: any) => o.id);
@@ -67,11 +67,7 @@ export function VolunteerDashboard() {
           .filter((e: any) => orgIdSet.has(e.org_id))
           .map((e: any) => ({ ...e, _kind: "event", _sortKey: e.starts_at || e.date || "" }));
 
-        const annRes = await api.getAnnouncements(activeOrgIds).catch(() => ({ announcements: [] }));
-        const newAnns = (annRes.announcements || [])
-          .map((a: any) => ({ ...a, _kind: "announcement", _sortKey: a.created_at || "" }));
-
-        const merged = [...newEvents, ...newAnns]
+        const merged = [...newEvents]
           .sort((a, b) => b._sortKey.localeCompare(a._sortKey))
           .slice(0, 5);
         setWhatsNew(merged);
@@ -148,7 +144,7 @@ export function VolunteerDashboard() {
           <div style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: "14px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#1D4ED8", marginBottom: 2 }}>Join an organization to get started</div>
-              <div style={{ fontSize: 13, color: "#3B82F6" }}>Browse organizations and apply for membership to see their events and announcements.</div>
+              <div style={{ fontSize: 13, color: "#3B82F6" }}>Browse organizations and apply for membership to see their events.</div>
             </div>
             <button
               onClick={() => navigate("/dashboard/orgs")}
@@ -190,8 +186,7 @@ export function VolunteerDashboard() {
                 <div
                   key={`${item._kind}-${item.id}`}
                   onClick={() => {
-                    if (item._kind === "event") navigate(`/dashboard/org/${item.org_id}?tab=events`);
-                    else navigate(`/dashboard/org/${item.org_id}?tab=announcements`);
+                    navigate(`/dashboard/org/${item.org_id}?tab=events`);
                   }}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,

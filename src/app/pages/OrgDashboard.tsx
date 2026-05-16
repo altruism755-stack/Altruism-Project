@@ -177,11 +177,11 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
       <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
         {/* Header */}
         <div className="grid" style={{
-          gridTemplateColumns: sub === "active" ? "2fr 2fr 1.2fr 1.4fr 1.2fr 1.4fr" : "2fr 2fr 1.2fr 1.2fr 1.5fr",
+          gridTemplateColumns: sub === "active" ? "2fr 2fr 1.2fr 1.2fr 1.4fr" : "2fr 2fr 1.2fr 1.2fr 1.5fr",
           padding: "11px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0",
         }}>
           {(sub === "active"
-            ? ["Volunteer", "Email", "Phone", "Supervisor", "Department", "Actions"]
+            ? ["Volunteer", "Email", "Phone", "Department", "Actions"]
             : ["Volunteer", "Email", "Phone", "Applied", "Actions"]
           ).map((h) => <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>)}
         </div>
@@ -197,7 +197,7 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
           const rowBorderLeft = sub === "pending" ? "3px solid #D97706" : sub === "rejected" ? "3px solid #DC2626" : "none";
 
           if (sub === "active") return (
-            <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.4fr 1.2fr 1.4fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}
+            <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.2fr 1.4fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}
               onClick={() => setSelectedMember(v)}
             >
               <div className="flex items-center gap-3">
@@ -214,7 +214,6 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
               </div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{v.phone || "—"}</div>
-              <div style={{ fontSize: 13, color: "#64748B" }}>{v.supervisor_name || "—"}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{v.department || "—"}</div>
               <button onClick={(e) => { e.stopPropagation(); doRemove(v.id, v.name); }} disabled={loading}
                 style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer", width: "fit-content" }}>
@@ -298,7 +297,6 @@ function VolunteersTab({ orgId, members, supervisors, onRefresh, defaultSub }: {
                   ["Field of Study", v.field_of_study],
                   ["Study Year", v.study_year],
                   ["Applied", v.joined_date],
-                  ["Supervisor", v.supervisor_name],
                   ["Department", v.department],
                   ["Hours/Week", v.hours_per_week ? `${v.hours_per_week} hrs` : null],
                 ].filter(([, val]) => val).map(([label, val]) => (
@@ -409,15 +407,15 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
       {/* Supervisors list */}
       <div style={{ flex: 1 }}>
         <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-          <div className="grid" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1fr 1.2fr", padding: "11px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0" }}>
-            {["Name", "Email", "Department", "Volunteers", "Status", "Actions"].map((h) => (
+          <div className="grid" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1.2fr", padding: "11px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0" }}>
+            {["Name", "Email", "Department", "Status", "Actions"].map((h) => (
               <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
             ))}
           </div>
           {supervisors.length === 0 ? (
             <div className="text-center py-12" style={{ color: "#94A3B8", fontSize: 14 }}>No supervisors yet. Add one using the form.</div>
           ) : supervisors.map((s) => (
-            <div key={s.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1fr 1.2fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9" }}>
+            <div key={s.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1fr 1.2fr", padding: "13px 20px", borderBottom: "1px solid #F1F5F9" }}>
               <div className="flex items-center gap-3">
                 <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>
                   {(s.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
@@ -426,7 +424,6 @@ function SupervisorsTab({ supervisors, onRefresh }: { supervisors: any[]; onRefr
               </div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{s.email}</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>{s.team || "—"}</div>
-              <div><span style={{ backgroundColor: "#DBEAFE", color: "#1D4ED8", fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "2px 8px" }}>{s.assigned_volunteers ?? 0}</span></div>
               <div><span style={{ backgroundColor: s.status === "active" ? "#DCFCE7" : "#FEF3C7", color: s.status === "active" ? "#15803D" : "#B45309", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 10px" }}>{s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : ""}</span></div>
               <button onClick={() => doRemove(s.id, s.name)} disabled={removing === s.id}
                 style={{ height: 30, padding: "0 12px", backgroundColor: "#fff", color: "#DC2626", border: "1px solid #DC2626", borderRadius: 7, fontSize: 12, cursor: "pointer", width: "fit-content" }}>

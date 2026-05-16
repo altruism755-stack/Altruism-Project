@@ -36,7 +36,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-type TabType = "announcements" | "events" | "activities" | "certificates" | "pending";
+type TabType = "events" | "activities" | "certificates" | "pending";
 
 export function VolunteerOrgDashboard() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -50,7 +50,6 @@ export function VolunteerOrgDashboard() {
   const [data,           setData]           = useState<any>(null);
   const [orgEvents,      setOrgEvents]      = useState<any[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
-  const [announcements,  setAnnouncements]  = useState<any[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [activeTab,      setActiveTab]      = useState<TabType>(initialTab);
   const [applyingId,     setApplyingId]     = useState<number | null>(null);
@@ -66,16 +65,14 @@ export function VolunteerOrgDashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [res, evtRes, appsRes, annRes] = await Promise.all([
+        const [res, evtRes, appsRes] = await Promise.all([
           api.getVolunteerOrgDashboard(volId, Number(orgId)),
           api.getEvents({ org_id: String(orgId), status: "upcoming" }),
           api.getEventApplications(),
-          api.getAnnouncements([Number(orgId)]).catch(() => ({ announcements: [] })),
         ]);
         setData(res);
         setOrgEvents(evtRes.events || []);
         setMyApplications(appsRes.applications || []);
-        setAnnouncements(annRes.announcements || []);
 
         // If ?tab=pending was requested but this org has nothing pending, fall back to events
         if (searchParams.get("tab") === "pending") {
@@ -192,7 +189,6 @@ export function VolunteerOrgDashboard() {
   );
 
   const tabs: { key: TabType; label: string }[] = [
-    { key: "announcements", label: announcements.length > 0 ? `Announcements (${announcements.length})` : "Announcements" },
     { key: "events",        label: `Events (${orgEvents.length})`                                                          },
     { key: "activities",    label: "Activities"                                                                             },
     { key: "certificates",  label: "Certificates"                                                                           },
@@ -267,30 +263,6 @@ export function VolunteerOrgDashboard() {
             }}>{label}</button>
           ))}
         </div>
-
-        {/* ── Announcements Tab ── */}
-        {activeTab === "announcements" && (
-          <div className="flex flex-col gap-3">
-            {announcements.length === 0 ? (
-              <EmptyState icon="📢" title="No announcements yet"
-                body={`${org.name} hasn't posted any announcements. Check back later.`} />
-            ) : (
-              announcements.map((ann: any) => (
-                <div key={ann.id} style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: ann.content ? 10 : 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1E293B" }}>{ann.title}</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8", whiteSpace: "nowrap", flexShrink: 0 }}>
-                      {new Date(ann.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </div>
-                  </div>
-                  {ann.content && (
-                    <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{ann.content}</div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )}
 
         {/* ── Events Tab ── */}
         {activeTab === "events" && (

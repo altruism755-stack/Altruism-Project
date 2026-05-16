@@ -265,12 +265,12 @@ export function VolunteerManagement() {
         <div style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", marginBottom: 0 }}>
           {/* Header row */}
           <div className="grid" style={{
-            gridTemplateColumns: tab === "pending" ? "2fr 2fr 1.2fr 1.2fr 1.6fr" : "2fr 2fr 1.2fr 1.4fr 1.2fr 1.6fr",
+            gridTemplateColumns: tab === "pending" ? "2fr 2fr 1.2fr 1.2fr 1.6fr" : "2fr 2fr 1.2fr 1.2fr 1.6fr",
             padding: "12px 20px", backgroundColor: "#F8FAFC", borderBottom: "2px solid #E2E8F0",
           }}>
             {(tab === "pending"
               ? ["Volunteer", "Email", "Phone", "Applied", "Actions"]
-              : ["Volunteer", "Email", "Phone", "Supervisor", "Department", "Actions"]
+              : ["Volunteer", "Email", "Phone", "Department", "Actions"]
             ).map((h) => (
               <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
             ))}
@@ -324,7 +324,7 @@ export function VolunteerManagement() {
               // Active tab
               const skills: string[] = (() => { try { return JSON.parse(v.skills || "[]"); } catch { return []; } })();
               return (
-                <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.4fr 1.2fr 1.6fr", padding: "14px 20px", borderBottom: "1px solid #F1F5F9" }}>
+                <div key={v.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 2fr 1.2fr 1.2fr 1.6fr", padding: "14px 20px", borderBottom: "1px solid #F1F5F9" }}>
                   <div className="flex items-center gap-3">
                     <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: GREEN, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{initials}</div>
                     <div>
@@ -336,7 +336,6 @@ export function VolunteerManagement() {
                   </div>
                   <div style={{ fontSize: 13, color: "#64748B" }}>{v.email}</div>
                   <div style={{ fontSize: 13, color: "#64748B" }}>{v.phone || "—"}</div>
-                  <div style={{ fontSize: 13, color: "#64748B" }}>{v.supervisor_name || "—"}</div>
                   <div style={{ fontSize: 13, color: "#64748B" }}>{v.department || "—"}</div>
                   <div className="flex gap-2">
                     <button

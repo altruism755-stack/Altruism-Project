@@ -274,7 +274,7 @@ def update_my_profile(
 
 def _fetch_org_admins(db, org_id: int) -> list:
     return dict_rows(db.execute(
-        "SELECT oa.id, oa.user_id, u.email, oa.created_at, oa.role "
+        "SELECT oa.id, oa.user_id, u.email, oa.created_at "
         "FROM org_admins oa JOIN users u ON oa.user_id = u.id "
         "WHERE oa.org_id = %s ORDER BY oa.created_at ASC",
         (org_id,),

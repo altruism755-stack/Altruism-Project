@@ -120,7 +120,7 @@ export function LandingPage() {
             <h1 style={{ fontSize: 56, fontWeight: 800, color: C.white, lineHeight: 1.1, letterSpacing: "-0.03em", margin: "0 0 24px 0" }}>
               The bridge between volunteers and the organizations that need them
             </h1>
-            <p style={{ fontSize: 18, color: "rgba(148,163,184,0.9)", lineHeight: 1.7, margin: "0 0 40px 0", maxWidth: 560 }}>
+            <p style={{ fontSize: 18, color: "#ffffff", lineHeight: 1.7, margin: "0 0 40px 0", maxWidth: 560, textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>
               Altruism connects non-profit organizations and student entities with the volunteers who power them — with tools for activity coordination, reporting, and certificates built in.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
