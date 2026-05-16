@@ -121,10 +121,10 @@ def seed():
 
         # ──────────── ORG ADMINS ────────────
         org_admins = [
-            (1, 1),
-            (1, 2),
-            (2, 1),
-            (4, 3),
+            (1, 1),   # sherifaziz  → Resala
+            (2, 1),   # monakamal   → Resala
+            (3, 2),   # fatima      → Red Crescent
+            (4, 3),   # mohamedfarouk → Enactus
         ]
         _executemany(db,
             "INSERT INTO org_admins (user_id, org_id) VALUES (%s, %s)",
@@ -608,9 +608,15 @@ def seed():
             (1, "membership",  "Pending Volunteer",
              "Hossam Adel is pending approval as a Resala volunteer.", False, "/admin/volunteers", "2026-04-01 12:00:00"),
             (3, "application", "New Event Application",
-             "Yara Hassan applied to 'Blood Donation Drive'.", False, "/admin/applications", "2026-04-13 10:06:00"),
+             "Yara Hassan applied to 'National Blood Donation Drive — Spring'.", False, "/admin/applications", "2026-04-13 10:06:00"),
+            (3, "application", "New Event Application",
+             "Omar Farouk applied to 'National Blood Donation Drive — Spring'.", False, "/admin/applications", "2026-04-15 11:01:00"),
             (3, "membership",  "Pending Volunteer",
-             "Menna Tarek is pending approval as a Red Crescent volunteer.", True, "/admin/volunteers", "2026-04-05 13:00:00"),
+             "Menna Tarek is pending approval as a Red Crescent volunteer.", False, "/admin/volunteers", "2026-04-05 13:00:00"),
+            (3, "membership",  "New Volunteer Joined",
+             "Layla Samir joined Red Crescent as a Medical volunteer.", True, "/admin/volunteers", "2026-03-01 10:00:00"),
+            (3, "activity",    "Activity Pending Review",
+             "Hana Youssef submitted a pre-drill prep log for 'Emergency Response Drill — June'.", False, "/admin/activities", "2026-05-22 09:31:00"),
             # Notifications for Nourhan Ali (user_id=13)
             (13, "application", "New Event Application",
              "Yara Hassan applied to 'Emergency Response Drill — June'.", False, "/supervisor/applications", "2026-05-10 10:01:00"),
